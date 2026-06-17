@@ -692,6 +692,7 @@ const ICONS={
  basvurular:'<svg viewBox="0 0 24 24"><path d="M9 4h6l1 2h3a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h3z"/><path d="M9 13l2 2 4-4.5"/></svg>',
  kararlar:'<svg viewBox="0 0 24 24"><path d="M12 3v18M5 7l7-4 7 4"/><path d="M3.5 13a3.5 3.5 0 007 0L7 7zM13.5 13a3.5 3.5 0 007 0L17 7z"/></svg>',
  raporlar:'<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>',
+ analiz:'<svg viewBox="0 0 24 24"><path d="M21 21H4a1 1 0 01-1-1V3"/><path d="M7 14l3.5-4 3 2.5L20 6"/><circle cx="20" cy="6" r="1.4" fill="currentColor" stroke="none"/></svg>',
  mesajlar:'<svg viewBox="0 0 24 24"><path d="M4 5h16a1 1 0 011 1v10a1 1 0 01-1 1H8l-4 3.5V6a1 1 0 011-1z"/></svg>',
  asistan:'<svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.7L19.6 10l-5.7 1.9L12 17.6l-1.9-5.7L4.4 10l5.7-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>',
  ayarlar:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 00-2-1.2L14.2 3H9.8L9.4 5.7a7 7 0 00-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 002 1.2l.4 2.7h4.4l.4-2.7a7 7 0 002-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>'
@@ -699,7 +700,7 @@ const ICONS={
 const PAGES=[
  ['dashboard','Dashboard','Genel Bakış'],['asistan','AI Asistan','Genel Bakış'],
  ['uyeler','Üye Yönetimi','Operasyon'],['aidat','Aidat & Ödemeler','Operasyon'],['basvurular','Başvurular','Operasyon'],['kararlar','YK Kararları','Operasyon'],
- ['raporlar','Raporlama','Analiz'],['mesajlar','Mesaj Şablonları','Analiz'],
+ ['raporlar','Raporlama','Analiz'],['analiz','Analiz & Grafikler','Analiz'],['mesajlar','Mesaj Şablonları','Analiz'],
  ['ayarlar','Ayarlar & Entegrasyon','Sistem']
 ];
 function renderNav(){
@@ -1138,6 +1139,149 @@ function pageRaporlar(){
   </div></div>`;
 }
 
+
+/* ================================================================
+   ANALİZ & GRAFİKLER
+================================================================ */
+function analizData(){
+  const aidat=p=>((p.tip||'AIDAT').toUpperCase()==='AIDAT'||(p.tip||'').toUpperCase()==='AİDAT');
+  const yrs=years().sort();
+  const yil=THIS_YEAR;
+  const aylik=Array(12).fill(0);
+  S.payments.filter(p=>p.yil===yil&&aidat(p)&&p.odemeTarihi).forEach(p=>{
+    const d=new Date(p.odemeTarihi); if(!isNaN(d)&&d.getFullYear()===yil) aylik[d.getMonth()]+=(p.odenenTutar||p.tutar||0);
+  });
+  const ceyrek=[0,1,2,3].map(q=>aylik.slice(q*3,q*3+3).reduce((a,b)=>a+b,0));
+  const yillikTahsilat=yrs.map(yy=>{
+    const ps=S.payments.filter(p=>p.yil===yy&&aidat(p));
+    const tah=ps.filter(p=>p.durum==='ÖDENDİ').reduce((s,p)=>s+(p.tutar||0),0)+ps.filter(p=>p.durum==='KISMİ').reduce((s,p)=>s+(p.odenenTutar||0),0);
+    const plan=ps.filter(p=>p.durum!=='MUAF').reduce((s,p)=>s+(p.tutar||0),0);
+    return {yil:yy,tahsilat:tah,planlanan:plan,oran:plan?Math.round(tah/plan*100):0};
+  });
+  const katilimByYil={};
+  S.members.forEach(m=>{ const ky=(m.ykKararTarihi||m.kayitTarihi||'').slice(0,4); if(ky) katilimByYil[ky]=(katilimByYil[ky]||0)+1; });
+  const buyumeYrs=Object.keys(katilimByYil).sort();
+  let kumulatif=0;
+  const buyume=buyumeYrs.map(yy=>{ kumulatif+=katilimByYil[yy]; return {yil:yy,katilim:katilimByYil[yy],toplam:kumulatif}; });
+  const turler={};
+  S.members.filter(m=>m.durum==='AKTİF').forEach(m=>{
+    let t=m.uyelikTuru||'Diğer';
+    if(/kurumsal/i.test(t)) t='Kurumsal'; else if(/sponsor/i.test(t)) t='Sponsor';
+    else if(/akademi/i.test(t)) t='Akademisyen'; else if(/kamu/i.test(t)) t='Kamu'; else t='Gerçek Üye';
+    turler[t]=(turler[t]||0)+1;
+  });
+  const py=S.payments.filter(p=>p.yil===yil&&aidat(p));
+  const tahNow=py.filter(p=>p.durum==='ÖDENDİ').reduce((s,p)=>s+(p.tutar||0),0)+py.filter(p=>p.durum==='KISMİ').reduce((s,p)=>s+(p.odenenTutar||0),0);
+  const planNow=py.filter(p=>p.durum!=='MUAF'&&member(p.uyeId)?.durum==='AKTİF').reduce((s,p)=>s+(p.tutar||0),0);
+  const gecmisOran=yillikTahsilat.filter(r=>r.yil<yil&&r.oran>0);
+  const ortOran=gecmisOran.length?Math.round(gecmisOran.reduce((s,r)=>s+r.oran,0)/gecmisOran.length):(planNow?Math.round(tahNow/planNow*100):0);
+  const tahmin=Math.round(planNow*ortOran/100);
+  return {yil,aylik,ceyrek,yillikTahsilat,buyume,turler,tahNow,planNow,ortOran,tahmin};
+}
+const AYLAR=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+function fmtK(n){ n=+n||0; return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?Math.round(n/1e3)+'K':String(n); }
+function barChartSVG(labels,values,opts){
+  opts=opts||{}; const W=opts.w||640,H=opts.h||220,pad=34,gap=(W-pad*2)/values.length,bw=gap*0.62;
+  const max=Math.max(1,...values);
+  const bars=values.map((v,i)=>{
+    const h=(H-pad*1.6)*(v/max), x=pad+i*gap+(gap-bw)/2, y=H-pad-h;
+    return '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(0,h).toFixed(1)+'" rx="4" fill="url(#barg)"/>'+
+      '<text x="'+(x+bw/2).toFixed(1)+'" y="'+(H-pad+14)+'" text-anchor="middle" font-size="10.5" fill="var(--faint)">'+labels[i]+'</text>'+
+      (v>0?'<text x="'+(x+bw/2).toFixed(1)+'" y="'+(y-5).toFixed(1)+'" text-anchor="middle" font-size="9.5" fill="var(--muted)" font-weight="600">'+(opts.money?fmtK(v):v)+'</text>':'');
+  }).join('');
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:100%"><defs><linearGradient id="barg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0E1A33"/><stop offset="1" stop-color="#2A3A5C"/></linearGradient></defs><line x1="'+pad+'" y1="'+(H-pad)+'" x2="'+(W-pad)+'" y2="'+(H-pad)+'" stroke="var(--line)"/>'+bars+'</svg>';
+}
+function lineChartSVG(labels,values,opts){
+  opts=opts||{}; const W=opts.w||640,H=opts.h||220,pad=36;
+  const max=Math.max(1,...values);
+  const px=i=>pad+(W-pad*2)*(values.length<2?0.5:i/(values.length-1));
+  const py=v=>H-pad-(H-pad*1.6)*(v/(max||1));
+  const pts=values.map((v,i)=>px(i).toFixed(1)+','+py(v).toFixed(1)).join(' ');
+  const area=pad+','+(H-pad)+' '+pts+' '+px(values.length-1).toFixed(1)+','+(H-pad);
+  const dots=values.map((v,i)=>'<circle cx="'+px(i).toFixed(1)+'" cy="'+py(v).toFixed(1)+'" r="3.5" fill="var(--gold)"/><text x="'+px(i).toFixed(1)+'" y="'+(py(v)-9).toFixed(1)+'" text-anchor="middle" font-size="9.5" fill="var(--muted)" font-weight="600">'+v+'</text>').join('');
+  const labs=labels.map((l,i)=>'<text x="'+px(i).toFixed(1)+'" y="'+(H-pad+14)+'" text-anchor="middle" font-size="10" fill="var(--faint)">'+l+'</text>').join('');
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:100%"><defs><linearGradient id="lineg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(194,153,46,.28)"/><stop offset="1" stop-color="rgba(194,153,46,0)"/></linearGradient></defs><polygon points="'+area+'" fill="url(#lineg)"/><polyline points="'+pts+'" fill="none" stroke="var(--gold)" stroke-width="2.2" stroke-linejoin="round"/>'+dots+labs+'</svg>';
+}
+function pieSVG(data){
+  const entries=Object.entries(data).filter(e=>e[1]>0);
+  const total=entries.reduce((s,e)=>s+e[1],0)||1;
+  const cols=['#C2992E','#0E1A33','#3B6FB0','#5BA88A','#A8556F','#8A6FB0','#C77D3A'];
+  const cx=70,cy=70,r=58; let a0=-Math.PI/2; let paths='';
+  entries.forEach((e,i)=>{
+    const v=e[1]; const a1=a0+(v/total)*Math.PI*2;
+    const x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0),x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);
+    const large=(a1-a0)>Math.PI?1:0;
+    paths+='<path d="M'+cx+','+cy+' L'+x0.toFixed(1)+','+y0.toFixed(1)+' A'+r+','+r+' 0 '+large+' 1 '+x1.toFixed(1)+','+y1.toFixed(1)+' Z" fill="'+cols[i%cols.length]+'"/>';
+    a0=a1;
+  });
+  const legend=entries.map((e,i)=>'<div><span style="width:11px;height:11px;border-radius:3px;background:'+cols[i%cols.length]+';display:inline-block"></span> '+esc(e[0])+' <b style="margin-left:auto">'+e[1]+'</b> <span style="color:var(--faint)">(%'+Math.round(e[1]/total*100)+')</span></div>').join('');
+  return '<div class="donut-wrap"><svg width="140" height="140" viewBox="0 0 140 140">'+paths+'<circle cx="'+cx+'" cy="'+cy+'" r="30" fill="var(--panel)"/><text x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="20" font-weight="700" fill="var(--ink)">'+total+'</text><text x="'+cx+'" y="'+(cy+14)+'" text-anchor="middle" font-size="9" fill="var(--faint)">aktif üye</text></svg><div class="donut-legend" style="flex:1;min-width:180px">'+legend+'</div></div>';
+}
+let analizGorunum='aylik';
+function pageAnaliz(){
+  const d=analizData();
+  const aylikChart=analizGorunum==='ceyrek'?barChartSVG(['Ç1','Ç2','Ç3','Ç4'],d.ceyrek,{money:true}):barChartSVG(AYLAR,d.aylik,{money:true});
+  const yillikChart=barChartSVG(d.yillikTahsilat.map(r=>r.yil),d.yillikTahsilat.map(r=>r.tahsilat),{money:true});
+  const buyumeChart=lineChartSVG(d.buyume.map(r=>r.yil),d.buyume.map(r=>r.toplam));
+  const turChart=pieSVG(d.turler);
+  const oranBar='<div style="background:var(--line);border-radius:99px;height:14px;overflow:hidden;max-width:420px"><div style="height:100%;width:'+Math.min(100,d.ortOran)+'%;background:linear-gradient(90deg,#C2992E,#E3C76C)"></div></div>';
+  return ''
+  +'<div class="pagehead"><div><h2>Analiz & Grafikler</h2><div class="sub">Tahsilat trendi, üye büyümesi, dağılım ve yapay zekâ yorumu</div></div>'
+  +'<div class="actions"><button class="btn primary" onclick="analizAI()">✨ AI Yorumu</button><button class="btn" onclick="exportAnalizPdf()">🖨 PDF Rapor</button></div></div>'
+  +'<div id="analizAIBox"></div>'
+  +'<div class="card"><div class="card-h"><h3>'+d.yil+' Tahsilat Trendi</h3>'
+    +'<div class="filters no-print" style="margin:0"><button class="btn sm '+(analizGorunum==='aylik'?'primary':'')+'" onclick="analizGorunum=\'aylik\';render()">Aylık</button>'
+    +'<button class="btn sm '+(analizGorunum==='ceyrek'?'primary':'')+'" onclick="analizGorunum=\'ceyrek\';render()">Çeyreklik</button></div></div>'
+    +'<div class="card-b">'+aylikChart+'<p class="muted" style="margin-top:8px;font-size:12px">'+d.yil+' yılında ödeme tarihine göre toplanan aidat. Toplam: <b>'+fmt(d.tahNow)+'</b></p></div></div>'
+  +'<div class="card"><div class="card-h"><h3>Yıllara Göre Tahsilat</h3></div><div class="card-b">'+yillikChart+'</div></div>'
+  +'<div class="card"><div class="card-h"><h3>Üye Büyümesi (kümülatif)</h3></div><div class="card-b">'+buyumeChart+'<p class="muted" style="margin-top:8px;font-size:12px">Yıllara göre toplam üye sayısının seyri (YK karar tarihine göre).</p></div></div>'
+  +'<div class="card"><div class="card-h"><h3>Üyelik Türü Dağılımı</h3><span class="count">'+S.members.filter(m=>m.durum==='AKTİF').length+' aktif</span></div><div class="card-b">'+turChart+'</div></div>'
+  +'<div class="card"><div class="card-h"><h3>'+d.yil+' Yıl Sonu Tahsilat Tahmini</h3></div><div class="card-b">'
+    +'<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px">'
+    +'<div><div class="muted" style="font-size:11.5px">Şu ana dek toplanan</div><div style="font-size:22px;font-weight:760">'+fmt(d.tahNow)+'</div></div>'
+    +'<div><div class="muted" style="font-size:11.5px">Planlanan toplam</div><div style="font-size:22px;font-weight:760">'+fmt(d.planNow)+'</div></div>'
+    +'<div><div class="muted" style="font-size:11.5px">Geçmiş ort. tahsilat oranı</div><div style="font-size:22px;font-weight:760">%'+d.ortOran+'</div></div>'
+    +'<div><div class="muted" style="font-size:11.5px">Tahmini yıl sonu</div><div style="font-size:22px;font-weight:760;color:var(--gold-2)">'+fmt(d.tahmin)+'</div></div></div>'
+    +oranBar
+    +'<p class="muted" style="margin-top:10px;font-size:12px">Tahmin, geçmiş yılların ortalama tahsilat oranı (%'+d.ortOran+') bu yılın planlanan tutarına uygulanarak hesaplanır. Eğilim göstergesidir.</p></div></div>';
+}
+async function analizAI(){
+  const box=document.getElementById('analizAIBox');
+  box.innerHTML='<div class="card"><div class="card-b"><p class="muted">⟳ Yapay zekâ verileri yorumluyor…</p></div></div>';
+  const d=analizData();
+  const ozet={yil:d.yil,bu_yil_tahsilat:d.tahNow,planlanan:d.planNow,tahmini_yil_sonu:d.tahmin,ort_tahsilat_orani:d.ortOran,
+    aylik_tahsilat:d.aylik.map((v,i)=>({ay:AYLAR[i],tutar:Math.round(v)})),yillara_gore:d.yillikTahsilat,uye_buyume:d.buyume,
+    uyelik_turleri:d.turler,toplam_uye:S.members.length,aktif:S.members.filter(m=>m.durum==='AKTİF').length,pasif:S.members.filter(m=>m.durum==='PASİF').length};
+  const prompt='Sen bir dernek mali analistisin. Asagidaki FOYDER Dernegi verilerini yorumla. Turkce, kurumsal ve net yaz. SADECE duz metin dondur (JSON degil). Sunlari kapsa: 1) tahsilat trendi ve dikkat ceken aylar, 2) yillara gore gidisat, 3) uye buyumesi, 4) uye turu dagiliminin anlami, 5) yil sonu tahmini degerlendirmesi, 6) yonetim kuruluna 2-3 somut oneri. Kisa paragraflar ve madde isaretleri kullan. Veri:\n'+JSON.stringify(ozet);
+  try{
+    const txt=await aiCallText(prompt);
+    box.innerHTML='<div class="card" style="border-left:3px solid var(--gold)"><div class="card-h"><h3>✨ Yapay Zekâ Analizi</h3><button class="btn sm ghost no-print" onclick="document.getElementById(\'analizAIBox\').innerHTML=\'\'">✕ Kapat</button></div><div class="card-b" style="white-space:pre-wrap;line-height:1.55;font-size:13.5px">'+esc(txt)+'</div></div>';
+  }catch(e){
+    box.innerHTML='<div class="card"><div class="card-b"><p style="color:var(--red)">AI yorumu alınamadı: '+esc(e.message||String(e))+'</p><p class="muted">Ayarlar → Yapay Zekâ bölümünden sağlayıcı/anahtar kontrol edin.</p></div></div>';
+  }
+}
+async function aiCallText(prompt){
+  const a=S.ayarlar.ai;
+  if(a.provider==='claude'){
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':a.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:a.model||'claude-sonnet-4-6',max_tokens:1200,messages:[{role:'user',content:prompt}]})});
+    const j=await r.json(); if(j.error) throw new Error(j.error.message||'Claude hatası');
+    return (j.content||[]).map(c=>c.text||'').join('').trim();
+  }
+  if(a.provider==='gemini'){
+    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+(a.model||'gemini-1.5-flash')+':generateContent?key='+a.apiKey,
+      {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
+    const j=await r.json(); if(j.error) throw new Error(j.error.message||'Gemini hatası');
+    return (j.candidates&&j.candidates[0]&&j.candidates[0].content.parts[0].text||'').trim();
+  }
+  const url=(a.provider==='custom'&&a.endpoint)?a.endpoint:'https://api.openai.com/v1/chat/completions';
+  const r=await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+a.apiKey,'content-type':'application/json'},
+    body:JSON.stringify({model:a.model||'gpt-4o-mini',max_tokens:1200,messages:[{role:'user',content:prompt}]})});
+  const j=await r.json(); if(j.error) throw new Error(j.error.message||'AI hatası');
+  return (j.choices&&j.choices[0]&&j.choices[0].message.content||'').trim();
+}
+function exportAnalizPdf(){ window.print(); }
+
 /* ================================================================
    MESAJ ŞABLONLARI
 ================================================================ */
@@ -1511,7 +1655,7 @@ function resetData(){
 /* ================================================================
    RENDER & BAŞLATMA
 ================================================================ */
-const P={dashboard:pageDashboard,asistan:pageAsistan,uyeler:pageUyeler,aidat:pageAidat,basvurular:pageBasvurular,kararlar:pageKararlar,raporlar:pageRaporlar,mesajlar:pageMesajlar,ayarlar:pageAyarlar};
+const P={dashboard:pageDashboard,asistan:pageAsistan,uyeler:pageUyeler,aidat:pageAidat,basvurular:pageBasvurular,kararlar:pageKararlar,raporlar:pageRaporlar,analiz:pageAnaliz,mesajlar:pageMesajlar,ayarlar:pageAyarlar};
 function render(){
   renderNav();
   document.getElementById('main').innerHTML=(P[route]||pageDashboard)();
