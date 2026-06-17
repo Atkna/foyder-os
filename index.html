@@ -385,7 +385,8 @@ Eylem tipleri:
 {"type":"basvuru_ekle","ad":"...","email":null,"telefon":null,"gorev":null,"uyelikTuru":"Gerçek Üye"}
 {"type":"not_ekle","uye":"...","not":"..."}
 {"type":"bilgi","soru":"..."}  (veri sorgusu: kaç üye, kim ödemedi vb.)
-Kurallar: Ad alanına yalnızca metinde geçen ismi yaz; uydurma. Tutar belirtilmemişse null. "ödedi/yatırdı/ödemesi alındı" → odeme. Komut bir eylem içermiyorsa actions boş bırakıp cevap alanında kısa yanıt ver.`;
+Kurallar: Ad alanına yalnızca metinde geçen ismi yaz; uydurma. Tutar belirtilmemişse null. "ödedi/yatırdı/ödemesi alındı" → odeme.
+SORU/SORGU ise (kim, kaç, ne kadar, listele, hangi, var mı, toplam, oran, durumu ne, borcu var mı gibi) MUTLAKA {"type":"bilgi","soru":"<kullanıcının sorusu aynen>"} kullan ve başka eylem ekleme. Sadece kesin bir kayıt değişikliği (ödeme işle, üye ekle, durum değiştir) istendiğinde işlem eylemi üret. Emin değilsen bilgi olarak işaretle.`;
 
 async function aiCall(userText){
   const a=S.ayarlar.ai;
@@ -441,8 +442,10 @@ function localParse(t){
   } else if(/basvuru/.test(lo)){
     const ad=t.match(/([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)+)/);
     actions.push({type:'basvuru_ekle',ad:ad?ad[1]:'',email:null,telefon:null,gorev:null,uyelikTuru:'Gerçek Üye'});
+  } else if(/(kac|kim|ne kadar|listele|hangi|var mi|toplam|oran|kacta|durumu|borc|odemeyen|odeyen|tahsilat|gelir|kalan|muaf|sayisi)/.test(lo)||t.includes('?')){
+    actions.push({type:'bilgi',soru:t});
   }
-  return {actions,cevap:actions.length?'Komut yerel kurallarla yorumlandı (AI bağlantısı yok).':'Komutu anlayamadım — Ayarlar → Yapay Zekâ bölümünden bir sağlayıcı bağlayın veya daha açık yazın.'};
+  return {actions,cevap:actions.length?'':'Komutu anlayamadım — daha açık yazın.'};
 }
 
 /* Komut çalıştırma — topbar ve Asistan sayfası ortak */
@@ -456,8 +459,18 @@ async function runCommand(text, fromChat){
   try{ plan=parseAiJson(await aiCall(text)); plan._src='ai'; }
   catch(e){ plan=localParse(text); plan._src='local'; }
   bar.classList.remove('busy');
+  // Bilgi/sorgu niyeti varsa: onay isteme, doğrudan veriden cevapla
+  const infoActs=(plan.actions||[]).filter(a=>a.type==='bilgi');
+  const islemActs=(plan.actions||[]).filter(a=>a.type!=='bilgi');
+  if(infoActs.length && !islemActs.length){
+    const cevap=infoActs.map(a=>answerQuery(a.soru||text)).join('\n\n');
+    S.chat.push({r:'a',t:cevap}); persist(); route==='asistan'?render():toast('🤖 '+cevap.slice(0,90));
+    if(route!=='asistan') go('asistan');
+    return;
+  }
   if(!plan.actions||!plan.actions.length){
-    const ans=plan.cevap|| 'Bu komuttan bir işlem çıkaramadım.';
+    // Hiç eylem yoksa, soruyu yine de veriden yanıtlamayı dene
+    const ans=answerQuery(text) || plan.cevap || 'Bu komuttan bir işlem çıkaramadım.';
     S.chat.push({r:'a',t:ans}); persist(); route==='asistan'?render():toast('🤖 '+ans);
     if(route!=='asistan') go('asistan');
     return;
@@ -500,7 +513,7 @@ function applyActions(actions){
     if(a.type==='odeme'){
       const mid=a._uyeId??(resolveMembers(a.uye)[0]?.id); if(!mid){ sum.push('⚠ üye bulunamadı'); continue; }
       const yil=+a.yil||THIS_YEAR;
-      let p=S.payments.find(p=>p.uyeId===mid&&p.yil===yil&&p.tip==='AIDAT');
+      let p=S.payments.find(p=>p.uyeId===mid&&p.yil===yil&&((p.tip||'AIDAT').toUpperCase()==='AIDAT'||(p.tip||'').toUpperCase()==='AİDAT'));
       if(!p){ p={id:nid('p'),uyeId:mid,yil,tip:'AIDAT',tutar:a.tutar||S.ayarlar.aidat[yil]||null,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Asistan'}; S.payments.push(p); }
       if(a.tutar) p.tutar=a.tutar;
       p.durum=a.durum==='KISMİ'?'KISMİ':'ÖDENDİ';
@@ -531,15 +544,74 @@ function applyActions(actions){
   return sum;
 }
 function answerQuery(q){
-  const lo=trNorm(q);
-  const akt=S.members.filter(m=>m.durum==='AKTİF').length;
-  const pas=S.members.filter(m=>m.durum==='PASİF').length;
-  const py=S.payments.filter(p=>p.yil===THIS_YEAR&&p.tip==='AIDAT');
-  const odemeyen=py.filter(p=>['ÖDENMEDİ','KISMİ'].includes(p.durum)&&member(p.uyeId)?.durum==='AKTİF');
-  if(/odemeyen|odenmeyen|borclu/.test(lo)) return `${THIS_YEAR}: ${odemeyen.length} aktif üyenin aidatı açık (Raporlar sayfasında liste).`;
-  if(/kac uye|uye sayisi|toplam uye/.test(lo)) return `Toplam ${S.members.length} üye · ${akt} aktif · ${pas} pasif.`;
-  if(/tahsilat|gelir|toplandi/.test(lo)){ const t=py.filter(p=>p.durum==='ÖDENDİ').reduce((s,p)=>s+(p.tutar||0),0); return `${THIS_YEAR} tahsilatı: ${fmt(t)}.`; }
-  return `Özet: ${S.members.length} üye (${akt} aktif), ${odemeyen.length} açık aidat.`;
+  const lo=trNorm(q||'');
+  const YIL=(lo.match(/\b(20\d{2})\b/)||[])[1]; const yil=YIL?+YIL:THIS_YEAR;
+  const aidat=p=>(p.tip||'AIDAT').toUpperCase()==='AIDAT'||(p.tip||'').toUpperCase()==='AİDAT';
+  const py=S.payments.filter(p=>p.yil===yil && aidat(p));
+  const aktif=S.members.filter(m=>m.durum==='AKTİF');
+  const pasif=S.members.filter(m=>m.durum==='PASİF');
+  const odendi=py.filter(p=>p.durum==='ÖDENDİ');
+  const muaf=py.filter(p=>p.durum==='MUAF');
+  const acik=py.filter(p=>['ÖDENMEDİ','KISMİ'].includes(p.durum)&&member(p.uyeId)?.durum==='AKTİF');
+  const tahsilat=odendi.reduce((s,p)=>s+(p.odenenTutar||p.tutar||0),0);
+  const beklenen=py.filter(p=>p.durum!=='MUAF'&&member(p.uyeId)?.durum==='AKTİF').reduce((s,p)=>s+(p.tutar||0),0);
+  const isimList=(arr,n=15)=>arr.slice(0,n).map(x=>member(x.uyeId)?.ad).filter(Boolean).join(', ')+(arr.length>n?` … (+${arr.length-n})`:'');
+
+  // 1) Belirli bir kişi soruluyor mu? (ödedi mi / borcu var mı)
+  const kisi=resolveMembers(q);
+  if(kisi.length && /(odedi|odemis|borc|durum|ne kadar|aidat|odeme)/.test(lo)){
+    const m=kisi[0];
+    const kayit=S.payments.filter(p=>p.uyeId===m.id&&aidat(p)).sort((a,b)=>b.yil-a.yil);
+    const buYil=kayit.find(p=>p.yil===yil);
+    const ozet=kayit.slice(0,5).map(p=>`${p.yil}: ${p.durum}${p.tutar?` (${fmt(p.tutar)})`:''}`).join(' · ');
+    return `${m.ad} (${m.durum})\n${yil} durumu: ${buYil?buYil.durum:'kayıt yok'}.\nSon kayıtlar → ${ozet||'yok'}`;
+  }
+
+  // 2) Ödemeyenler / borçlular — isimleriyle
+  if(/(odemeyen|odenmeyen|borclu|borc|kim odemedi)/.test(lo)){
+    if(!acik.length) return `${yil} yılında açık aidatı olan aktif üye yok. 🎉`;
+    return `${yil}: ${acik.length} aktif üyenin aidatı açık.\n${isimList(acik)}`;
+  }
+  // 3) Ödeyenler
+  if(/(odeyen|odemis olan|odendi|odeyenler)/.test(lo)){
+    return `${yil}: ${odendi.length} üye ödemiş (tahsilat ${fmt(tahsilat)}).\n${isimList(odendi)}`;
+  }
+  // 4) Sayım soruları
+  if(/(kac kisi|kac uye|kac aktif|uye sayisi|toplam uye|kac pasif)/.test(lo)){
+    if(/pasif/.test(lo)) return `${pasif.length} pasif üye var.`;
+    if(/aktif/.test(lo)) return `${aktif.length} aktif üye var.`;
+    return `Toplam ${S.members.length} üye · ${aktif.length} aktif · ${pasif.length} pasif.`;
+  }
+  // 5) Tahsilat / gelir / borç toplamı
+  if(/(tahsilat|gelir|toplandi|ne kadar topla|kasa)/.test(lo)){
+    return `${yil} tahsilatı: ${fmt(tahsilat)} (${odendi.length} ödeme).\nBeklenen toplam: ${fmt(beklenen)} · Açık: ${fmt(Math.max(0,beklenen-tahsilat))}.`;
+  }
+  if(/(kalan|acik tutar|tahsil edilecek|borc toplam)/.test(lo)){
+    return `${yil} açık tutar: ${fmt(Math.max(0,beklenen-tahsilat))} (${acik.length} üye).`;
+  }
+  // 6) Muaf üyeler
+  if(/(muaf|ucretsiz)/.test(lo)){
+    return `${yil}: ${muaf.length} muaf kayıt. Ücretsiz üye sayısı: ${S.members.filter(m=>m.ucretsiz).length}.`;
+  }
+  // 7) Başvurular
+  if(/(basvuru|aday)/.test(lo)){
+    const b=S.basvurular||[]; const yeni=b.filter(x=>x.durum==='YENİ').length;
+    return `${b.length} başvuru kaydı · ${yeni} yeni/bekleyen.`;
+  }
+  // 8) Oran / yüzde
+  if(/(oran|yuzde|tahsilat orani)/.test(lo)){
+    const tahmin=odendi.length+acik.length+muaf.length;
+    const o=tahmin?Math.round(odendi.length/(odendi.length+acik.length||1)*100):0;
+    return `${yil} tahsilat oranı: %${o} (${odendi.length} ödeyen / ${acik.length} açık).`;
+  }
+  // 9) En yüksek/düşük aidat
+  if(/(en yuksek|en cok|en buyuk).*(aidat|tutar|odeme)/.test(lo)){
+    const top=[...odendi].sort((a,b)=>(b.tutar||0)-(a.tutar||0))[0];
+    return top?`En yüksek ${yil} ödemesi: ${member(top.uyeId)?.ad} — ${fmt(top.tutar)}.`:'Kayıt yok.';
+  }
+
+  // Genel özet (varsayılan)
+  return `${yil} özeti: ${S.members.length} üye (${aktif.length} aktif), ${odendi.length} ödedi, ${acik.length} açık, ${muaf.length} muaf. Tahsilat ${fmt(tahsilat)}.`;
 }
 
 /* ================================================================
