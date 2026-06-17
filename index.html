@@ -50,7 +50,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
 .role-chip select{background:transparent;border:0;color:#DCE4F0;font-size:12.5px;font-weight:600;padding:0;width:auto;box-shadow:none}
 .role-chip select:focus{box-shadow:none}
 .role-chip select option{color:#111}
-.role-chip .rl{font-size:9.5px;color:#6F7E97;letter-spacing:.6px;text-transform:uppercase}
+.role-chip .rl{font-size:11px;color:#DCE4F0;font-weight:650}
+.role-tag{font-size:9.5px;color:#6F7E97;letter-spacing:.6px;text-transform:uppercase;margin-top:1px}
 
 /* ============ TOPBAR + AI COMMAND ============ */
 .topnav{position:fixed;top:0;left:var(--sb);right:0;height:var(--tb);background:rgba(255,255,255,.88);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 26px;z-index:40}
@@ -187,6 +188,12 @@ tr.clickable{cursor:pointer}
 .setrow .sl{font-weight:640;font-size:13px}
 .setrow .sd{font-size:11.5px;color:var(--faint);margin-top:2px;max-width:480px}
 .setrow .ctl{flex:none;min-width:240px}
+.ayar-wrap{max-width:920px;margin:0 auto}
+.ayar-body{padding:6px 26px 24px}
+.ayar-tabs{padding:0 26px}
+.ayar-body .setrow .ctl input,.ayar-body .setrow .ctl select{width:100%}
+.ayar-body .code{max-width:100%}
+@media(max-width:720px){.ayar-body{padding:6px 14px 18px}.ayar-tabs{padding:0 12px}}
 .switch{position:relative;width:40px;height:22px;flex:none}
 .switch input{display:none}
 .switch i{position:absolute;inset:0;background:#D5DAE3;border-radius:99px;transition:.18s;cursor:pointer;display:block}
@@ -217,11 +224,8 @@ tr.clickable{cursor:pointer}
   <nav class="nav" id="nav"></nav>
   <div class="side-foot">
     <div class="role-chip"><div class="av" id="roleAv">A</div>
-      <div><div class="rl">Aktif Rol</div>
-      <select id="roleSel" onchange="setRole(this.value)">
-        <option value="admin">Admin</option><option value="operasyon">Operasyon</option>
-        <option value="muhasebe">Muhasebe</option><option value="okuyucu">Okuyucu</option>
-      </select></div>
+      <div><div class="rl" id="userName">Kullanıcı</div>
+      <div class="role-tag" id="roleTag">—</div></div>
     </div>
     <button class="btn sm" style="width:100%;margin-top:10px;justify-content:center;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14);color:#C7CEDC" onclick="authSignOut()">⎋ Çıkış Yap</button>
   </div>
@@ -345,8 +349,9 @@ const EVRAKLAR=[['cv','CV'],['form','Başvuru Formu'],['etik','Etik Beyan'],['ad
 const val=id=>document.getElementById(id)?.value??'';
 
 const PERM={admin:{uye:1,aidat:1,basvuru:1,karar:1,ayar:1},operasyon:{uye:1,aidat:0,basvuru:1,karar:1,ayar:0},muhasebe:{uye:0,aidat:1,basvuru:0,karar:0,ayar:0},okuyucu:{uye:0,aidat:0,basvuru:0,karar:0,ayar:0}};
-function can(k){ return !!PERM[S.ayarlar.rol][k]; }
-function setRole(r){ S.ayarlar.rol=r; persist(); render(); toast('Rol değişti: '+r); }
+window._myRole='okuyucu';
+function can(k){ return !!(PERM[window._myRole]||PERM.okuyucu)[k]; }
+function isAdmin(){ return window._myRole==='admin'; }
 
 /* ================================================================
    İSİM EŞLEŞTİRME (TR normalize + bulanık)
@@ -633,8 +638,11 @@ function renderNav(){
     html+=`<button class="${route===id?'active':''}" onclick="go('${id}')"><span class="ic">${ICONS[id]}</span><span class="t">${t}</span>${id==='basvurular'&&eksik?`<span class="pill">${eksik}</span>`:''}</button>`;
   }
   document.getElementById('nav').innerHTML=html;
-  document.getElementById('roleSel').value=S.ayarlar.rol;
-  document.getElementById('roleAv').textContent=S.ayarlar.rol[0].toUpperCase();
+  const ROLAD={admin:'Yönetici',operasyon:'Operasyon',muhasebe:'Muhasebe',okuyucu:'Okuyucu'};
+  const uname=window._sbUser?.user_metadata?.name||window._sbUser?.email||'Kullanıcı';
+  document.getElementById('userName').textContent=uname;
+  document.getElementById('roleTag').textContent=ROLAD[window._myRole]||window._myRole;
+  document.getElementById('roleAv').textContent=uname[0].toUpperCase();
   document.getElementById('crumb').textContent=PAGES.find(p=>p[0]===route)?.[1]||'';
   const sh=S.ayarlar.sheets;
   document.getElementById('syncDot').classList.toggle('off',!(sh.csvUyeler||sh.csvOdemeler||sh.webhook));
@@ -1236,48 +1244,85 @@ function pageAyarlar(){
       <div class="ctl" style="min-width:auto"><button class="btn danger" onclick="resetData()">⚠ Sıfırla</button></div></div>`;
   }
   if(ayarTab==='kul'){
-    body=`<p class="muted" style="margin-bottom:12px">Panele kaydolan herkes burada <b>BEKLİYOR</b> durumunda listelenir; siz onaylamadan veriye erişemez. Onayı dilediğiniz an geri alabilirsiniz.</p>
+    body=`<p class="muted" style="margin-bottom:12px">Panele kaydolan herkes burada <b>BEKLİYOR</b> durumunda listelenir; siz onaylamadan veriye erişemez. <b>Yönetici</b> rolündeki kişiler buradan kullanıcıları onaylayabilir, reddedebilir ve her kullanıcıya ayrı <b>rol</b> atayabilir. Onayı dilediğiniz an geri alabilirsiniz.</p>
     <div id="kulList"><div class="empty">⟳ Kullanıcı listesi yükleniyor…</div></div>`;
     setTimeout(loadProfiles,60);
   }
   if(ayarTab==='rol'){
     const R=[['admin','Yönetici','Tüm modüller + ayarlar'],['operasyon','Operasyon','Üye, başvuru, YK kararı; aidat salt-okunur'],['muhasebe','Muhasebe','Aidat & ödemeler; üye kayıtları salt-okunur'],['okuyucu','Okuyucu','Yalnızca görüntüleme ve raporlar']];
     body=`
-    <p class="muted" style="margin-bottom:12px">Rol, sağ üst köşeden seçilir ve düzenleme düğmelerini buna göre gizler. Bu tek dosyalık sürümde rol bir <b>görünüm kısıtı</b>dır; parola tabanlı gerçek yetkilendirme için rehberdeki Supabase seçeneğine bakınız.</p>
+    <p class="muted" style="margin-bottom:12px">Her kullanıcının rolü <b>🔐 Kullanıcı Onayları</b> sekmesinden, yalnızca yönetici tarafından atanır ve o kişinin görebileceği/düzenleyebileceği bölümleri belirler. Aşağıda rollerin yetki haritası yer alır.</p>
     <div class="tbl-wrap"><table><thead><tr><th>Rol</th><th>Açıklama</th><th>Üye</th><th>Aidat</th><th>Başvuru</th><th>YK</th><th>Ayar</th></tr></thead><tbody>
     ${R.map(([k,t,d])=>`<tr><td><b>${t}</b></td><td class="muted">${d}</td>${['uye','aidat','basvuru','karar','ayar'].map(p=>`<td>${PERM[k][p]?'✓':'—'}</td>`).join('')}</tr>`).join('')}
     </tbody></table></div>`;
   }
   return `
+  <div class="ayar-wrap">
   <div class="pagehead"><div><h2>Ayarlar & Entegrasyon</h2><div class="sub">Genel tanımlar, yapay zekâ sağlayıcısı, Google Sheets bağlantıları ve yedekleme</div></div></div>
   <div class="card">
-    <div class="tabs">${TABS.map(([k,t])=>`<button class="${ayarTab===k?'on':''}" onclick="ayarTab='${k}';render()">${t}</button>`).join('')}</div>
-    ${body}
+    <div class="tabs ayar-tabs">${TABS.map(([k,t])=>`<button class="${ayarTab===k?'on':''}" onclick="ayarTab='${k}';render()">${t}</button>`).join('')}</div>
+    <div class="ayar-body">${body}</div>
+  </div>
   </div>`;
 }
 function copyCode(id){ navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>toast('📋 Kod panoya kopyalandı')); }
 
 async function loadProfiles(){
   const el=document.getElementById('kulList'); if(!el) return;
+  const admin=isAdmin();
   try{
-    const {data,error}=await window._sb.from('profiles').select('id,email,name,onayli,created_at').order('created_at');
+    const {data,error}=await window._sb.from('profiles').select('id,email,name,onayli,rol,created_at').order('created_at');
     if(error) throw error;
     if(!data.length){ el.innerHTML='<div class="empty">Henüz kayıtlı kullanıcı yok.</div>'; return; }
-    el.innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Ad</th><th>E-posta</th><th>Durum</th><th>Kayıt</th><th></th></tr></thead><tbody>${
-      data.map(p=>`<tr><td><b>${esc(p.name||'—')}</b>${p.id===window._sbUser.id?' <span class="tag t-blue nodot">siz</span>':''}</td><td>${esc(p.email||'')}</td>
-        <td><span class="tag ${p.onayli?'t-green':'t-amber'}">${p.onayli?'ONAYLI':'BEKLİYOR'}</span></td>
-        <td>${p.created_at?String(p.created_at).slice(0,10):'—'}</td>
-        <td>${p.onayli
-          ?`<button class="btn sm danger" onclick="setApproval('${p.id}',false)">Onayı Kaldır</button>`
-          :`<button class="btn sm primary" onclick="setApproval('${p.id}',true)">✓ Onayla</button>`}</td></tr>`).join('')
-    }</tbody></table></div>`;
+    const ROLAD={admin:'Yönetici',operasyon:'Operasyon',muhasebe:'Muhasebe',okuyucu:'Okuyucu'};
+    const rolOpts=(cur)=>['admin','operasyon','muhasebe','okuyucu'].map(r=>`<option value="${r}" ${cur===r?'selected':''}>${ROLAD[r]}</option>`).join('');
+    el.innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Ad</th><th>E-posta</th><th>Durum</th><th>Rol</th><th>Kayıt</th><th style="text-align:right">İşlem</th></tr></thead><tbody>${
+      data.map(p=>{
+        const me=p.id===window._sbUser.id;
+        const rolCell=admin
+          ? `<select onchange="setUserRole('${p.id}',this.value)" ${me?'title="Kendi rolünüz"':''}>${rolOpts(p.rol||'okuyucu')}</select>`
+          : `<span class="tag t-gray nodot">${ROLAD[p.rol||'okuyucu']}</span>`;
+        let actions='';
+        if(admin){
+          actions = p.onayli
+            ? `<button class="btn sm ghost danger" onclick="setApproval('${p.id}',false)">Onayı Kaldır</button>`
+            : `<button class="btn sm primary" onclick="setApproval('${p.id}',true)">✓ Onayla</button>
+               <button class="btn sm ghost danger" onclick="rejectUser('${p.id}','${esc(p.email||'').replace(/'/g,'')}')">✕ Reddet</button>`;
+        } else actions='<span class="muted" style="font-size:11px">—</span>';
+        return `<tr><td><b>${esc(p.name||'—')}</b>${me?' <span class="tag t-blue nodot">siz</span>':''}</td>
+          <td>${esc(p.email||'')}</td>
+          <td><span class="tag ${p.onayli?'t-green':'t-amber'}">${p.onayli?'ONAYLI':'BEKLİYOR'}</span></td>
+          <td style="max-width:150px">${rolCell}</td>
+          <td>${p.created_at?String(p.created_at).slice(0,10):'—'}</td>
+          <td style="text-align:right;white-space:nowrap">${actions}</td></tr>`;
+      }).join('')
+    }</tbody></table></div>
+    ${admin?'':'<p class="muted" style="margin-top:12px;font-size:12px">Kullanıcı onaylama ve rol atama yalnızca <b>Yönetici</b> rolündeki kişilerce yapılabilir.</p>'}`;
   }catch(e){ console.error(e); el.innerHTML='<div class="empty">⚠ Liste alınamadı — profiles tablosu ve izin SQL\'inin çalıştırıldığını kontrol edin.</div>'; }
 }
 async function setApproval(id,val){
+  if(!isAdmin()) return toast('⚠ Yalnızca yönetici onaylayabilir');
   if(id===window._sbUser.id&&!val&&!confirm('Kendi onayınızı kaldırırsanız panele erişiminiz KAPANIR. Emin misiniz?'))return;
   const {error}=await window._sb.from('profiles').update({onayli:val}).eq('id',id);
   if(error){ console.error(error); toast('⚠ Güncellenemedi — yetkinizi kontrol edin'); }
   else { toast(val?'✓ Kullanıcı onaylandı':'Onay kaldırıldı'); loadProfiles(); }
+}
+async function setUserRole(id,rol){
+  if(!isAdmin()) return toast('⚠ Yalnızca yönetici rol atayabilir');
+  const {error}=await window._sb.from('profiles').update({rol}).eq('id',id);
+  if(error){ console.error(error); toast('⚠ Rol güncellenemedi'); }
+  else {
+    toast('✓ Rol güncellendi');
+    if(id===window._sbUser.id){ window._myRole=rol; render(); }
+  }
+}
+async function rejectUser(id,email){
+  if(!isAdmin()) return toast('⚠ Yalnızca yönetici işlem yapabilir');
+  if(id===window._sbUser.id) return toast('Kendi hesabınızı buradan silemezsiniz');
+  if(!confirm(`"${email}" başvurusu reddedilip kayıttan kaldırılsın mı?\n\nKişi onaylı kullanıcılar listesinden çıkar. (Oturum açma kaydı Supabase → Authentication bölümünden de silinmelidir.)`))return;
+  const {error}=await window._sb.from('profiles').delete().eq('id',id);
+  if(error){ console.error(error); toast('⚠ Kaldırılamadı — yetkinizi kontrol edin'); }
+  else { toast('Kullanıcı reddedildi ve listeden kaldırıldı'); loadProfiles(); }
 }
 
 async function aiTest(){
@@ -1471,9 +1516,10 @@ async function cloudLoad(){
 }
 async function checkApproval(){
   try{
-    const {data}=await window._sb.from('profiles').select('onayli').eq('id',window._sbUser.id).maybeSingle();
+    const {data}=await window._sb.from('profiles').select('onayli,rol').eq('id',window._sbUser.id).maybeSingle();
+    window._myRole=(data&&data.rol)||'okuyucu';
     return !!(data&&data.onayli===true);
-  }catch(e){ console.error('checkApproval',e); return false; }
+  }catch(e){ console.error('checkApproval',e); window._myRole='okuyucu'; return false; }
 }
 async function boot(){
   document.getElementById('authWrap').classList.add('auth-hide');
