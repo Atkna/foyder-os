@@ -308,7 +308,7 @@ function defaultState(){
       rol:'admin', dernekAdi:'FOYDER Derneği', iban:'',
       aidat:{2023:2200,2024:3500,2025:5000,2026:6500}, girisOdentisi:1000,
       ai:{provider:'claude', model:'', apiKey:'', endpoint:'', onayla:true},
-      sheets:{csvUyeler:'', csvOdemeler:'', csvBasvurular:'', webhook:'', autoPull:false}
+      sheets:{csvUyeler:'', csvOdemeler:'', csvBasvurular:'', yilCsv:'', webhook:'', autoPull:false}
     },
     seq:{ m:SEED.members.length, p:SEED.payments.length, b:0, k:SEED.kararlar.length }
   };
@@ -569,6 +569,10 @@ function answerQuery(q){
   const beklenen=py.filter(p=>p.durum!=='MUAF'&&member(p.uyeId)?.durum==='AKTİF').reduce((s,p)=>s+(p.tutar||0),0);
   const isimList=(arr,n=15)=>arr.slice(0,n).map(x=>member(x.uyeId)?.ad).filter(Boolean).join(', ')+(arr.length>n?` … (+${arr.length-n})`:'');
 
+  // 0) WhatsApp hatirlatma listesi isteniyor mu?
+  if(/(whatsapp|watsap|wp )|hatirlatma listesi|mesaj atilacak|mesaj listesi|kime mesaj/.test(lo)){
+    return wpListText(yil);
+  }
   // 1) Belirli bir kişi soruluyor mu? (ödedi mi / borcu var mı)
   const kisi=resolveMembers(q);
   if(kisi.length && /(odedi|odemis|borc|durum|ne kadar|aidat|odeme)/.test(lo)){
@@ -650,10 +654,32 @@ const cval=(r,keys)=>{ for(const k of keys){ if(r[k]!=null&&String(r[k]).trim()!
 const isAidatTip=p=>{ const t=String(p.tip||'AIDAT').toLocaleUpperCase('tr'); return t==='AIDAT'||t==='AİDAT'; };
 async function sheetsPull(manual){
   const sh=S.ayarlar.sheets;
-  if(!sh.csvUyeler&&!sh.csvOdemeler&&!sh.csvBasvurular){ if(manual){ toast('Sheets bağlantısı tanımlı değil — Ayarlar → Entegrasyonlar'); go('ayarlar'); ayarTab='ent'; render(); } return; }
+  if(!sh.csvUyeler&&!sh.csvOdemeler&&!sh.csvBasvurular&&!sh.yilCsv){ if(manual){ toast('Sheets bağlantısı tanımlı değil — Ayarlar → Entegrasyonlar'); go('ayarlar'); ayarTab='ent'; render(); } return; }
   toast('⟳ Google Sheets ile senkronize ediliyor…');
   let nU=0,uU=0,nP=0,nB=0;
   try{
+    // Yıl sayfaları: "2026: link" satırları — mevcut Excel yapısıyla (Ad Soyad/İsim, Aidat Tutarı, Aidat Durumu, Ödeme Tarihi) doğrudan çalışır
+    if(sh.yilCsv){
+      const lines=sh.yilCsv.split(/\n+/).map(l=>l.trim()).filter(Boolean);
+      for(const line of lines){
+        const mm=line.match(/^(\d{4})\s*[:|]?\s*(https?:\/\/\S+)/); if(!mm) continue;
+        const yil=+mm[1], url=mm[2];
+        const objs=csvToObjects(await (await fetch(url)).text());
+        objs.forEach(r=>{
+          const ad=cval(r,['Ad Soyad','İsim','ADI - SOYADI','Üye Adı Soyadı / Kurum','Ad']); if(!ad) return;
+          let m=S.members.find(x=>trNorm(x.ad)===trNorm(ad));
+          if(!m){ m={id:nid('m'),ad:ad.trim(),defterNo:null,kayitTarihi:null,ykKararTarihi:null,dogumYili:null,notlar:'Sheets '+yil,ucretsiz:false,email:'',telefon:'',uyelikTuru:cval(r,['Üyelik Türü'])||'Gerçek Üye',gorev:cval(r,['Görevi','Meslek','Görev'])||'',durum:'AKTİF'}; S.members.push(m); nU++; }
+          else { const tur=cval(r,['Üyelik Türü']), grv=cval(r,['Görevi','Meslek','Görev']); if(tur) m.uyelikTuru=tur; if(grv) m.gorev=grv; uU++; }
+          let p=S.payments.find(x=>String(x.uyeId)===String(m.id)&&Number(x.yil)===yil&&isAidatTip(x));
+          if(!p){ p={id:nid('p'),uyeId:m.id,yil,tip:'AIDAT',tutar:null,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Sheets'}; S.payments.push(p); nP++; }
+          const dRaw=cval(r,['Aidat Durumu','Durum','ÖDEME BİLGİSİ']);
+          const durum=dRaw?dRaw.toLocaleUpperCase('tr').replace('ODENDI','ÖDENDİ').replace('ODENMEDI','ÖDENMEDİ'):p.durum;
+          const tRaw=cval(r,['Aidat Tutarı','Tutar','Alınacak Tutar']);
+          const trh=cval(r,['Ödeme Tarihi']);
+          Object.assign(p,{tutar:tRaw?+tRaw.replace(/[^0-9]/g,'')||p.tutar:p.tutar,durum,odemeTarihi:trh||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(p.tutar||0):p.odenenTutar});
+        });
+      }
+    }
     if(sh.csvUyeler){
       const objs=csvToObjects(await (await fetch(sh.csvUyeler)).text());
       objs.forEach(r=>{ const ad=cval(r,['Ad Soyad','İsim','ADI - SOYADI','Üye Adı Soyadı / Kurum','Ad','AD SOYAD','ad soyad']); if(!ad) return;
@@ -735,7 +761,7 @@ function renderNav(){
   document.getElementById('roleAv').textContent=uname[0].toUpperCase();
   document.getElementById('crumb').textContent=PAGES.find(p=>p[0]===route)?.[1]||'';
   const sh=S.ayarlar.sheets;
-  document.getElementById('syncDot').classList.toggle('off',!(sh.csvUyeler||sh.csvOdemeler||sh.webhook));
+  document.getElementById('syncDot').classList.toggle('off',!(sh.csvUyeler||sh.csvOdemeler||sh.yilCsv||sh.webhook));
 }
 function go(r){ route=r; render(); window.scrollTo(0,0); }
 
@@ -865,6 +891,7 @@ function memberTable(list){
       <td onclick="event.stopPropagation()">${can('uye')?`<button class="btn sm ghost" onclick="editMember('${m.id}')">Düzenle</button>`:''}</td></tr>`;}).join('')}
   </tbody></table>`;
 }
+function renderKF(id){ render(); requestAnimationFrame(()=>{ const el=document.getElementById(id); if(el){ el.focus(); try{ const v=el.value; el.setSelectionRange(v.length,v.length); }catch(e){} } }); }
 function rerenderBody(){ const el=document.getElementById('tblBody'); const l=filteredMembers(); if(el) el.innerHTML=memberTable(l); const c=document.getElementById('uCount'); if(c) c.textContent=l.length+' kayıt'; }
 
 function openMember(id){
@@ -950,7 +977,7 @@ function pageAidat(){
     <select onchange="fA.yil=this.value;render()">${ys.map(y=>`<option ${+fA.yil===y?'selected':''}>${y}</option>`).join('')}</select>
     <select onchange="fA.tip=this.value;render()"><option value="AIDAT" ${fA.tip==='AIDAT'?'selected':''}>Yıllık Aidat</option><option value="GİRİŞ" ${fA.tip==='GİRİŞ'?'selected':''}>Giriş Ödentisi</option></select>
     <select onchange="fA.durum=this.value;render()"><option value="">Durum: Tümü</option>${['ÖDENDİ','ÖDENMEDİ','KISMİ','MUAF'].map(d=>`<option ${fA.durum===d?'selected':''}>${d}</option>`).join('')}</select>
-    <input type="search" placeholder="Üye ara…" value="${esc(fA.q)}" oninput="fA.q=this.value;render()">
+    <input type="search" id="aqInput" placeholder="Üye ara…" value="${esc(fA.q)}" oninput="fA.q=this.value;renderKF('aqInput')">
     <span class="count">${list.length} kayıt</span>
   </div><div class="card-b np tbl-wrap">
   ${list.length?`<table><thead><tr><th>Üye</th><th>Tür</th><th class="num">Tutar</th><th class="num">Kalan</th><th>Durum</th><th>Tarih</th><th></th></tr></thead><tbody>
@@ -1099,7 +1126,7 @@ function pageKararlar(){
   <div class="pagehead"><div><h2>Yönetim Kurulu Kararları</h2><div class="sub">Üyelik kabul kararları ve karar takibi</div></div>
   <div class="actions">${can('karar')?`<button class="btn primary" onclick="editKarar()">+ Yeni Karar</button>`:''}</div></div>
   <div class="card"><div class="filters">
-    <input type="search" placeholder="Karar no, üye adı veya konu ara…" value="${esc(fK.q)}" oninput="fK.q=this.value;render()" style="min-width:300px">
+    <input type="search" id="kqInput" placeholder="Karar no, üye adı veya konu ara…" value="${esc(fK.q)}" oninput="fK.q=this.value;renderKF('kqInput')" style="min-width:300px">
     <span class="count">${list.length} karar</span>
   </div><div class="card-b np tbl-wrap">
   ${list.length?`<table><thead><tr><th>No</th><th>Tarih</th><th>Konu</th><th>İlgili Üye / Şirket</th><th>Tür</th><th>Statü</th><th>Not</th>${can('karar')?'<th></th>':''}</tr></thead><tbody>
@@ -1303,6 +1330,28 @@ function exportAnalizPdf(){ window.print(); }
    MESAJ ŞABLONLARI
 ================================================================ */
 let msj={tip:'aidat_wp',uye:''};
+// Bu hafta WhatsApp'tan hatirlatma yapilacak kisilerin guncel listesi (bu yil odemeyen/kismi aktif uyeler)
+function wpList(yil){
+  yil=yil||THIS_YEAR;
+  return S.payments
+    .filter(p=>Number(p.yil)===yil&&isAidatTip(p)&&['ÖDENMEDİ','KISMİ'].includes(p.durum)&&member(p.uyeId)?.durum==='AKTİF')
+    .map(p=>({m:member(p.uyeId),p}))
+    .sort((a,b)=>a.m.ad.localeCompare(b.m.ad,'tr'));
+}
+function wpListText(yil){
+  yil=yil||THIS_YEAR;
+  const L=wpList(yil);
+  const bas=`FOYDER ${yil} Aidat Hatırlatma Listesi — ${new Date().toLocaleDateString('tr-TR')} (${L.length} kişi)`;
+  const satirlar=L.map((x,i)=>`${i+1}. ${x.m.ad}${x.p.durum==='KISMİ'?` (kısmi — kalan ${fmt(kalan(x.p))})`:''}`);
+  return bas+'\n\n'+satirlar.join('\n');
+}
+function copyWpList(){
+  const t=wpListText();
+  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(
+    ()=>toast('✓ Liste panoya kopyalandı — WhatsApp\'a yapıştırabilirsiniz'),
+    ()=>{ modal('WhatsApp Listesi',`<textarea rows="14" style="width:100%" onclick="this.select()">${esc(t)}</textarea>`); }
+  );
+}
 function pageMesajlar(){
   const y=THIS_YEAR;
   const acik=S.payments.filter(p=>p.yil===y&&p.tip==='AIDAT'&&['ÖDENMEDİ','KISMİ'].includes(p.durum)&&member(p.uyeId)?.durum==='AKTİF');
@@ -1319,7 +1368,15 @@ function pageMesajlar(){
   };
   const cur=T[msj.tip];
   return `
-  <div class="pagehead"><div><h2>Mesaj Şablonları</h2><div class="sub">Aidat hatırlatma, eksik evrak ve üye iletişimi</div></div></div>
+  <div class="pagehead"><div><h2>Mesaj Şablonları</h2><div class="sub">Aidat hatırlatma, eksik evrak ve üye iletişimi</div></div>
+  <div class="card" style="border-left:3px solid var(--gold)">
+    <div class="card-h"><h3>📋 Bu Haftaki WhatsApp Hatırlatma Listesi</h3><span class="count">${wpList().length} kişi</span></div>
+    <div class="card-b">
+      <p class="muted" style="margin-bottom:10px;font-size:12.5px">${THIS_YEAR} aidatını henüz ödememiş <b>aktif</b> üyeler. Ödeme işlendikçe liste kendiliğinden güncellenir.</p>
+      <div style="white-space:pre-wrap;line-height:1.7;font-size:13.5px;max-height:300px;overflow:auto;background:var(--faint-bg,rgba(0,0,0,.03));border:1px solid var(--line);border-radius:10px;padding:12px 16px">${esc(wpList().map((x,i)=>`${i+1}. ${x.m.ad}${x.p.durum==='KISMİ'?` (kısmi — kalan ${fmt(kalan(x.p))})`:''}`).join('\n'))||'Bu yıl açık aidat yok 🎉'}</div>
+      <div class="actions no-print" style="margin-top:12px"><button class="btn primary" onclick="copyWpList()">📋 Listeyi Kopyala</button></div>
+    </div>
+  </div></div>
   <div class="card"><div class="filters">
     <select onchange="msj.tip=this.value;render()">${Object.entries(T).map(([k,v])=>`<option value="${k}" ${msj.tip===k?'selected':''}>${v.t}</option>`).join('')}</select>
     <select onchange="msj.uye=this.value;render()"><option value="">Üye seç (otomatik doldur)…</option>${opts}</select>
@@ -1405,6 +1462,8 @@ function pageAyarlar(){
     const sh=A.sheets;
     body=`
     <p class="muted" style="margin-bottom:14px">Google Sheets'i ücretsiz bir "bulut veritabanı" gibi kullanabilirsiniz: panel verileri yayınlanmış CSV bağlantılarından <b>çeker</b>, Apps Script webhook'u ile <b>gönderir</b>. Kurulum adımları aşağıdaki kod kutularında ve birlikte verilen rehber dosyasındadır.</p>
+    <div class="setrow"><div><div class="sl">Yıl Sayfaları (önerilen — mevcut Excel yapınız)</div><div class="sd">Her satıra bir yıl sayfası: <b>2026: link</b> biçiminde. Sheets → Dosya → Paylaş → Web'de yayınla → sayfayı seç → CSV → linki kopyala. Panel Ad Soyad/İsim, Üyelik Türü, Görevi, Aidat Tutarı, Aidat Durumu, Ödeme Tarihi kolonlarını otomatik tanır.</div></div>
+      <div class="ctl" style="min-width:340px"><textarea rows="4" style="width:100%;resize:vertical" placeholder="2026: https://docs.google.com/…&gid=…&single=true&output=csv&#10;2025: https://docs.google.com/…output=csv" onchange="setAyar('sheets.yilCsv',this.value);renderNav()">${esc(sh.yilCsv||'')}</textarea></div></div>
     <div class="setrow"><div><div class="sl">Üyeler CSV bağlantısı</div><div class="sd">Sheets → Dosya → Paylaş → Web'de yayınla → ilgili sayfa → CSV.</div></div>
       <div class="ctl" style="min-width:340px"><input value="${esc(sh.csvUyeler)}" placeholder="https://docs.google.com/…/pub?output=csv" onchange="setAyar('sheets.csvUyeler',this.value);renderNav()"></div></div>
     <div class="setrow"><div><div class="sl">Ödemeler CSV bağlantısı</div><div class="sd">Sütunlar: ad, yil, tutar, durum, odemeTarihi.</div></div>
