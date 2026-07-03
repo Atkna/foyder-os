@@ -308,7 +308,7 @@ function defaultState(){
       rol:'admin', dernekAdi:'FOYDER Derneği', iban:'',
       aidat:{2023:2200,2024:3500,2025:5000,2026:6500}, girisOdentisi:1000,
       ai:{provider:'claude', model:'', apiKey:'', endpoint:'', onayla:true},
-      sheets:{csvUyeler:'', csvOdemeler:'', csvBasvurular:'', yilCsv:'', webhook:'', autoPull:false}
+      sheets:{csvUyeler:'', csvOdemeler:'', csvBasvurular:'', yilCsv:'', webhook:'', autoPull:false, autoPush:false}
     },
     seq:{ m:SEED.members.length, p:SEED.payments.length, b:0, k:SEED.kararlar.length }
   };
@@ -335,7 +335,19 @@ function persist(){
       if(error) throw error;
       const d=document.getElementById('syncDot'); if(d) d.classList.remove('off');
     }}catch(e){ console.error(e); toast('⚠ Buluta kaydedilemedi — bağlantıyı kontrol edin'); }
+    schedulePushDurum();
   },350);
+}
+let _pushTimer=null;
+function schedulePushDurum(){
+  const sh=S&&S.ayarlar&&S.ayarlar.sheets; if(!sh||!sh.webhook||!sh.autoPush) return;
+  clearTimeout(_pushTimer);
+  _pushTimer=setTimeout(async()=>{
+    try{
+      const odemeler=S.payments.filter(p=>isAidatTip(p)&&member(p.uyeId)).map(p=>({yil:Number(p.yil),ad:member(p.uyeId).ad,durum:p.durum,tarih:p.odemeTarihi||''}));
+      await fetch(sh.webhook,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',body:JSON.stringify({mod:'durum',odemeler})});
+    }catch(e){ console.warn('autoPush',e); }
+  },4000);
 }
 function restoreAiKey(){
   try{
@@ -347,9 +359,11 @@ function restoreAiKey(){
 function nid(p){ S.seq[p]++; return p.toUpperCase()+String(S.seq[p]).padStart(p==='p'?4:3,'0'); }
 
 const fmt=n=>n==null||isNaN(n)?'—':new Intl.NumberFormat('tr-TR').format(Math.round(n))+' ₺';
-const dfmt=d=>d?new Date(String(d).slice(0,10)+'T00:00:00').toLocaleDateString('tr-TR'):'—';
+function toISOdate(v){ if(!v) return null; v=String(v).trim(); let m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'); m=v.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/); if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'); return null; }
+const dfmt=d=>{ if(!d) return '—'; const iso=toISOdate(d); if(!iso) return String(d); const dt=new Date(iso+'T00:00:00'); return isNaN(dt)?String(d):dt.toLocaleDateString('tr-TR'); };
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const byName=(a,b)=>a.ad.localeCompare(b.ad,'tr');
+const byDefter=(a,b)=>((a.defterNo??1e9)-(b.defterNo??1e9))||byName(a,b);
 const initials=ad=>ad.split(' ').map(w=>w[0]).slice(0,2).join('').toLocaleUpperCase('tr');
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
 function member(id){ return S.members.find(m=>m.id===id); }
@@ -368,7 +382,7 @@ function isAdmin(){ return window._myRole==='admin'; }
 /* ================================================================
    İSİM EŞLEŞTİRME (TR normalize + bulanık)
 ================================================================ */
-function trNorm(s){ return String(s||'').toLocaleLowerCase('tr').replace(/[çğıöşüâî]/g,c=>({'ç':'c','ğ':'g','ı':'i','ö':'o','ş':'s','ü':'u','â':'a','î':'i'}[c])).replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+function trNorm(s){ return String(s||'').toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[çğıöşüâî]/g,c=>({'ç':'c','ğ':'g','ı':'i','ö':'o','ş':'s','ü':'u','â':'a','î':'i'}[c]||c)).replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
 function resolveMembers(nameStr){
   const q=trNorm(nameStr).replace(/\b(bey|hanim|bey'?in|hanim'?in)\b/g,'').trim();
   if(!q) return [];
@@ -652,6 +666,33 @@ function csvToObjects(text){
 // Google Sheets kolon takma adlari: farkli baslik adlarini panelin bekledigi alanlara esler
 const cval=(r,keys)=>{ for(const k of keys){ if(r[k]!=null&&String(r[k]).trim()!=='') return String(r[k]).trim(); } return ''; };
 const isAidatTip=p=>{ const t=String(p.tip||'AIDAT').toLocaleUpperCase('tr'); return t==='AIDAT'||t==='AİDAT'; };
+function mergeDuplicates(){
+  if(!confirm('Aynı isme sahip üye kayıtları birleştirilecek: ödemeler tek kayda taşınır, boş alanlar dolu olandan tamamlanır, fazla kayıt silinir. Devam edilsin mi?')) return;
+  const groups={};
+  S.members.forEach(m=>{ const k=trNorm(m.ad); (groups[k]=groups[k]||[]).push(m); });
+  let merged=0;
+  Object.values(groups).forEach(g=>{
+    if(g.length<2) return;
+    g.sort((a,b)=>((a.defterNo?0:1)-(b.defterNo?0:1)));
+    const hedef=g[0];
+    g.slice(1).forEach(dup=>{
+      S.payments.filter(p=>String(p.uyeId)===String(dup.id)).forEach(p=>{
+        const ex=S.payments.find(x=>String(x.uyeId)===String(hedef.id)&&Number(x.yil)===Number(p.yil)&&isAidatTip(x)&&isAidatTip(p));
+        if(ex){
+          if(ex.durum!=='ÖDENDİ'&&p.durum==='ÖDENDİ'){ ex.durum='ÖDENDİ'; ex.tutar=p.tutar||ex.tutar; ex.odemeTarihi=p.odemeTarihi||ex.odemeTarihi; ex.odenenTutar=ex.tutar||0; }
+          else { if(!ex.odemeTarihi&&p.odemeTarihi) ex.odemeTarihi=p.odemeTarihi; if(!ex.tutar&&p.tutar) ex.tutar=p.tutar; }
+          S.payments=S.payments.filter(x=>x.id!==p.id);
+        } else { p.uyeId=hedef.id; }
+      });
+      ['defterNo','kayitTarihi','ykKararTarihi','dogumYili','email','telefon','gorev','uyelikTuru'].forEach(f=>{ if(!hedef[f]&&dup[f]) hedef[f]=dup[f]; });
+      if(dup.durum==='AKTİF') hedef.durum='AKTİF';
+      S.members=S.members.filter(x=>x.id!==dup.id);
+      merged++;
+    });
+  });
+  if(merged){ persist(); render(); toast('✓ '+merged+' mükerrer üye kaydı birleştirildi'); }
+  else toast('Mükerrer üye bulunamadı — kayıtlar temiz ✓');
+}
 async function sheetsPull(manual){
   const sh=S.ayarlar.sheets;
   if(!sh.csvUyeler&&!sh.csvOdemeler&&!sh.csvBasvurular&&!sh.yilCsv){ if(manual){ toast('Sheets bağlantısı tanımlı değil — Ayarlar → Entegrasyonlar'); go('ayarlar'); ayarTab='ent'; render(); } return; }
@@ -675,7 +716,7 @@ async function sheetsPull(manual){
           const dRaw=cval(r,['Aidat Durumu','Durum','ÖDEME BİLGİSİ']);
           const durum=dRaw?dRaw.toLocaleUpperCase('tr').replace('ODENDI','ÖDENDİ').replace('ODENMEDI','ÖDENMEDİ'):p.durum;
           const tRaw=cval(r,['Aidat Tutarı','Tutar','Alınacak Tutar']);
-          const trh=cval(r,['Ödeme Tarihi']);
+          const trh=toISOdate(cval(r,['Ödeme Tarihi']));
           Object.assign(p,{tutar:tRaw?+tRaw.replace(/[^0-9]/g,'')||p.tutar:p.tutar,durum,odemeTarihi:trh||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(p.tutar||0):p.odenenTutar});
         });
       }
@@ -697,7 +738,7 @@ async function sheetsPull(manual){
         const dRaw=cval(r,['Durum','Aidat Durumu','ÖDEME BİLGİSİ'])||p.durum;
         const durum=dRaw.toLocaleUpperCase('tr').replace('ODENDI','ÖDENDİ').replace('ODENMEDI','ÖDENMEDİ');
         const tRaw=cval(r,['Tutar','Aidat Tutarı','Alınacak Tutar']);
-        Object.assign(p,{tutar:tRaw?+tRaw.replace(/[^0-9]/g,''):p.tutar,durum,odemeTarihi:cval(r,['Ödeme Tarihi'])||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(p.tutar||0):p.odenenTutar}); });
+        Object.assign(p,{tutar:tRaw?+tRaw.replace(/[^0-9]/g,''):p.tutar,durum,odemeTarihi:toISOdate(cval(r,['Ödeme Tarihi']))||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(p.tutar||0):p.odenenTutar}); });
     }
     if(sh.csvBasvurular){
       const objs=csvToObjects(await (await fetch(sh.csvBasvurular)).text());
@@ -771,7 +812,7 @@ function go(r){ route=r; render(); window.scrollTo(0,0); }
 function pageDashboard(){
   const aktif=S.members.filter(m=>m.durum==='AKTİF'), pasif=S.members.filter(m=>m.durum==='PASİF');
   const aday=S.basvurular.filter(b=>!['ONAYLANDI','REDDEDİLDİ'].includes(b.durum));
-  const py=S.payments.filter(p=>p.yil===THIS_YEAR&&p.tip==='AIDAT');
+  const py=S.payments.filter(p=>p.yil===THIS_YEAR&&isAidatTip(p));
   const odenen=py.filter(p=>p.durum==='ÖDENDİ').reduce((s,p)=>s+(p.tutar||0),0)+py.filter(p=>p.durum==='KISMİ').reduce((s,p)=>s+(p.odenenTutar||0),0);
   const bekleyen=py.reduce((s,p)=>s+kalan(p),0);
   const odemeyenler=py.filter(p=>['ÖDENMEDİ','KISMİ'].includes(p.durum)&&member(p.uyeId)?.durum==='AKTİF');
@@ -779,7 +820,7 @@ function pageDashboard(){
   const oran=py.length-muaf>0?Math.round(odendiC/(py.length-muaf)*100):0;
   const sonOdemeler=S.payments.filter(p=>p.odemeTarihi).sort((a,b)=>String(b.odemeTarihi).localeCompare(String(a.odemeTarihi))).slice(0,7);
   const sonUyeler=[...S.members].sort((a,b)=>String(b.ykKararTarihi||b.kayitTarihi||'').localeCompare(String(a.ykKararTarihi||a.kayitTarihi||''))).slice(0,7);
-  const yearTotals=years().sort().map(y=>{const ps=S.payments.filter(p=>p.yil===y&&p.tip==='AIDAT');
+  const yearTotals=years().sort().map(y=>{const ps=S.payments.filter(p=>p.yil===y&&isAidatTip(p));
     return [y,ps.filter(p=>p.durum==='ÖDENDİ').reduce((s,p)=>s+(p.tutar||0),0)+ps.filter(p=>p.durum==='KISMİ').reduce((s,p)=>s+(p.odenenTutar||0),0)];});
   const maxT=Math.max(...yearTotals.map(t=>t[1]),1), C=2*Math.PI*52;
   const kp=(cls,ico,l,v,d,target)=>`<div class="kpi" onclick="go('${target}')"><div class="ico ${cls}">${ico}</div><div class="l">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
@@ -858,7 +899,7 @@ let fU={q:'',durum:'',tur:'',gorev:''};
 function filteredMembers(){
   return S.members.filter(m=>
     (!fU.q||trNorm(m.ad).includes(trNorm(fU.q)))&&(!fU.durum||m.durum===fU.durum)&&
-    (!fU.tur||(m.uyelikTuru||'')===fU.tur)&&(!fU.gorev||(m.gorev||'')===fU.gorev)).sort(byName);
+    (!fU.tur||(m.uyelikTuru||'')===fU.tur)&&(!fU.gorev||(m.gorev||'')===fU.gorev)).sort(byDefter);
 }
 function pageUyeler(){
   const turler=[...new Set(S.members.map(m=>m.uyelikTuru).filter(Boolean))].sort();
@@ -880,7 +921,7 @@ function memberTable(list){
   if(!list.length) return '<div class="empty">Filtreye uyan üye bulunamadı.</div>';
   const y=THIS_YEAR;
   return `<table><thead><tr><th>No</th><th>Üye</th><th>Üyelik Türü</th><th>Meslek</th><th>Durum</th><th>${y} Aidat</th><th>YK Tarihi</th><th></th></tr></thead><tbody>
-  ${list.map(m=>{const p=S.payments.find(p=>p.uyeId===m.id&&p.yil===y&&p.tip==='AIDAT');
+  ${list.map(m=>{const p=S.payments.find(p=>p.uyeId===m.id&&p.yil===y&&isAidatTip(p));
     return `<tr class="clickable" onclick="openMember('${m.id}')">
       <td class="num">${m.defterNo??'—'}</td>
       <td><div class="name-cell"><span class="avatar">${initials(m.ad)}</span><div><div class="nm">${esc(m.ad)}</div>${m.ucretsiz?'<div class="sb">ücretsiz statü</div>':''}</div></div></td>
@@ -1018,12 +1059,12 @@ function savePayment(pid){
 }
 function delPayment(pid){ if(!confirm('Bu ödeme kaydı silinsin mi?'))return; S.payments=S.payments.filter(p=>p.id!==pid); persist(); closeModal(); render(); toast('Kayıt silindi'); }
 function yilBorcuOlustur(){
-  const hedef=S.payments.some(p=>p.yil===THIS_YEAR&&p.tip==='AIDAT')?THIS_YEAR+1:THIS_YEAR;
+  const hedef=S.payments.some(p=>p.yil===THIS_YEAR&&isAidatTip(p))?THIS_YEAR+1:THIS_YEAR;
   const t=prompt(`${hedef} yılı aidat tutarı (₺)?\nTüm AKTİF üyeler için borç kaydı oluşturulacak; ücretsiz statüdekiler MUAF işaretlenecek.`,S.ayarlar.aidat[hedef]||S.ayarlar.aidat[THIS_YEAR]||6500);
   if(t===null)return; const tutar=+t; if(!tutar){toast('Geçerli tutar giriniz');return;}
   S.ayarlar.aidat[hedef]=tutar; let n=0;
   S.members.filter(m=>m.durum==='AKTİF').forEach(m=>{
-    if(S.payments.some(p=>p.uyeId===m.id&&p.yil===hedef&&p.tip==='AIDAT'))return;
+    if(S.payments.some(p=>p.uyeId===m.id&&p.yil===hedef&&isAidatTip(p)))return;
     S.payments.push({id:nid('p'),uyeId:m.id,yil:hedef,tip:'AIDAT',tutar,durum:m.ucretsiz?'MUAF':'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Otomatik yıl borcu'}); n++; });
   fA.yil=hedef; persist(); render(); toast(`✓ ${hedef} için ${n} üyeye borç oluşturuldu`);
 }
@@ -1163,10 +1204,10 @@ let rapor='odemeyen';
 function pageRaporlar(){
   const y=THIS_YEAR;
   const R={
-    odemeyen:{t:`${y} Aidat Ödemeyenler`,h:['Ad Soyad','Üyelik Türü','Meslek','Tutar','Kalan','Durum'],rows:()=>S.payments.filter(p=>p.yil===y&&p.tip==='AIDAT'&&['ÖDENMEDİ','KISMİ'].includes(p.durum)&&member(p.uyeId)?.durum==='AKTİF').map(p=>{const m=member(p.uyeId);return [m.ad,m.uyelikTuru||'',m.gorev||'',fmt(p.tutar),fmt(kalan(p)),p.durum];})},
+    odemeyen:{t:`${y} Aidat Ödemeyenler`,h:['Ad Soyad','Üyelik Türü','Meslek','Tutar','Kalan','Durum'],rows:()=>S.payments.filter(p=>p.yil===y&&isAidatTip(p)&&['ÖDENMEDİ','KISMİ'].includes(p.durum)&&member(p.uyeId)?.durum==='AKTİF').map(p=>{const m=member(p.uyeId);return [m.ad,m.uyelikTuru||'',m.gorev||'',fmt(p.tutar),fmt(kalan(p)),p.durum];})},
     aktif:{t:'Aktif Üyeler',h:['No','Ad Soyad','Üyelik Türü','Meslek','YK Tarihi','Statü'],rows:()=>S.members.filter(m=>m.durum==='AKTİF').sort(byName).map(m=>[m.defterNo??'',m.ad,m.uyelikTuru||'',m.gorev||'',dfmt(m.ykKararTarihi),m.ucretsiz?'Ücretsiz':''])},
     pasif:{t:'Pasif Üyeler',h:['No','Ad Soyad','Üyelik Türü','Meslek','Not'],rows:()=>S.members.filter(m=>m.durum==='PASİF').sort(byName).map(m=>[m.defterNo??'',m.ad,m.uyelikTuru||'',m.gorev||'',m.notlar||''])},
-    tahsilat:{t:'Yıllara Göre Tahsilat',h:['Yıl','Kayıt','Ödendi','Açık','Planlanan','Tahsil','Oran'],rows:()=>years().sort().map(yy=>{const ps=S.payments.filter(p=>p.yil===yy&&p.tip==='AIDAT');const tah=ps.filter(p=>p.durum==='ÖDENDİ').reduce((s,p)=>s+(p.tutar||0),0)+ps.filter(p=>p.durum==='KISMİ').reduce((s,p)=>s+(p.odenenTutar||0),0);const plan=ps.filter(p=>p.durum!=='MUAF').reduce((s,p)=>s+(p.tutar||0),0);return [yy,ps.length,ps.filter(p=>p.durum==='ÖDENDİ').length,ps.filter(p=>['ÖDENMEDİ','KISMİ'].includes(p.durum)).length,fmt(plan),fmt(tah),plan?'%'+Math.round(tah/plan*100):'—'];})},
+    tahsilat:{t:'Yıllara Göre Tahsilat',h:['Yıl','Kayıt','Ödendi','Açık','Planlanan','Tahsil','Oran'],rows:()=>years().sort().map(yy=>{const ps=S.payments.filter(p=>p.yil===yy&&isAidatTip(p));const tah=ps.filter(p=>p.durum==='ÖDENDİ').reduce((s,p)=>s+(p.tutar||0),0)+ps.filter(p=>p.durum==='KISMİ').reduce((s,p)=>s+(p.odenenTutar||0),0);const plan=ps.filter(p=>p.durum!=='MUAF').reduce((s,p)=>s+(p.tutar||0),0);return [yy,ps.length,ps.filter(p=>p.durum==='ÖDENDİ').length,ps.filter(p=>['ÖDENMEDİ','KISMİ'].includes(p.durum)).length,fmt(plan),fmt(tah),plan?'%'+Math.round(tah/plan*100):'—'];})},
     evrak:{t:'Eksik Evraklı Başvurular',h:['Aday','Tür','Başvuru','Eksik Evraklar','Durum'],rows:()=>S.basvurular.filter(b=>!['ONAYLANDI','REDDEDİLDİ'].includes(b.durum)&&EVRAKLAR.some(([k])=>!b.evraklar[k])).map(b=>[b.ad,b.uyelikTuru,dfmt(b.basvuruTarihi),EVRAKLAR.filter(([k])=>!b.evraklar[k]).map(([,t])=>t).join(', '),b.durum])},
   };
   const r=R[rapor],rows=r.rows(); window._raporCache={t:r.t,h:r.h,rows};
@@ -1354,10 +1395,10 @@ function copyWpList(){
 }
 function pageMesajlar(){
   const y=THIS_YEAR;
-  const acik=S.payments.filter(p=>p.yil===y&&p.tip==='AIDAT'&&['ÖDENMEDİ','KISMİ'].includes(p.durum)&&member(p.uyeId)?.durum==='AKTİF');
+  const acik=S.payments.filter(p=>p.yil===y&&isAidatTip(p)&&['ÖDENMEDİ','KISMİ'].includes(p.durum)&&member(p.uyeId)?.durum==='AKTİF');
   const opts=acik.map(p=>member(p.uyeId)).sort(byName).map(m=>`<option value="${m.id}" ${msj.uye===m.id?'selected':''}>${esc(m.ad)}</option>`).join('');
   const m=msj.uye?member(msj.uye):null;
-  const p=m?S.payments.find(p=>p.uyeId===m.id&&p.yil===y&&p.tip==='AIDAT'):null;
+  const p=m?S.payments.find(p=>p.uyeId===m.id&&p.yil===y&&isAidatTip(p)):null;
   const ad=m?m.ad:'[Üye Adı]', tutar=p?fmt(kalan(p)):fmt(S.ayarlar.aidat[y]||0);
   const ibanLine=S.ayarlar.iban?`\nHesap (FOYDER Derneği): ${S.ayarlar.iban}\n`:'';
   const T={
@@ -1474,9 +1515,12 @@ function pageAyarlar(){
       <div class="ctl" style="min-width:340px"><input value="${esc(sh.webhook)}" placeholder="https://script.google.com/macros/s/…/exec" onchange="setAyar('sheets.webhook',this.value);renderNav()"></div></div>
     <div class="setrow"><div><div class="sl">Açılışta otomatik çek</div><div class="sd">Panel her açıldığında CSV bağlantılarından yeni kayıtları alır.</div></div>
       <div class="ctl" style="min-width:auto"><label class="switch"><input type="checkbox" ${sh.autoPull?'checked':''} onchange="setAyar('sheets.autoPull',this.checked)"><span></span></label></div></div>
+    <div class="setrow"><div><div class="sl">Değişiklikleri Sheets'e otomatik yaz</div><div class="sd">Panelde veya AI ile bir ödeme "ÖDENDİ" yapıldığında, webhook üzerinden ilgili yıl sayfasındaki Aidat Durumu ve Ödeme Tarihi hücreleri aynı formatta güncellenir. Webhook kurulumu gerektirir.</div></div>
+      <div class="ctl" style="min-width:auto"><label class="switch"><input type="checkbox" ${sh.autoPush?'checked':''} onchange="setAyar('sheets.autoPush',this.checked)"><span></span></label></div></div>
     <div class="actions" style="margin:14px 0 6px">
       <button class="btn primary" onclick="sheetsPull(true)">⟳ Şimdi Çek</button>
       <button class="btn" onclick="sheetsPush()">⬆ Sheets'e Gönder</button>
+      <button class="btn" onclick="mergeDuplicates()">🧹 Mükerrer Üyeleri Birleştir</button>
     </div>
     <div class="tabs" style="margin-top:18px"><button class="on">Apps Script Kodları</button></div>
     <p class="muted"><b>1) Gmail → Sheet: üye başvurusu e-postalarını otomatik listeye çevirir.</b> Google Sheets'te Uzantılar → Apps Script'e yapıştırın, <code>etiket</code> adını Gmail'de başvuru maillerine verdiğiniz etiketle değiştirin, tetikleyiciyi 10 dakikada bire kurun.</p>
