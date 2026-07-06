@@ -373,7 +373,8 @@ function toISOdate(v){ if(!v) return null; v=String(v).trim(); let m=v.match(/^(
 const dfmt=d=>{ if(!d) return '—'; const iso=toISOdate(d); if(!iso) return String(d); const dt=new Date(iso+'T00:00:00'); return isNaN(dt)?String(d):dt.toLocaleDateString('tr-TR'); };
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const byName=(a,b)=>a.ad.localeCompare(b.ad,'tr');
-const byDefter=(a,b)=>((a.defterNo??1e9)-(b.defterNo??1e9))||byName(a,b);
+const uyeNo=m=>m.sira??m.defterNo??null;
+const byDefter=(a,b)=>((uyeNo(a)??1e9)-(uyeNo(b)??1e9))||byName(a,b);
 const initials=ad=>ad.split(' ').map(w=>w[0]).slice(0,2).join('').toLocaleUpperCase('tr');
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
 function member(id){ return S.members.find(m=>m.id===id); }
@@ -694,7 +695,7 @@ function mergeDuplicates(){
           S.payments=S.payments.filter(x=>x.id!==p.id);
         } else { p.uyeId=hedef.id; }
       });
-      ['defterNo','kayitTarihi','ykKararTarihi','dogumYili','email','telefon','gorev','uyelikTuru'].forEach(f=>{ if(!hedef[f]&&dup[f]) hedef[f]=dup[f]; });
+      ['defterNo','sira','kayitTarihi','ykKararTarihi','dogumYili','email','telefon','gorev','uyelikTuru'].forEach(f=>{ if(!hedef[f]&&dup[f]) hedef[f]=dup[f]; });
       if(dup.durum==='AKTİF') hedef.durum='AKTİF';
       S.members=S.members.filter(x=>x.id!==dup.id);
       merged++;
@@ -718,9 +719,11 @@ async function sheetsPull(manual){
         const objs=csvToObjects(await (await fetch(url)).text());
         objs.forEach(r=>{
           const ad=cval(r,['Ad Soyad','İsim','ADI - SOYADI','Üye Adı Soyadı / Kurum','Ad']); if(!ad) return;
+          const siraNo=+cval(r,['Sıra','SIRA','Sıra No','No'])||null;
           let m=S.members.find(x=>trNorm(x.ad)===trNorm(ad));
           if(!m){ m={id:nid('m'),ad:ad.trim(),defterNo:null,kayitTarihi:null,ykKararTarihi:null,dogumYili:null,notlar:'Sheets '+yil,ucretsiz:false,email:'',telefon:'',uyelikTuru:cval(r,['Üyelik Türü'])||'Gerçek Üye',gorev:cval(r,['Görevi','Meslek','Görev'])||'',durum:'AKTİF'}; S.members.push(m); nU++; }
           else { const tur=cval(r,['Üyelik Türü']), grv=cval(r,['Görevi','Meslek','Görev']); if(tur) m.uyelikTuru=tur; if(grv) m.gorev=grv; uU++; }
+          if(siraNo&&yil>=THIS_YEAR) m.sira=siraNo; // listedeki güncel sıra numarası
           let p=S.payments.find(x=>String(x.uyeId)===String(m.id)&&Number(x.yil)===yil&&isAidatTip(x));
           if(!p){ p={id:nid('p'),uyeId:m.id,yil,tip:'AIDAT',tutar:null,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Sheets'}; S.payments.push(p); nP++; }
           const dRaw=cval(r,['Aidat Durumu','Durum','ÖDEME BİLGİSİ']);
@@ -937,7 +940,7 @@ function memberTable(list){
   return `<table><thead><tr><th>No</th><th>Üye</th><th>Üyelik Türü</th><th>Meslek</th><th>Durum</th><th>${y} Aidat</th><th>YK Tarihi</th><th></th></tr></thead><tbody>
   ${list.map(m=>{const p=S.payments.find(p=>p.uyeId===m.id&&p.yil===y&&isAidatTip(p));
     return `<tr class="clickable" onclick="openMember('${m.id}')">
-      <td class="num">${m.defterNo??'—'}</td>
+      <td class="num">${uyeNo(m)??'—'}</td>
       <td><div class="name-cell"><span class="avatar">${initials(m.ad)}</span><div><div class="nm">${esc(m.ad)}</div>${m.ucretsiz?'<div class="sb">ücretsiz statü</div>':''}</div></div></td>
       <td>${esc(m.uyelikTuru||'—')}</td><td>${esc(m.gorev||'—')}</td>
       <td><span class="tag ${stTag(m.durum)}">${m.durum}</span></td>
@@ -962,6 +965,7 @@ function openMember(id){
       <div><div style="font-size:16px;font-weight:720">${esc(m.ad)}</div><div class="muted">${esc(m.uyelikTuru||'')} · ${esc(m.gorev||'')}</div></div>
       <span class="tag ${stTag(m.durum)}" style="margin-left:auto">${m.durum}</span></div>
     <div class="detail-grid">
+      <div><div class="dl">Liste Sırası</div><div class="dv">${m.sira??'—'}</div></div>
       <div><div class="dl">Defter No</div><div class="dv">${m.defterNo??'—'}</div></div>
       <div><div class="dl">YK Karar</div><div class="dv">${dfmt(m.ykKararTarihi)}</div></div>
       <div><div class="dl">Defter Kayıt</div><div class="dv">${dfmt(m.kayitTarihi)}</div></div>
@@ -1227,7 +1231,7 @@ function pageRaporlar(){
   const y=THIS_YEAR;
   const R={
     odemeyen:{t:`${y} Aidat Ödemeyenler`,h:['Ad Soyad','Üyelik Türü','Meslek','Tutar','Kalan','Durum'],rows:()=>S.payments.filter(p=>p.yil===y&&isAidatTip(p)&&['ÖDENMEDİ','KISMİ'].includes(p.durum)&&member(p.uyeId)?.durum==='AKTİF').map(p=>{const m=member(p.uyeId);return [m.ad,m.uyelikTuru||'',m.gorev||'',fmt(p.tutar),fmt(kalan(p)),p.durum];})},
-    aktif:{t:'Aktif Üyeler',h:['No','Ad Soyad','Üyelik Türü','Meslek','YK Tarihi','Statü'],rows:()=>S.members.filter(m=>m.durum==='AKTİF').sort(byName).map(m=>[m.defterNo??'',m.ad,m.uyelikTuru||'',m.gorev||'',dfmt(m.ykKararTarihi),m.ucretsiz?'Ücretsiz':''])},
+    aktif:{t:'Aktif Üyeler',h:['No','Ad Soyad','Üyelik Türü','Meslek','YK Tarihi','Statü'],rows:()=>S.members.filter(m=>m.durum==='AKTİF').sort(byDefter).map(m=>[uyeNo(m)??'',m.ad,m.uyelikTuru||'',m.gorev||'',dfmt(m.ykKararTarihi),m.ucretsiz?'Ücretsiz':''])},
     pasif:{t:'Pasif Üyeler',h:['No','Ad Soyad','Üyelik Türü','Meslek','Not'],rows:()=>S.members.filter(m=>m.durum==='PASİF').sort(byName).map(m=>[m.defterNo??'',m.ad,m.uyelikTuru||'',m.gorev||'',m.notlar||''])},
     tahsilat:{t:'Yıllara Göre Tahsilat',h:['Yıl','Kayıt','Ödendi','Açık','Planlanan','Tahsil','Oran'],rows:()=>years().sort().map(yy=>{const ps=S.payments.filter(p=>p.yil===yy&&isAidatTip(p));const tah=ps.filter(p=>p.durum==='ÖDENDİ').reduce((s,p)=>s+(p.tutar||0),0)+ps.filter(p=>p.durum==='KISMİ').reduce((s,p)=>s+(p.odenenTutar||0),0);const plan=ps.filter(p=>p.durum!=='MUAF').reduce((s,p)=>s+(p.tutar||0),0);return [yy,ps.length,ps.filter(p=>p.durum==='ÖDENDİ').length,ps.filter(p=>['ÖDENMEDİ','KISMİ'].includes(p.durum)).length,fmt(plan),fmt(tah),plan?'%'+Math.round(tah/plan*100):'—'];})},
     evrak:{t:'Eksik Evraklı Başvurular',h:['Aday','Tür','Başvuru','Eksik Evraklar','Durum'],rows:()=>S.basvurular.filter(b=>!['ONAYLANDI','REDDEDİLDİ'].includes(b.durum)&&EVRAKLAR.some(([k])=>!b.evraklar[k])).map(b=>[b.ad,b.uyelikTuru,dfmt(b.basvuruTarihi),EVRAKLAR.filter(([k])=>!b.evraklar[k]).map(([,t])=>t).join(', '),b.durum])},
