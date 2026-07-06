@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230E1A33%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 text-anchor=%22middle%22 fill=%22%23C2992E%22 font-family=%22Georgia%22 font-weight=%22bold%22>F</text></svg>">
 <title>FOYDER OS · Üye ve Aidat Yönetim Sistemi</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -203,6 +204,15 @@ tr.clickable{cursor:pointer}
 
 .hidden{display:none!important}
 .skel{height:300px;display:flex;align-items:center;justify-content:center;color:var(--faint)}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:#F7F8FB}
+.card{transition:box-shadow .18s}
+.card:hover{box-shadow:0 4px 20px rgba(14,26,51,.07)}
+.btn{transition:background .15s,box-shadow .15s,transform .05s}
+.btn:active{transform:translateY(1px)}
+input:focus,select:focus,textarea:focus{border-color:var(--gold)!important;box-shadow:0 0 0 3px rgba(194,153,46,.14);outline:none}
+.kpi{transition:box-shadow .18s,transform .12s}
+.kpi:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(14,26,51,.09)}
 @media print{
   .sidebar,.topnav,.actions,.filters,.no-print{display:none!important}
   .main{margin:0;padding:10px} body{background:#fff} .card{box-shadow:none;break-inside:avoid}
@@ -749,6 +759,9 @@ async function sheetsPull(manual){
     persist(); render();
     document.getElementById('syncDot').classList.remove('off');
     toast(`✓ Senkron tamam: ${nU} yeni üye, ${uU} güncelleme, ${nP} ödeme, ${nB} başvuru`);
+    const _g={}; S.members.forEach(m=>{ const k=trNorm(m.ad); _g[k]=(_g[k]||0)+1; });
+    const _dup=Object.values(_g).filter(c=>c>1).length;
+    if(_dup) setTimeout(()=>toast('⚠ '+_dup+' olası mükerrer üye tespit edildi — Ayarlar → Entegrasyonlar → 🧹 Birleştir'),1800);
   }catch(e){ console.error(e); toast('⚠ Sheets verisi çekilemedi. Yayınlama linkini ve erişimi kontrol edin.'); }
 }
 async function sheetsPush(){
@@ -827,6 +840,7 @@ function pageDashboard(){
   return `
   <div class="pagehead"><div><h2>Hoş geldiniz 👋</h2><div class="sub">${new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${S.ayarlar.dernekAdi}</div></div>
   <div class="actions"><button class="btn" onclick="window.print()">🖨 Yazdır</button><button class="btn gold" onclick="go('asistan')">✨ AI Asistan</button></div></div>
+  ${(()=>{const y2=[THIS_YEAR-1,THIS_YEAR];const kronik=S.members.filter(m=>m.durum==='AKTİF'&&y2.every(yy=>S.payments.some(p=>String(p.uyeId)===String(m.id)&&Number(p.yil)===yy&&isAidatTip(p)&&['ÖDENMEDİ','KISMİ'].includes(p.durum))));return kronik.length?`<div class="banner amber" style="cursor:pointer" onclick="go('mesajlar')">⚠ <b>${kronik.length} üyenin</b> aidatı üst üste 2 yıldır (${THIS_YEAR-1}–${THIS_YEAR}) açık: ${esc(kronik.slice(0,5).map(m=>m.ad).join(', '))}${kronik.length>5?' … (+'+(kronik.length-5)+')':''} — hatırlatma listesi için tıklayın</div>`:''})()}
   <div class="kpis">
     ${kp('t-blue','👥','Toplam Üye',S.members.length,'kayıtlı üye defteri','uyeler')}
     ${kp('t-green','✓','Aktif Üye',aktif.length,aktif.filter(m=>m.ucretsiz).length+' ücretsiz statüde','uyeler')}
@@ -938,6 +952,11 @@ function rerenderBody(){ const el=document.getElementById('tblBody'); const l=fi
 function openMember(id){
   const m=member(id); if(!m) return;
   const hist=S.payments.filter(p=>p.uyeId===id).sort((a,b)=>b.yil-a.yil);
+  const yas=m.dogumYili?THIS_YEAR-m.dogumYili:null;
+  const uyeYilIso=toISOdate(m.ykKararTarihi||m.kayitTarihi);
+  const uyeSure=uyeYilIso?Math.max(0,Math.floor((Date.now()-new Date(uyeYilIso).getTime())/31557600000)):null;
+  const topOdenen=hist.reduce((s,p)=>s+(p.durum==='ÖDENDİ'?(p.tutar||0):(p.odenenTutar||0)),0);
+  const acikBakiye=hist.reduce((s,p)=>s+kalan(p),0);
   modal('Üye Detayı',`
     <div style="display:flex;align-items:center;gap:13px;margin-bottom:18px"><span class="avatar" style="width:44px;height:44px;font-size:15px">${initials(m.ad)}</span>
       <div><div style="font-size:16px;font-weight:720">${esc(m.ad)}</div><div class="muted">${esc(m.uyelikTuru||'')} · ${esc(m.gorev||'')}</div></div>
@@ -946,9 +965,12 @@ function openMember(id){
       <div><div class="dl">Defter No</div><div class="dv">${m.defterNo??'—'}</div></div>
       <div><div class="dl">YK Karar</div><div class="dv">${dfmt(m.ykKararTarihi)}</div></div>
       <div><div class="dl">Defter Kayıt</div><div class="dv">${dfmt(m.kayitTarihi)}</div></div>
-      <div><div class="dl">Doğum Yılı</div><div class="dv">${m.dogumYili||'—'}</div></div>
+      <div><div class="dl">Doğum Yılı</div><div class="dv">${m.dogumYili?m.dogumYili+(yas?' <span style="color:var(--faint);font-weight:500">('+yas+' yaş)</span>':''):'—'}</div></div>
       <div><div class="dl">E-posta</div><div class="dv">${esc(m.email||'—')}</div></div>
       <div><div class="dl">Telefon</div><div class="dv">${esc(m.telefon||'—')}</div></div>
+      <div><div class="dl">Üyelik Süresi</div><div class="dv">${uyeSure!=null?(uyeSure<1?'1 yıldan az':uyeSure+' yıl'):'—'}</div></div>
+      <div><div class="dl">Toplam Ödenen</div><div class="dv" style="color:var(--green)">${fmt(topOdenen)}</div></div>
+      <div><div class="dl">Açık Bakiye</div><div class="dv" style="color:${acikBakiye>0?'var(--red)':'var(--ink)'}">${fmt(acikBakiye)}</div></div>
     </div>
     ${m.notlar?`<div class="banner amber">📝 ${esc(m.notlar)}</div>`:''}
     <h3 style="font-size:13.5px;margin:4px 0 9px;font-weight:700">Ödeme Geçmişi</h3>
@@ -1488,7 +1510,7 @@ function pageAyarlar(){
     ${needEp?`<div class="setrow"><div><div class="sl">Endpoint</div><div class="sd">OpenAI-uyumlu /v1/chat/completions adresi (ör. yerel Ollama, OpenRouter).</div></div>
       <div class="ctl" style="min-width:340px"><input value="${esc(A.ai.endpoint)}" placeholder="https://…/v1/chat/completions" onchange="setAyar('ai.endpoint',this.value)"></div></div>`:''}
     <div class="setrow"><div><div class="sl">İşlem öncesi onay iste</div><div class="sd">Açıkken AI'ın önerdiği her kayıt önce onay penceresinde gösterilir. Kapatmanız önerilmez.</div></div>
-      <div class="ctl" style="min-width:auto"><label class="switch"><input type="checkbox" ${A.ai.onayla?'checked':''} onchange="setAyar('ai.onayla',this.checked)"><span></span></label></div></div>
+      <div class="ctl" style="min-width:auto"><label class="switch"><input type="checkbox" ${A.ai.onayla?'checked':''} onchange="setAyar('ai.onayla',this.checked)"><i></i></label></div></div>
     <div class="setrow" style="border-bottom:0"><div><div class="sl">Bağlantı Testi</div><div class="sd">Seçili sağlayıcıya kısa bir deneme isteği gönderir.</div></div>
       <div class="ctl" style="min-width:auto"><button class="btn primary" onclick="aiTest()">▶ Test Et</button></div></div>
     <div id="aiTestOut"></div>
@@ -1514,9 +1536,9 @@ function pageAyarlar(){
     <div class="setrow"><div><div class="sl">Apps Script Webhook (gönderim)</div><div class="sd">"Sheets'e Gönder" düğmesinin POST adresi. Aşağıdaki 2 no.lu kodu dağıtınca oluşan /exec bağlantısı.</div></div>
       <div class="ctl" style="min-width:340px"><input value="${esc(sh.webhook)}" placeholder="https://script.google.com/macros/s/…/exec" onchange="setAyar('sheets.webhook',this.value);renderNav()"></div></div>
     <div class="setrow"><div><div class="sl">Açılışta otomatik çek</div><div class="sd">Panel her açıldığında CSV bağlantılarından yeni kayıtları alır.</div></div>
-      <div class="ctl" style="min-width:auto"><label class="switch"><input type="checkbox" ${sh.autoPull?'checked':''} onchange="setAyar('sheets.autoPull',this.checked)"><span></span></label></div></div>
+      <div class="ctl" style="min-width:auto"><label class="switch"><input type="checkbox" ${sh.autoPull?'checked':''} onchange="setAyar('sheets.autoPull',this.checked)"><i></i></label></div></div>
     <div class="setrow"><div><div class="sl">Değişiklikleri Sheets'e otomatik yaz</div><div class="sd">Panelde veya AI ile bir ödeme "ÖDENDİ" yapıldığında, webhook üzerinden ilgili yıl sayfasındaki Aidat Durumu ve Ödeme Tarihi hücreleri aynı formatta güncellenir. Webhook kurulumu gerektirir.</div></div>
-      <div class="ctl" style="min-width:auto"><label class="switch"><input type="checkbox" ${sh.autoPush?'checked':''} onchange="setAyar('sheets.autoPush',this.checked)"><span></span></label></div></div>
+      <div class="ctl" style="min-width:auto"><label class="switch"><input type="checkbox" ${sh.autoPush?'checked':''} onchange="setAyar('sheets.autoPush',this.checked)"><i></i></label></div></div>
     <div class="actions" style="margin:14px 0 6px">
       <button class="btn primary" onclick="sheetsPull(true)">⟳ Şimdi Çek</button>
       <button class="btn" onclick="sheetsPush()">⬆ Sheets'e Gönder</button>
