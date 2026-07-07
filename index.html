@@ -373,7 +373,7 @@ function toISOdate(v){ if(!v) return null; v=String(v).trim(); let m=v.match(/^(
 const dfmt=d=>{ if(!d) return '—'; const iso=toISOdate(d); if(!iso) return String(d); const dt=new Date(iso+'T00:00:00'); return isNaN(dt)?String(d):dt.toLocaleDateString('tr-TR'); };
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const byName=(a,b)=>a.ad.localeCompare(b.ad,'tr');
-const uyeNo=m=>m.sira??m.defterNo??null;
+const uyeNo=m=>{ const sheetMode=S.members.some(x=>x.sira!=null); return sheetMode?(m.sira??null):(m.defterNo??null); };
 const byDefter=(a,b)=>((uyeNo(a)??1e9)-(uyeNo(b)??1e9))||byName(a,b);
 const initials=ad=>ad.split(' ').map(w=>w[0]).slice(0,2).join('').toLocaleUpperCase('tr');
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
@@ -670,9 +670,16 @@ function parseCSV(text){
   return rows.filter(r=>r.some(c=>c.trim()));
 }
 function csvToObjects(text){
-  const rows=parseCSV(text); if(rows.length<2) return [];
-  const head=rows[0].map(h=>h.trim());
+  const rows=parseCSV(String(text||'').replace(/^\uFEFF/,'')); if(rows.length<2) return [];
+  const head=rows[0].map(h=>String(h).replace(/\uFEFF/g,'').trim());
   return rows.slice(1).map(r=>Object.fromEntries(head.map((h,i)=>[h,(r[i]||'').trim()])));
+}
+// Google'ın yayın önbelleğini atlayarak CSV indir (eski kopya gelmesin)
+async function fetchCsv(url){
+  const u=url+(url.includes('?')?'&':'?')+'cb='+Date.now();
+  const r=await fetch(u,{cache:'no-store'});
+  if(!r.ok) throw new Error('CSV indirilemedi ('+r.status+')');
+  return await r.text();
 }
 // Google Sheets kolon takma adlari: farkli baslik adlarini panelin bekledigi alanlara esler
 const cval=(r,keys)=>{ for(const k of keys){ if(r[k]!=null&&String(r[k]).trim()!=='') return String(r[k]).trim(); } return ''; };
@@ -708,7 +715,7 @@ async function sheetsPull(manual){
   const sh=S.ayarlar.sheets;
   if(!sh.csvUyeler&&!sh.csvOdemeler&&!sh.csvBasvurular&&!sh.yilCsv){ if(manual){ toast('Sheets bağlantısı tanımlı değil — Ayarlar → Entegrasyonlar'); go('ayarlar'); ayarTab='ent'; render(); } return; }
   toast('⟳ Google Sheets ile senkronize ediliyor…');
-  let nU=0,uU=0,nP=0,nB=0;
+  let nU=0,uU=0,nP=0,nB=0,nS=0;
   try{
     // Yıl sayfaları: "2026: link" satırları — mevcut Excel yapısıyla (Ad Soyad/İsim, Aidat Tutarı, Aidat Durumu, Ödeme Tarihi) doğrudan çalışır
     if(sh.yilCsv){
@@ -716,14 +723,14 @@ async function sheetsPull(manual){
       for(const line of lines){
         const mm=line.match(/^(\d{4})\s*[:|]?\s*(https?:\/\/\S+)/); if(!mm) continue;
         const yil=+mm[1], url=mm[2];
-        const objs=csvToObjects(await (await fetch(url)).text());
+        const objs=csvToObjects(await fetchCsv(url));
         objs.forEach(r=>{
           const ad=cval(r,['Ad Soyad','İsim','ADI - SOYADI','Üye Adı Soyadı / Kurum','Ad']); if(!ad) return;
           const siraNo=+cval(r,['Sıra','SIRA','Sıra No','No'])||null;
           let m=S.members.find(x=>trNorm(x.ad)===trNorm(ad));
           if(!m){ m={id:nid('m'),ad:ad.trim(),defterNo:null,kayitTarihi:null,ykKararTarihi:null,dogumYili:null,notlar:'Sheets '+yil,ucretsiz:false,email:'',telefon:'',uyelikTuru:cval(r,['Üyelik Türü'])||'Gerçek Üye',gorev:cval(r,['Görevi','Meslek','Görev'])||'',durum:'AKTİF'}; S.members.push(m); nU++; }
           else { const tur=cval(r,['Üyelik Türü']), grv=cval(r,['Görevi','Meslek','Görev']); if(tur) m.uyelikTuru=tur; if(grv) m.gorev=grv; uU++; }
-          if(siraNo&&yil>=THIS_YEAR) m.sira=siraNo; // listedeki güncel sıra numarası
+          if(siraNo&&yil>=THIS_YEAR){ m.sira=siraNo; nS++; } // listedeki güncel sıra numarası
           let p=S.payments.find(x=>String(x.uyeId)===String(m.id)&&Number(x.yil)===yil&&isAidatTip(x));
           if(!p){ p={id:nid('p'),uyeId:m.id,yil,tip:'AIDAT',tutar:null,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Sheets'}; S.payments.push(p); nP++; }
           const dRaw=cval(r,['Aidat Durumu','Durum','ÖDEME BİLGİSİ']);
@@ -735,7 +742,7 @@ async function sheetsPull(manual){
       }
     }
     if(sh.csvUyeler){
-      const objs=csvToObjects(await (await fetch(sh.csvUyeler)).text());
+      const objs=csvToObjects(await fetchCsv(sh.csvUyeler));
       objs.forEach(r=>{ const ad=cval(r,['Ad Soyad','İsim','ADI - SOYADI','Üye Adı Soyadı / Kurum','Ad','AD SOYAD','ad soyad']); if(!ad) return;
         const ex=S.members.find(m=>trNorm(m.ad)===trNorm(ad));
         const data={uyelikTuru:cval(r,['Üyelik Türü','ÜYELİK TÜRÜ'])||ex?.uyelikTuru||'Gerçek Üye',gorev:cval(r,['Meslek','Görevi','Görev'])||ex?.gorev||'',durum:(cval(r,['Durum','AKTİF/PASİF'])||ex?.durum||'AKTİF').toLocaleUpperCase('tr'),email:cval(r,['E-posta','E-Posta','Email'])||ex?.email||'',telefon:cval(r,['Telefon'])||ex?.telefon||''};
@@ -743,7 +750,7 @@ async function sheetsPull(manual){
         else{S.members.push({id:nid('m'),ad:ad.trim(),defterNo:null,kayitTarihi:null,ykKararTarihi:null,dogumYili:null,notlar:'Sheets',ucretsiz:false,...data});nU++;} });
     }
     if(sh.csvOdemeler){
-      const objs=csvToObjects(await (await fetch(sh.csvOdemeler)).text());
+      const objs=csvToObjects(await fetchCsv(sh.csvOdemeler));
       objs.forEach(r=>{ const ad=cval(r,['Ad Soyad','İsim','ADI - SOYADI','Üye Adı Soyadı / Kurum','Ad']),yil=+cval(r,['Yıl','Yil','YIL','Dönem']); if(!ad||!yil) return;
         const m=S.members.find(m=>trNorm(m.ad)===trNorm(ad)); if(!m) return;
         let p=S.payments.find(p=>String(p.uyeId)===String(m.id)&&Number(p.yil)===yil&&isAidatTip(p));
@@ -754,14 +761,15 @@ async function sheetsPull(manual){
         Object.assign(p,{tutar:tRaw?+tRaw.replace(/[^0-9]/g,''):p.tutar,durum,odemeTarihi:toISOdate(cval(r,['Ödeme Tarihi']))||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(p.tutar||0):p.odenenTutar}); });
     }
     if(sh.csvBasvurular){
-      const objs=csvToObjects(await (await fetch(sh.csvBasvurular)).text());
+      const objs=csvToObjects(await fetchCsv(sh.csvBasvurular));
       objs.forEach(r=>{ const ad=r['Ad Soyad']||r['Ad']; if(!ad) return;
         if(S.basvurular.some(b=>trNorm(b.ad)===trNorm(ad))||S.members.some(m=>trNorm(m.ad)===trNorm(ad))) return;
         S.basvurular.push({id:nid('b'),ad:ad.trim(),email:r['E-posta']||'',telefon:r['Telefon']||'',gorev:r['Meslek']||'',uyelikTuru:r['Üyelik Türü']||'Gerçek Üye',basvuruTarihi:r['Tarih']||TODAY,durum:'YENİ',komiteDurumu:'',ykKararNo:'',referans1:r['Referans 1']||'',referans2:r['Referans 2']||'',evraklar:{},notlar:'E-posta/Form aktarımı'}); nB++; });
     }
     persist(); render();
     document.getElementById('syncDot').classList.remove('off');
-    toast(`✓ Senkron tamam: ${nU} yeni üye, ${uU} güncelleme, ${nP} ödeme, ${nB} başvuru`);
+    toast(`✓ Senkron tamam: ${nU} yeni üye, ${uU} güncelleme, ${nP} ödeme, ${nB} başvuru${nS?`, ${nS} sıra no`:''}`);
+    if(S.ayarlar.sheets.yilCsv&&!nS) setTimeout(()=>toast('⚠ Sıra kolonu okunamadı — Sheets birkaç dakika önbellekte eski kalabilir, biraz sonra tekrar Senkron deneyin'),1600);
     const _g={}; S.members.forEach(m=>{ const k=trNorm(m.ad); _g[k]=(_g[k]||0)+1; });
     const _dup=Object.values(_g).filter(c=>c>1).length;
     if(_dup) setTimeout(()=>toast('⚠ '+_dup+' olası mükerrer üye tespit edildi — Ayarlar → Entegrasyonlar → 🧹 Birleştir'),1800);
