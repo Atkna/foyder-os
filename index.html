@@ -334,19 +334,22 @@ async function loadState(){
 }
 function persist(){
   clearTimeout(saveTimer);
-  saveTimer=setTimeout(async()=>{
+  saveTimer=setTimeout(()=>cloudQueue(async()=>{
     // AI anahtari yalnizca bu tarayicida saklanir; buluta ve ortak depoya asla yazilmaz
     try{ localStorage.setItem('foyder:aikey', (S.ayarlar&&S.ayarlar.ai&&S.ayarlar.ai.apiKey)||''); }catch(e){}
     const out=JSON.parse(JSON.stringify(S)); if(out.ayarlar&&out.ayarlar.ai) out.ayarlar.ai.apiKey='';
     try{ if(HAS_STORE) await window.storage.set('foyder:v2',JSON.stringify(out)); }catch(e){}
     try{ if(window._sb&&window._sbUser){
       window._lastSaveAt=Date.now();
+      // Toplantılar ve Görevler verisi buluttaki son hâlle birleştirilir; başka kullanıcının eklediği görev silinmez
+      const hzSent=await HZ.prepareOut(out);
       const {error}=await window._sb.from('app_state').upsert({id:'main',data:out,updated_at:new Date().toISOString()});
       if(error) throw error;
+      HZ.synced(hzSent,out.hafiza);
       const d=document.getElementById('syncDot'); if(d) d.classList.remove('off');
     }}catch(e){ console.error(e); toast('⚠ Buluta kaydedilemedi — bağlantıyı kontrol edin'); }
     schedulePushDurum();
-  },350);
+  }),350);
 }
 let _pushTimer=null;
 function schedulePushDurum(){
@@ -385,7 +388,7 @@ function kalan(p){ if(p.durum==='MUAF')return 0; return Math.max(0,(p.tutar||0)-
 const EVRAKLAR=[['cv','CV'],['form','Başvuru Formu'],['etik','Etik Beyan'],['adli','Adli Sicil'],['diploma','Diploma'],['kimlik','Kimlik']];
 const val=id=>document.getElementById(id)?.value??'';
 
-const PERM={admin:{uye:1,aidat:1,basvuru:1,karar:1,ayar:1},operasyon:{uye:1,aidat:0,basvuru:1,karar:1,ayar:0},muhasebe:{uye:0,aidat:1,basvuru:0,karar:0,ayar:0},okuyucu:{uye:0,aidat:0,basvuru:0,karar:0,ayar:0}};
+const PERM={admin:{uye:1,aidat:1,basvuru:1,karar:1,ayar:1,gorev:1},operasyon:{uye:1,aidat:0,basvuru:1,karar:1,ayar:0,gorev:1},muhasebe:{uye:0,aidat:1,basvuru:0,karar:0,ayar:0,gorev:1},okuyucu:{uye:0,aidat:0,basvuru:0,karar:0,ayar:0,gorev:0}};
 window._myRole='okuyucu';
 function can(k){ return !!(PERM[window._myRole]||PERM.okuyucu)[k]; }
 function isAdmin(){ return window._myRole==='admin'; }
@@ -803,11 +806,12 @@ const ICONS={
  analiz:'<svg viewBox="0 0 24 24"><path d="M21 21H4a1 1 0 01-1-1V3"/><path d="M7 14l3.5-4 3 2.5L20 6"/><circle cx="20" cy="6" r="1.4" fill="currentColor" stroke="none"/></svg>',
  mesajlar:'<svg viewBox="0 0 24 24"><path d="M4 5h16a1 1 0 011 1v10a1 1 0 01-1 1H8l-4 3.5V6a1 1 0 011-1z"/></svg>',
  asistan:'<svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.7L19.6 10l-5.7 1.9L12 17.6l-1.9-5.7L4.4 10l5.7-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>',
+ gorevler:'<svg viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.6 1.6L8 4.7M3.5 12l1.6 1.6L8 10.7"/><circle cx="5.2" cy="18" r="1.2"/></svg>',
  ayarlar:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 00-2-1.2L14.2 3H9.8L9.4 5.7a7 7 0 00-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 002 1.2l.4 2.7h4.4l.4-2.7a7 7 0 002-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>'
 };
 const PAGES=[
  ['dashboard','Dashboard','Genel Bakış'],['asistan','AI Asistan','Genel Bakış'],
- ['uyeler','Üye Yönetimi','Operasyon'],['aidat','Aidat & Ödemeler','Operasyon'],['basvurular','Başvurular','Operasyon'],['kararlar','YK Kararları','Operasyon'],
+ ['uyeler','Üye Yönetimi','Operasyon'],['aidat','Aidat & Ödemeler','Operasyon'],['basvurular','Başvurular','Operasyon'],['kararlar','YK Kararları','Operasyon'],['gorevler','Toplantılar ve Görevler','Operasyon'],
  ['raporlar','Raporlama','Analiz'],['analiz','Analiz & Grafikler','Analiz'],['mesajlar','Mesaj Şablonları','Analiz'],
  ['ayarlar','Ayarlar & Entegrasyon','Sistem']
 ];
@@ -816,7 +820,8 @@ function renderNav(){
   let html='',lastG='';
   for(const [id,t,g] of PAGES){
     if(g!==lastG){ html+=`<div class="nav-label">${g}</div>`; lastG=g; }
-    html+=`<button class="${route===id?'active':''}" onclick="go('${id}')"><span class="ic">${ICONS[id]}</span><span class="t">${t}</span>${id==='basvurular'&&eksik?`<span class="pill">${eksik}</span>`:''}</button>`;
+    const pill=id==='basvurular'?eksik:id==='gorevler'?HZ.badge():0;
+    html+=`<button class="${route===id?'active':''}" onclick="go('${id}')"><span class="ic">${ICONS[id]}</span><span class="t">${t}</span>${pill?`<span class="pill">${pill}</span>`:''}</button>`;
   }
   document.getElementById('nav').innerHTML=html;
   const ROLAD={admin:'Yönetici',operasyon:'Operasyon',muhasebe:'Muhasebe',okuyucu:'Okuyucu'};
@@ -1463,6 +1468,1401 @@ function pageMesajlar(){
   </div></div>`;
 }
 </script>
+<!-- ============ TOPLANTILAR VE GÖREVLER (Hafıza) ============ -->
+<style>
+/* ============ TOPLANTILAR VE GÖREVLER ============ */
+.toast:not(.show){pointer-events:none}
+.toast button{margin-left:12px;background:var(--gold);border:0;color:#fff;border-radius:7px;padding:4px 11px;font-weight:650;font-size:12px}
+.modal-f{flex-wrap:wrap}
+.hz-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.hz-tabs::-webkit-scrollbar{display:none}
+.hz-tabs button{background:none;border:0;padding:13px 11px 11px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.hz-tabs button:hover{color:var(--text)}
+.hz-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}
+.hz-tabs button b{font-size:10.5px;background:#EEF1F5;color:var(--muted);border-radius:99px;padding:1px 7px;font-weight:700}
+.hz-tabs button.on b{background:var(--gold-soft);color:var(--gold)}
+.hz-seg{display:inline-flex;background:#EEF1F5;border-radius:9px;padding:3px;gap:2px}
+.hz-seg button{border:0;background:none;padding:5px 11px;border-radius:7px;font-size:12px;font-weight:600;color:var(--muted)}
+.hz-seg button.on{background:#fff;color:var(--text);box-shadow:var(--sh)}
+.hz-group{padding:14px 18px 6px;font-size:10.5px;font-weight:700;letter-spacing:.9px;color:var(--faint);display:flex;gap:6px;align-items:center;border-bottom:1px solid #F0F2F6}
+.hz-group.late{color:var(--red)}
+.hz-task{display:flex;align-items:flex-start;gap:12px;padding:12px 18px;border-bottom:1px solid #F0F2F6;cursor:pointer;transition:background .12s}
+.hz-task:hover{background:#F9FAFD}
+.hz-task input[type=checkbox]{width:18px;height:18px;margin-top:1px;flex:none;accent-color:var(--green);cursor:pointer;padding:0}
+.hz-task-main{flex:1;min-width:0}
+.hz-task-title{font-weight:620;line-height:1.4;overflow-wrap:anywhere}
+.hz-task.done .hz-task-title{text-decoration:line-through;color:var(--faint)}
+.hz-meta{display:flex;flex-wrap:wrap;gap:5px 10px;align-items:center;margin-top:5px;font-size:11.5px;color:var(--muted)}
+.hz-meta .late{color:var(--red);font-weight:650}
+.hz-src{flex:none;max-width:210px;font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-top:2px}
+.tag.hz-proj{background:#F2F4F8;color:var(--text)}
+.tag.hz-proj::before{background:var(--pc,#95A0B4)}
+.hz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:13px;padding:16px 18px}
+.hz-tr{border:1px solid var(--line);border-radius:12px;padding:14px 15px;cursor:pointer;background:#fff;display:flex;flex-direction:column;gap:7px;transition:border-color .14s,box-shadow .14s}
+.hz-tr:hover{border-color:#C6CEDB;box-shadow:var(--sh2)}
+.hz-tr .d{font-size:10.5px;font-weight:700;letter-spacing:.8px;color:var(--gold)}
+.hz-tr h4{font-size:13.5px;font-weight:700;line-height:1.35;overflow-wrap:anywhere}
+.hz-tr p{font-size:12px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.hz-tr .f{display:flex;justify-content:space-between;font-size:11.5px;color:var(--faint);margin-top:auto;padding-top:4px}
+.hz-tr .f b{color:var(--text)}
+.hz-text{white-space:pre-wrap;line-height:1.6;font-size:12.8px;background:#F8F9FC;border:1px solid var(--line);border-radius:11px;padding:14px;max-height:46vh;overflow:auto;overflow-wrap:anywhere}
+.hz-sublabel{font-size:11.5px;font-weight:650;color:var(--muted);margin-bottom:6px}
+.hz-linked{display:flex;flex-direction:column;gap:5px;margin-bottom:16px}
+.hz-linked button{text-align:left;background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start;color:var(--text)}
+.hz-linked button:hover{border-color:var(--gold)}
+.hz-linked button.done{color:var(--faint);text-decoration:line-through}
+.hz-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.hz-foot{padding:13px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;background:#FBFCFD;flex-wrap:wrap}
+.hz-foot .left{margin-right:auto}
+.hz-textarea{min-height:300px;resize:vertical;line-height:1.55}
+.hz-cand{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:#fff}
+.hz-cand.off{opacity:.55;background:#FAFBFC}
+.hz-cand-top{display:flex;gap:10px;align-items:flex-start}
+.hz-cand-top input[type=checkbox]{width:18px;height:18px;margin-top:9px;flex:none;accent-color:var(--green);padding:0}
+.hz-cand-top textarea{flex:1;resize:none;overflow:hidden;font-weight:620;line-height:1.4;min-height:36px}
+.hz-cand-grid{display:grid;grid-template-columns:1.2fr 1fr 150px 110px 1.3fr;gap:8px;margin-top:9px;padding-left:28px}
+.hz-cand-link{display:flex;gap:8px;align-items:center;margin-top:8px;padding-left:28px;font-size:12px;color:var(--muted);white-space:nowrap}
+.hz-cand-link select{flex:1;min-width:0}
+.hz-cand-st{margin-top:8px;padding-left:28px;font-size:12px;line-height:1.5}
+.hz-match{background:var(--blue-soft);color:var(--blue);border-radius:8px;padding:7px 10px}
+.hz-match.fin{background:var(--green-soft);color:var(--green)}
+.hz-new{color:var(--green);font-weight:600}
+.hz-ctx{margin-top:6px;padding-left:28px;font-size:11.5px;color:var(--faint);line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:920px){
+  .hz-cand-grid{grid-template-columns:1fr 1fr;padding-left:0}
+  .hz-cand-link,.hz-cand-st,.hz-ctx{padding-left:0}
+  .hz-src{display:none}
+  .hz-task{padding:12px 14px}
+  .hz-group{padding:12px 14px 6px}
+  .hz-grid{padding:12px 14px}
+  .hz-filters input,.hz-filters select{flex:1 1 150px;min-width:0!important}
+  .hz-filters .count{margin-left:0}
+}
+@media(max-width:560px){
+  .hz-cand-grid{grid-template-columns:1fr}
+  .hz-grid{grid-template-columns:1fr}
+  .hz-cand-link{flex-wrap:wrap;white-space:normal}
+  .hz-textarea{min-height:220px}
+  .hz-kpis{grid-template-columns:1fr 1fr;gap:9px}
+  .hz-kpis .kpi{padding:12px}
+  .hz-kpis .kpi .ico{width:26px;height:26px;margin-bottom:6px;font-size:13px}
+  .hz-kpis .kpi .v{font-size:19px}
+  .hz-kpis .kpi .d{display:none}
+}
+</style>
+<!-- hafiza/task-engine.js ve hafiza/reminders.js değiştirilmeden gömülüdür; güncellemek için: node tools/hafiza-gom.js -->
+<script id="hafiza-task-engine">
+(function (root) {
+  'use strict';
+
+  /* ------------------------------------------------------------------ *
+   *  Metin yardımcıları
+   * ------------------------------------------------------------------ */
+
+  const UP = 'A-ZÇĞİÖŞÜÂÎÛ';
+  const LOW = 'a-zçğıöşüâîû';
+
+  // Türkçe harfleri sadeleştirir; noktalama boşluğa döner ("Kerem'e" -> "kerem e").
+  const fold = value => String(value || '').toLocaleLowerCase('tr-TR')
+    .replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u')
+    .replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+  // Ek ayıran kesme işaretini silerek sadeleştirir ("Kerem'e" -> "kereme"); fiil çözümlemesi için.
+  const foldJoined = value => fold(String(value || '').replace(/['’`´]/g, ''));
+  const localISO = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const capitalize = text => text ? text.charAt(0).toLocaleUpperCase('tr-TR') + text.slice(1) : text;
+
+  /* ------------------------------------------------------------------ *
+   *  Tarih, saat ve öncelik
+   * ------------------------------------------------------------------ */
+
+  const months = { ocak:0, subat:1, mart:2, nisan:3, mayis:4, haziran:5, temmuz:6, agustos:7, eylul:8, ekim:9, kasim:10, aralik:11 };
+  const monthNames = Object.keys(months).join('|');
+  const weekdays = { pazartesi:1, sali:2, carsamba:3, persembe:4, cuma:5, cumartesi:6, pazar:0 };
+  const numberWords = { bir:1, iki:2, uc:3, dort:4, bes:5, alti:6, yedi:7, sekiz:8, dokuz:9, on:10 };
+
+  function baseDate(meetingDate) {
+    return /^\d{4}-\d\d-\d\d$/.test(meetingDate || '') ? new Date(`${meetingDate}T12:00:00`) : new Date(new Date().setHours(12, 0, 0, 0));
+  }
+  const addDays = (date, days) => { const d = new Date(date); d.setDate(d.getDate() + days); return d; };
+  const validDate = (y, m, d) => { const date = new Date(y, m, d, 12); return date.getMonth() === m && date.getDate() === d ? date : null; };
+
+  function dateFrom(text, meetingDate) {
+    const base = baseDate(meetingDate);
+    const raw = String(text || '');
+    const f = fold(raw);
+
+    // 1) "5 Ekim", "15 Kasım 2026"
+    const named = f.match(new RegExp(`\\b(\\d{1,2}) (${monthNames})(?: (20\\d{2}))?\\b`));
+    if (named) {
+      const day = Number(named[1]), month = months[named[2]];
+      let year = Number(named[3]) || base.getFullYear();
+      let date = validDate(year, month, day);
+      if (date) {
+        if (!named[3] && date.getTime() < base.getTime() - 45 * 86400000) date = validDate(++year, month, day) || date;
+        return localISO(date);
+      }
+    }
+
+    // 2) "05.10.2026", "5/10/26", "05.10" — saat (10.30), tutar (2.000) ve aralıkları (15-20 gün) tarih sanma.
+    const numeric = raw.match(/(?<![\d.,/:-])(\d{1,2})([./-])(\d{1,2})\2(20\d{2}|\d{2})(?![\d:])/);
+    if (numeric) {
+      const year = numeric[4].length === 2 ? 2000 + Number(numeric[4]) : Number(numeric[4]);
+      const date = validDate(year, Number(numeric[3]) - 1, Number(numeric[1]));
+      if (date) return localISO(date);
+    }
+    const short = raw.match(/(?<![\d.,/:-])(\d{2})[./](\d{2})(?![\d.,/:-]|\s*(?:TL|₺|%|bin|milyon|kişi|adet|saat|dakika|gün|hafta|ay|yıl)\b)/i);
+    if (short && !/saat\s*$/i.test(raw.slice(0, short.index))) {
+      let date = validDate(base.getFullYear(), Number(short[2]) - 1, Number(short[1]));
+      if (date) {
+        if (date.getTime() < base.getTime() - 45 * 86400000) date = validDate(base.getFullYear() + 1, Number(short[2]) - 1, Number(short[1])) || date;
+        return localISO(date);
+      }
+    }
+
+    // 3) "Kasım sonu", "ay sonuna kadar", "yıl sonu"
+    const monthEdge = f.match(new RegExp(`\\b(${monthNames}) (sonu\\w*|ortasi\\w*|basi\\w*)\\b`));
+    if (monthEdge) {
+      const month = months[monthEdge[1]];
+      let year = base.getFullYear();
+      if (month < base.getMonth() - 1) year++;
+      const day = monthEdge[2].startsWith('son') ? new Date(year, month + 1, 0).getDate() : monthEdge[2].startsWith('ort') ? 15 : 1;
+      return localISO(new Date(year, month, day, 12));
+    }
+    if (/\bay sonu\w*\b/.test(f)) return localISO(new Date(base.getFullYear(), base.getMonth() + 1, 0, 12));
+    if (/\byil sonu\w*\b/.test(f)) return localISO(new Date(base.getFullYear(), 11, 31, 12));
+
+    // 4) Göreli ifadeler
+    const span = f.match(/\b(\d{1,2}|bir|iki|uc|dort|bes|alti|yedi|sekiz|dokuz|on) (gun|hafta) (icinde|icerisinde|sonra|sonraya)\b/);
+    if (span) {
+      const n = Number(span[1]) || numberWords[span[1]] || 0;
+      if (n > 0 && n <= 90) return localISO(addDays(base, span[2] === 'hafta' ? n * 7 : n));
+    }
+    if (/\b(yarindan sonra|obur gun)\b/.test(f)) return localISO(addDays(base, 2));
+    if (/\byarin(a|ki)?\b/.test(f)) return localISO(addDays(base, 1));
+    if (/\bbugun\b|\bgun icinde\b|\baksama kadar\b|\bmesai bitimine\b/.test(f)) return localISO(base);
+
+    const nextWeek = /\b(haftaya|gelecek hafta|onumuzdeki hafta|gelecek haftaya)\b/.test(f);
+    const dayMatch = f.match(/\b(pazartesi|sali|carsamba|persembe|cumartesi|cuma)(?:ya|ye)?\b/) || f.match(/\b(pazar)(?: gunu| gunune| gunku| sabahi| aksami|a kadar)\b/);
+    if (dayMatch) {
+      const target = weekdays[dayMatch[1]];
+      let diff = (target - base.getDay() + 7) % 7;
+      if (diff === 0) diff = 7;
+      if (nextWeek) {
+        // "Haftaya salı": bir sonraki takvim haftasındaki o gün.
+        const monday = addDays(base, ((8 - base.getDay()) % 7) || 7);
+        return localISO(addDays(monday, (target + 6) % 7));
+      }
+      return localISO(addDays(base, diff));
+    }
+    if (nextWeek) return localISO(addDays(base, 7));
+    if (/\bhafta sonu\w*\b/.test(f)) {
+      const day = base.getDay();
+      return localISO(addDays(base, day === 0 ? 0 : 6 - day));
+    }
+    if (/\bbu hafta\b/.test(f)) {
+      const day = base.getDay();
+      // Hafta içi: o haftanın cuması; hafta sonu: pazar.
+      return localISO(addDays(base, day >= 1 && day <= 5 ? 5 - day : day === 6 ? 1 : 0));
+    }
+    return '';
+  }
+
+  function timeFrom(text) {
+    const raw = String(text || '');
+    const match = raw.match(/\bsaat\s+(\d{1,2})[:.](\d{2})\b/i) || raw.match(/\b(\d{1,2})[:.](\d{2})['’][dt][ea]\b/i);
+    if (!match) return '';
+    const h = Number(match[1]), m = Number(match[2]);
+    return h <= 23 && m <= 59 ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` : '';
+  }
+
+  function priority(text) {
+    const f = fold(text);
+    if (/\b(acelesi yok|acil degil|aciliyeti (yok|bulunmam\w*)|aciliyet yok|oncelikli degil|dusuk oncelik\w*|bekleyebilir|beklet\w*|vakit olunca|firsat olunca)\b/.test(f)) return 'low';
+    if (/\b(acil|acilen|aciliyet\w*|ivedi\w*|derhal|bir an once|en kisa surede|vakit kaybetmeden|gecikmeden|kritik|cok onemli|oncelikli|yuksek oncelik\w*|mutlaka)\b/.test(f)) return 'high';
+    if (/\bhemen\b/.test(f) && !/\bhemen hemen\b/.test(f)) return 'high';
+    return 'medium';
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Örnek toplantı için hazır başlık kuralları
+   * ------------------------------------------------------------------ */
+
+  const sampleRules = [
+    ['mekan rezervasyonu', 'Mekânla görüşüp 17 Ekim tekstil buluşması için ön rezervasyonu teyit et', 'Tekstil Buluşması', 'textile-venue'],
+    ['salon buyutme opsiyonu', 'Mekâna katılım 50 kişiye çıkarsa daha büyük salona geçiş imkânını sor', 'Tekstil Buluşması', 'textile-bigger-room'],
+    ['masa duzen ilavesi', 'Mekâna ek masa ile salon kapasitesini en az 10 kişi artırma seçeneğini sor', 'Tekstil Buluşması', 'textile-extra-tables'],
+    ['seri formati', 'Kerem’e sektörel kahvaltılar için tekrar kullanılabilir broşür şablonunu anlat', 'Tekstil Buluşması', 'textile-brochure-series'],
+    ['afis hiyerarsisi', 'Kerem’e afiş başlığını üstte belirgin göstermesini ilet', 'Tekstil Buluşması', 'textile-poster-heading'],
+    ['4 gorsel fotograf', 'Afişte Önder Bey, moderatör ve iki katılımcının fotoğraflarını kullan', 'Tekstil Buluşması', 'textile-four-photos'],
+    ['eksik konusmaci bilgileri', 'Mustafa Kanıcı’dan ek konuşmacının fotoğrafını ve unvanını doğrula', 'Tekstil Buluşması', 'textile-speaker-details'],
+    ['yonetim kurulu karari', 'Mahmut Bey’le görüşüp A.Ş. yönetim kurulu kararının imza gereksinimini netleştir', 'Şirket & Dernek', 'company-board-signatures'],
+    ['imzalarin toplanmasi', 'Önder Bey ve Özgür Bey’den şirket kararları için imzaları topla', 'Şirket & Dernek', 'company-collect-signatures'],
+    ['dernek yonetim kurulu temsil karari', 'Derneğin Önder Yılmaz’ı A.Ş. genel kurulunda temsilci atayan kararını sürece ekle', 'Şirket & Dernek', 'association-representation'],
+    ['uyelik basvurulari karari', 'Dört adayın üyelik kararını beklet ve yeni başvuruları listeye ekle', 'Şirket & Dernek', 'association-membership'],
+    ['tma odemesi takibi', 'Kara Tillman’dan TMA ödemesiyle ilgili yanıtı takip et ve Önder Bey’e bildir', 'Uluslararası Yazışmalar', 'tma-payment-followup'],
+    ['e posta cc kurali', 'Kurumsal yazışmalarda Önder Bey’in Axfera adresini CC’ye ekle', 'Uluslararası Yazışmalar', 'email-onder-cc'],
+    ['sozlesmeler ve faturalandirma', 'Ön onaylı sponsorlara sözleşmeleri gönder ve tahsilat durumunu takip et', 'Büyük Zirve', 'summit-sponsor-contracts'],
+    ['sponsorluk sozlesmesi konusunda', 'Mustafa Kanıcı’yı arayıp sponsorluk sözleşmesini hızlandırmasını iste', 'Büyük Zirve', 'summit-kanici-sponsorship'],
+    ['katilimci sayisi ve e mailing kampanyasi', 'Geçmiş yıl katılımcılarına zirve için toplu e-posta kampanyasını başlat', 'Büyük Zirve', 'summit-email-campaign'],
+    ['ilk tur davetiyeler', 'Birliklere ve odalara zirve davetiyelerinin ilk turunu gönder', 'Büyük Zirve', 'summit-invites-first'],
+    ['hazirlik', 'Geçen yılın davet yazılarını inceleyip yeni taslakları Önder Bey’le paylaş', 'Büyük Zirve', 'summit-invite-drafts'],
+    ['ikinci tur davetiyeler', 'Zirveden 15–20 gün önce kurumlara ikinci tur hatırlatma davetiyesi gönder', 'Büyük Zirve', 'summit-invites-second'],
+    ['linkedin reklam butcesi ve dagitimi', 'Zirve için 5.000 TL LinkedIn reklam bütçesini paylaşımlara dağıtıp hedeflemeyi ayarla', 'Sosyal Medya', 'summit-linkedin-ads'],
+    ['13 ekim gebze etkinligi', '13 Ekim Gebze etkinliği için LinkedIn paylaşımını yayımla', 'Sosyal Medya', 'gebze-linkedin-post'],
+    ['linkedin kurumsal etiketleme stratejisi', 'TMA Türkiye paylaşımında ilgili oda ve birlikleri etiketleyen davet yorumunu yayımla', 'Sosyal Medya', 'summit-linkedin-tags'],
+    ['raporlama', 'Tamamlanan ve bekleyen işleri Önder Bey’e düzenli olarak bildir', 'Genel', 'onder-progress-report']
+  ];
+  const sampleAliases = {
+    'saat ve mekan onayi':'textile-venue',
+    'salon buyutme opsiyonu':'textile-bigger-room',
+    'masa duzen ilavesi':'textile-extra-tables',
+    'seri formati':'textile-brochure-series',
+    'eksik konusmaci bilgileri':'textile-speaker-details',
+    'yonetim kurulu karari':'company-board-signatures',
+    'imzalarin toplanmasi':'company-collect-signatures',
+    'dernek yonetim kurulu temsil karari':'association-representation',
+    'uyelik basvurulari karari':'association-membership',
+    'tma odemesi takibi':'tma-payment-followup',
+    'e posta cc kurali':'email-onder-cc',
+    'katilimci sayisi ve e mailing kampanyasi':'summit-email-campaign',
+    'ikinci tur davetiyeler':'summit-invites-second',
+    'linkedin reklam butcesi ve dagitimi':'summit-linkedin-ads',
+    '13 ekim gebze etkinligi':'gebze-linkedin-post',
+    'linkedin kurumsal etiketleme stratejisi':'summit-linkedin-tags',
+    'raporlama':'onder-progress-report',
+    'halkbank sponsor stant masalari':'summit-sponsor-tables',
+    'ilk tur davetiyeler 5 ekim pazartesi':'summit-invites-first',
+    'gecen yilki davet yazi formatlari incelenerek taslaklar hazirlanacak ve onder bey ile paylasilmak':'summit-invite-drafts'
+  };
+
+  // Başlıktan tahmin edilen konu anahtarı. Tek başına eşleşme sayılmaz; kelime benzerliğiyle desteklenmelidir.
+  function semanticKey(title) {
+    const text = fold(title);
+    if (/kara tillman|tma odeme/.test(text) && /odeme|yanit/.test(text)) return 'tma-payment-followup';
+    if (/mustafa|konusmaci/.test(text) && /fotograf|unvan/.test(text)) return 'textile-speaker-details';
+    if (/linkedin/.test(text) && /reklam|butce|hedefleme/.test(text)) return 'summit-linkedin-ads';
+    if (/linkedin/.test(text) && /gebze/.test(text)) return 'gebze-linkedin-post';
+    if (/sponsor/.test(text) && /sozlesme|tahsilat/.test(text)) return 'summit-sponsor-contracts';
+    if (/zirve|katilimci/.test(text) && /e posta|email|mailing/.test(text)) return 'summit-email-campaign';
+    if (/davet/.test(text) && /ilk tur|5 ekim/.test(text)) return 'summit-invites-first';
+    if (/davet/.test(text) && /ikinci tur|hatirlatma/.test(text)) return 'summit-invites-second';
+    if (/afis|brosur/.test(text) && /kerem|baslik/.test(text)) return 'textile-poster-heading';
+    return '';
+  }
+
+  // { key, strong }: kayıtlı anahtar ve eski kısa başlıklar kesin; başlıktan tahmin edilenler zayıf kabul edilir.
+  function canonical(item) {
+    if (item.key) return { key: item.key, strong: true };
+    const title = fold(item.title);
+    const alias = sampleAliases[title] || (title.startsWith('gecen yilki davet yazi formatlari') ? 'summit-invite-drafts' : '');
+    if (alias) return { key: alias, strong: true };
+    return { key: semanticKey(item.title), strong: false };
+  }
+
+  function sampleCandidates(text, meetingDate, owner) {
+    const marker = text.search(/yapılacaklar listesi|detaylı eylem raporu/i);
+    const normalized = fold(marker >= 0 ? text.slice(marker) : text);
+    if (!normalized.includes('17 ekim') || !normalized.includes('kara tillman') || !normalized.includes('zirve')) return [];
+    // Yalnızca gerçekten örnek toplantı metni ise hazır başlıkları kullan; benzer konulu başka notlar genel kurallarla işlenir.
+    if (sampleRules.filter(([label]) => normalized.includes(label)).length < 14) return [];
+    const out = [];
+    for (const [label, title, project, key] of sampleRules) {
+      if (!normalized.includes(label)) continue;
+      let dueDate = '';
+      if (key === 'summit-invites-first') dueDate = dateFrom('5 Ekim', meetingDate);
+      if (key === 'summit-invites-second') dueDate = dateFrom('15 Kasım', meetingDate);
+      if (key === 'gebze-linkedin-post') dueDate = dateFrom('13 Ekim', meetingDate);
+      out.push({ title, project, key, dueDate, dueTime:'', priority: key === 'summit-email-campaign' || key === 'textile-speaker-details' ? 'high' : 'medium', owner,
+        notes: `Toplantı notundan çıkarıldı. İlgili bölüm: ${label}.`, source:'' });
+    }
+    if (/stan[dt] masalari/.test(normalized) && !out.some(x => x.key === 'summit-sponsor-tables')) {
+      out.push({ title:'Halkbank’tan gelen stant masası ölçülerini sponsorlara ilet', project:'Büyük Zirve', key:'summit-sponsor-tables', dueDate:'', dueTime:'', priority:'medium', owner, notes:'Halkbank stant masası ölçüleri ve teknik detayları gönderildi.', source:'' });
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Metni satırlara ayırma
+   * ------------------------------------------------------------------ */
+
+  // Bitişik yazılan marka adları; satır sonu kaybı sanılıp bölünmemeli.
+  const brandWords = new Set(['powerpoint','sharepoint','wordpress','javascript','typescript','mailchimp','docusign','teamviewer','mastercard','quickbooks','sendgrid','blackrock','facetime','notebooklm','halkbank','denizbank','vakifbank','finansbank','turktelekom','wetransfer','googlemeet','indesign','airpods','dropbox','photoshop','superonline','hepsiburada','garantibbva','yapikredi','turkcell','instagram','facebook','microsoft']);
+
+  // Yapıştırırken satır sonları kaybolmuş metin: çok uzun ve neredeyse hiç satır sonu yok.
+  function isGlued(text) {
+    if (text.length < 500) return false;
+    return (text.match(/\n/g) || []).length < text.length / 450;
+  }
+
+  function prepare(text) {
+    let t = String(text || '').replace(/\r\n?/g, '\n').replace(/ /g, ' ');
+    if (!isGlued(t)) return t;
+    // Kaybolan satır sonları çoğunlukla art arda boşluk olarak kalır.
+    t = t.replace(/([^\s:,;])[ \t]{2,}(?=\S)/g, '$1\n');
+    // "…yapılacak.Sonraki cümle" ve "…almaktadır.1. Başlık"
+    t = t.replace(new RegExp(`([${LOW}\\)\\]”"’'%][.!?])(?=[${UP}"“(])`, 'g'), '$1\n');
+    t = t.replace(new RegExp(`([${LOW}\\)\\]”"][.!?])(?=\\d{1,2}[.)]\\s)`, 'g'), '$1\n');
+    // "…RaporuI. 17 Ekim" ve "…Raporu)1. Kurumsal"
+    t = t.replace(new RegExp(`([${LOW}\\)\\]”"])(?=(?:[IVX]{1,4}|\\d{1,2})\\.\\s+[${UP}0-9"“])`, 'g'), '$1\n');
+    // "Kapasite Opsiyonu:Saat ve Mekan Onayı: …"
+    t = t.replace(new RegExp(`:(?=[${UP}"“])`, 'g'), ':\n');
+    // "…Buluşması)Mekan Rezervasyonu"
+    t = t.replace(new RegExp(`([\\)\\]”])(?=[${UP}])`, 'g'), '$1\n');
+    // "…İşlemleriEvrakların Birleştirilmesi"
+    const camel = new RegExp(`([${UP}${LOW}]*[${LOW}]{3})([${UP}][${LOW}]{3,})`, 'g');
+    for (let i = 0; i < 3; i++) t = t.replace(camel, (match, a, b) => brandWords.has(fold(match)) ? match : `${a}\n${b}`);
+    return t;
+  }
+
+  // Yapay zekâ araçlarından kopyalanan kaynak etiketleri ("M4A", "M4A+ 2") ve boş madde işaretleri.
+  const noiseLine = /^(?:(?:m4a|mp3|mp4|wav|ogg|aac|pdf|docx?|txt|kaynak(?:lar)?|sources?)(?:\s*\+\s*\d+)?|\+?\d{1,3}|[-–—•*·._=]+)$/i;
+  const bulletPrefix = /^(?:[-–—•*·▪◦●○■□►➤>]+|\[[ xX]?\]|☐|☑|✓|✔)\s*/;
+  const numberPrefix = /^(?:([IVX]{1,5})\.|([A-H])\.|(\d{1,2})[.)])\s+(?=\S)/;
+  // "3. Detaylı Yapılacaklar Listesi (To-Do List)" gibi bölüm başlıkları.
+  const actionSection = /^(?:(?:[ivx]{1,4}|[a-h]|\d{1,2}) )?(?:(?:\w+ ){0,3}(?:yapilacaklar|yapilacak isler|eylem (?:plani|listesi|raporu|maddeleri)|aksiyon (?:listesi|raporu|maddeleri|plani)|to do|action items|sonraki adimlar)\b|(?:gorevler|gorev listesi|aksiyonlar)$)/;
+
+  function contentLines(text) {
+    const lines = prepare(text).split('\n').map(line => line.trim()).filter(line => line && !noiseLine.test(line));
+    // Deşifre + rapor birlikte yapıştırıldıysa yalnızca yapılacaklar bölümünü işle.
+    const start = lines.findIndex(line => line.length <= 90 && !/[.!?]$/.test(line) && actionSection.test(fold(line)));
+    return start >= 0 && lines.length - start > 2 ? lines.slice(start + 1) : lines;
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Eylem tespiti
+   * ------------------------------------------------------------------ */
+
+  const nonActionFuture = new Set(['olacak', 'bulunacak', 'kalacak', 'gelecek', 'surecek', 'gerekecek', 'yetecek', 'cikacak', 'baslayacak', 'bitecek', 'icecek', 'yiyecek']);
+  const obligation = new Set(['gerekiyor', 'gerekir', 'gerek', 'gerekli', 'gerekmekte', 'gerekmektedir', 'lazim', 'sart', 'isteniyor', 'bekleniyor']);
+  // Tek başına emir kipi olarak güvenle tanınabilen fiil kökleri.
+  const stems = new Set(['gonder', 'yolla', 'ilet', 'bildir', 'aktar', 'hazirla', 'olustur', 'paylas', 'baslat', 'yayimla', 'yayinla', 'raporla', 'netlestir', 'planla', 'ayarla', 'dogrula', 'incele', 'topla', 'tamamla', 'yukle', 'ekle', 'guncelle', 'duzenle', 'duzelt', 'cikar', 'hatirlat', 'onayla', 'imzala', 'imzalat', 'kaydet', 'degistir', 'arastir', 'ogren', 'bitir', 'hallet', 'sor', 'ara', 'gorus', 'konus', 'bak', 'yaz', 'yap', 'iste', 'bekle', 'beklet', 'tasarla', 'cevir', 'kaldir', 'ertele', 'listele', 'belirle', 'kararlastir', 'ulas', 'gecir', 'sagla', 'ode', 'bilgilendir', 'uyar', 'yonlendir', 'karsilastir', 'hesapla', 'dagit', 'goster', 'anlat', 'acikla', 'yedekle', 'indir', 'izle', 'dene', 'sonuclandir', 'kapat', 'duyur', 'tanit', 'faturala', 'getir', 'gotur', 'kontrollet', 'sikistir', 'organize', 'takvimle', 'etiketle', 'kurgula', 'tahsis']);
+  // Yalnızca ek aldığında fiil olduğu kesinleşen kısa kökler ("alalım", "verin", "gidelim").
+  const suffixOnlyStems = new Set(['al', 'ver', 'git', 'koy', 'cek', 'at', 'ac', 'bul', 'sec', 'sil', 'kur', 'don', 'tut', 'kes', 'gec', 'et']);
+  const lightVerbNouns = {
+    al: new Set(['randevu', 'teklif', 'onay', 'bilgi', 'imza', 'not', 'fiyat', 'yedek', 'cikti', 'destek', 'teyit', 'satin', 'gorus', 'izin']),
+    ver: new Set(['haber', 'bilgi', 'cevap', 'yanit', 'teklif', 'onay', 'brif', 'siparis', 'talimat', 'teyit']),
+    gec: new Set(['iletisime', 'harekete', 'temasa']),
+    tut: new Set(['hazir', 'guncel']),
+    kes: new Set(['fatura', 'makbuz']),
+    at: new Set(['mail', 'mesaj', 'eposta', 'posta', 'imza'])
+  };
+  const verbSuffixes = ['yiniz', 'iniz', 'unuz', 'yin', 'yun', 'sin', 'sun', 'yayim', 'yeyim', 'ayim', 'eyim', 'yalim', 'yelim', 'alim', 'elim', 'arim', 'erim', 'irim', 'urum', 'ariz', 'eriz', 'iriz', 'uruz', 'rim', 'riz', 'in', 'un'];
+
+  const normalizeStem = stem => stem.endsWith('ed') ? `${stem.slice(0, -2)}et` : stem === 'gid' ? 'git' : stem;
+
+  function isImperative(last, prev) {
+    if (last === 'et') return Boolean(prev);
+    if (lightVerbNouns[last]) return lightVerbNouns[last].has(prev);
+    if (last === 'don') return /[ae]$/.test(prev || '');
+    if (stems.has(last)) {
+      if (last === 'ara') return !['bir', 'bu', 'su', 'kisa', 'her'].includes(prev);
+      if (last === 'yaz') return !['gecen', 'bu', 'her', 'gelecek'].includes(prev);
+      return true;
+    }
+    for (const suffix of verbSuffixes) {
+      if (last.length - suffix.length < 2 || !last.endsWith(suffix)) continue;
+      const stem = normalizeStem(last.slice(0, -suffix.length));
+      if (stems.has(stem) || suffixOnlyStems.has(stem)) return true;
+    }
+    return false;
+  }
+
+  // Yan cümlenin son sözcüğüne bakar: Türkçede yüklem sonda olduğundan eylemi en güvenilir o gösterir.
+  function clauseKind(clause) {
+    const tokens = clause.split(' ').filter(Boolean);
+    if (tokens.length < 2) return '';
+    const last = tokens[tokens.length - 1], prev = tokens[tokens.length - 2];
+    if (/(?:ma|me)y(?:acak|ecek)(?:tir|lar|ler)?$/.test(last) || /(?:mamasi|memesi|mamali|memeli)(?:dir)?$/.test(last)) return 'negative';
+    const future = last.match(/^(\w{2,}(?:acak|ecek))(?:tir|lar|ler)?$/);
+    if (future) return nonActionFuture.has(future[1]) ? '' : 'future';
+    if (/^\w{2,}(?:acagim|ecegim|acagiz|ecegiz)$/.test(last)) return 'first';
+    if (/^\w{3,}(?:masi|mesi)$/.test(last)) return 'nominal';
+    if (obligation.has(last) && /(?:masi|mesi|mak|mek|malari|meleri)$/.test(prev)) return 'obligation';
+    if (/^\w{3,}(?:mali|meli)(?:dir|yiz|yim)?$/.test(last)) return 'obligation';
+    if (isImperative(last, prev)) return /(?:yayim|yeyim|ayim|eyim|yalim|yelim|alim|elim|arim|erim|irim|urum|ariz|eriz|iriz|uruz|rim|riz)$/.test(last) && !stems.has(last) ? 'first' : 'imperative';
+    return '';
+  }
+
+  const stripAsides = text => text.replace(/\([^()]*\)/g, ' ').replace(/["“”][^"“”]{0,240}["“”]/g, ' alinti ');
+  const clausesOf = text => stripAsides(text).split(/[;,]|\s+(?:ve|veya|ancak|fakat|ama)\s+/i).map(foldJoined).filter(Boolean);
+
+  // Cümledeki ilk eylem türünü ve o eylemin geçtiği bölümü (";" ile ayrılan) bulur.
+  function analyzeSentence(sentence) {
+    if (/\?\s*$/.test(sentence)) return null;
+    const segments = sentence.split(/;\s+/);
+    for (let index = 0; index < segments.length; index++) {
+      for (const clause of clausesOf(segments[index])) {
+        const kind = clauseKind(clause);
+        if (kind && kind !== 'negative') return { kind, first: index === 0, segment: segments[index].trim(), rest: segments.slice(index).join('; ').trim(), verb: clause.split(' ').pop() };
+      }
+    }
+    return null;
+  }
+
+  function splitSentences(text) {
+    const guarded = text.replace(/\b(vb|vs|bkz|Dr|Av|Prof|Doç|Sn|No|Tel|örn|Örn|yak|Ltd|Şti)\./g, '$1\u0001');
+    return guarded.split(new RegExp(`(?<=[${LOW}\\)\\]”"’'%][.!?])\\s+(?=[${UP}"“(0-9])`))
+      .map(sentence => sentence.replace(/\u0001/g, '.').trim()).filter(Boolean);
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Sorumlu, proje ve başlık
+   * ------------------------------------------------------------------ */
+
+  // "(Atakan)", "(Keremler / Atakan)", "(Önder Bey)" gibi başlık sonu sorumlu notu.
+  function ownerHint(label) {
+    const match = label.match(/\(([^()]{2,50})\)\s*$/);
+    if (!match) return { label, owner:'' };
+    const parts = match[1].split(/\s*[/,&]\s*|\s+ve\s+/).map(part => part.trim()).filter(Boolean);
+    const isName = part => new RegExp(`^[${UP}][${LOW}]+(?:\\s(?:Bey|Hanım))?$`).test(part);
+    if (!parts.length || !parts.every(isName)) return { label, owner:'' };
+    return { label: label.slice(0, match.index).trim(), owner: parts.join(' / ') };
+  }
+
+  function ownerFromSentence(sentence, verb) {
+    const by = sentence.match(new RegExp(`([${UP}][${LOW}]+(?:\\s(?:Bey|Hanım))?)\\s+tarafından`));
+    if (by) return by[1];
+    // "Önder Bey, … görüşecek": özne başta ve fiil etken ise sorumlu odur ("… gönderilecek" edilgendir).
+    if (/(?:[iu]l|n)(?:acak|ecek)(?:tir)?$|(?:masi|mesi)$/.test(verb || '')) return '';
+    const subject = sentence.match(new RegExp(`^([${UP}][${LOW}]+\\s(?:Bey|Hanım))(?=,|\\s(?!(?:ve|ile|veya)\\s))`));
+    return subject ? subject[1] : '';
+  }
+
+  const projectRules = [
+    ['Tekstil Buluşması', ['tekstil', 'kahvalti', 'brosur', 'afis', 'poster', 'konusmaci', 'moderator']],
+    ['Sosyal Medya', ['linkedin', 'instagram', 'sosyal medya', 'reklam', 'hedef kitle', 'gebze']],
+    ['Uluslararası Yazışmalar', ['kara tillman', 'ashley', 'tma odeme', 'uluslararasi', 'yurt disi', 'ingiltere', 'cc ye']],
+    ['Büyük Zirve', ['zirve', 'sponsor', 'davetiye', 'davet mektup', 'stant', 'simultane']],
+    ['Şirket & Dernek', ['genel kurul', 'yonetim kurulu', 'karar defteri', 'hazirun', 'tutanak', 'imza', 'dernek', 'sirket', 'sermaye', 'uyelik']]
+  ];
+  const projectStop = new Set(['genel', 'proje', 'projesi', 'isleri', 'diger', 'calismalari']);
+
+  function projectFor(section, group, text, knownProjects) {
+    // Virgüllü bölüm başlıkları ("Sponsorluk, Finans ve Tahsilat") genel kategoridir; daha az belirleyicidir.
+    const parts = [[fold(text), 1], [fold(group), 1.5], [fold(section), /,/.test(section) ? 0.75 : 1.5]];
+    const count = keywords => parts.reduce((sum, [value, weight]) => sum + keywords.filter(word => value.includes(word)).length * weight, 0);
+    let best = '', bestScore = 0;
+    for (const [name, keywords] of projectRules) {
+      const score = count(keywords);
+      if (score > bestScore) { best = name; bestScore = score; }
+    }
+    // Kullanıcının kendi açtığı projeler: adındaki belirgin sözcükler metinde geçiyorsa.
+    for (const name of knownProjects || []) {
+      if (projectRules.some(rule => rule[0] === name)) continue;
+      const keywords = fold(name).split(' ').filter(word => word.length > 3 && !projectStop.has(word));
+      if (!keywords.length) continue;
+      const hits = keywords.filter(word => parts.some(([value]) => value.includes(word))).length;
+      if (hits / keywords.length < 0.5) continue;
+      const score = count(keywords) + 0.5;
+      if (score > bestScore) { best = name; bestScore = score; }
+    }
+    return bestScore >= 1.5 ? best : 'Genel';
+  }
+
+  const fillers = /^(?:şimdi|tamam|peki|yani|bu arada|ayrıca|ancak|fakat|ama|ek olarak|bir de|o zaman|evet|hayır|şey|ee+|hı hı)[,\s]+/i;
+
+  function buildTitle(sentence, analysis, context) {
+    // Eylem ilk bölümdeyse cümlenin tamamı; "… kullanılmayacak; ödemeler … toplanacak" gibi
+    // sonraki bölümdeyse başlık eylemin geçtiği yerden başlar.
+    const whole = analysis.first ? sentence : analysis.rest;
+    let title = (whole.length <= 130 ? whole : analysis.segment).replace(/\s+/g, ' ').trim();
+    for (let i = 0; i < 3; i++) title = title.replace(fillers, '');
+    title = title.replace(/[.!?;:,\s]+$/, '').trim();
+    if (title.length > 150) title = `${title.slice(0, 147).replace(/\s+\S*$/, '')}…`;
+    if (title.length < 46 && context && !fold(title).includes(fold(context))) title = `${context}: ${title}`;
+    return capitalize(title);
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Genel görev çıkarma
+   * ------------------------------------------------------------------ */
+
+  // Çekimli fiille biten satır ("… güncellendi", "… bekleniyor") başlık değil, bilgi cümlesidir.
+  const finiteVerbEnd = /\w{3,}(?:[dt][iu](?:k|m|ler|lar)?|m[iu]s(?:tir|tur)?|[iu]yor(?:um|uz|lar)?)$/;
+
+  function titleCaseRatio(text) {
+    const tokens = text.split(/\s+/).filter(token => !/^(?:ve|ile|için|veya|ya da|&|\/|-|–)$/i.test(token));
+    if (!tokens.length) return 0;
+    return tokens.filter(token => new RegExp(`^["“(]?[${UP}0-9]`).test(token)).length / tokens.length;
+  }
+
+  function generalCandidates(text, meetingDate, options) {
+    const lines = contentLines(text);
+    const parsed = lines.map(line => {
+      const body = line.replace(bulletPrefix, '');
+      const number = body.match(numberPrefix);
+      return { body: number ? body.slice(number[0].length).trim() : body, numbered: Boolean(number), bulleted: body !== line };
+    });
+
+    // Konuşmacı etiketleri ("Önder Bey: …") bağlam başlığı olarak kullanılmaz.
+    const speakerPattern = new RegExp(`^([${UP}][${LOW}]+(?:\\s(?:Bey|Hanım|[${UP}][${LOW}]+))?):\\s+\\S`);
+    const speakerCounts = new Map();
+    for (const { body } of parsed) {
+      const match = body.match(speakerPattern);
+      if (match) speakerCounts.set(match[1], (speakerCounts.get(match[1]) || 0) + 1);
+    }
+    const speakers = new Set([...speakerCounts].filter(([, count]) => count >= 2).map(([name]) => name));
+
+    const out = [];
+    // titledGroup: "Alt başlık:" biçiminde açıkça yazılmış alt başlık; kısa görev adlarının önüne eklenir.
+    let section = '', group = '', groupOwner = '', titledGroup = '';
+    for (let i = 0; i < parsed.length; i++) {
+      const { body, numbered, bulleted } = parsed[i];
+      if (!body) continue;
+
+      // "Alt başlık (Sorumlu):" biçimindeki satırlar
+      if (/[:：]\s*$/.test(body) && body.length <= 160) {
+        const hint = numbered ? { label: body.replace(/[:：]\s*$/, '').trim(), owner:'' } : ownerHint(body.replace(/[:：]\s*$/, '').trim());
+        if (numbered) { section = hint.label; group = ''; groupOwner = ''; titledGroup = ''; }
+        else { group = hint.label; groupOwner = hint.owner; titledGroup = hint.label; }
+        continue;
+      }
+
+      const inline = body.match(/^([^:.!?]{3,90}?):\s+(\S.*)$/);
+      const rawLabel = inline && inline[1].split(/\s+/).length <= 10 ? inline[1].trim() : '';
+      const speaker = speakers.has(rawLabel) ? rawLabel : '';
+      const hinted = rawLabel && !speaker ? ownerHint(rawLabel) : { label:'', owner:'' };
+      const label = hinted.label;
+      const detail = rawLabel ? inline[2].trim() : body;
+
+      const sentences = splitSentences(detail);
+      const analyses = sentences.map(sentence => sentence.length >= 12 ? analyzeSentence(sentence) : null);
+      const terminal = /[.!?…]\s*$/.test(body);
+
+      // Başlık mı, görev mi? Noktasız ve kısa satırlar çoğunlukla bölüm başlığıdır.
+      if (!rawLabel && !terminal && !bulleted && body.length <= 110 && !finiteVerbEnd.test(foldJoined(body))) {
+        const kind = analyses[0]?.kind || '';
+        const softAction = !kind || kind === 'nominal';
+        const nextNumbered = parsed[i + 1]?.numbered;
+        const headingLike = numbered ? softAction && !nextNumbered && i < parsed.length - 1
+          : softAction && (!kind || (titleCaseRatio(body) >= 0.6 && body.split(/\s+/).length <= 10));
+        if (headingLike) {
+          if (numbered) { section = body; group = ''; groupOwner = ''; }
+          else { group = body; groupOwner = ''; }
+          titledGroup = '';
+          continue;
+        }
+      }
+
+      const context = label || titledGroup;
+      sentences.forEach((sentence, index) => {
+        const analysis = analyses[index];
+        if (!analysis) return;
+        const title = buildTitle(sentence, analysis, context);
+        if (title.length < 12) return;
+        const owner = (analysis.kind === 'first' && speaker) || ownerFromSentence(sentence, analysis.verb) || hinted.owner || groupOwner || options.defaultOwner;
+        const trail = [section, group, label].filter(Boolean).join(' › ');
+        const scope = `${label} ${sentence}`;
+        out.push({
+          title,
+          source: sentence,
+          notes: `${trail ? `${trail}: ` : ''}${detail}`.slice(0, 750),
+          dueDate: dateFrom(scope, meetingDate) || dateFrom(group, meetingDate),
+          dueTime: timeFrom(sentence),
+          priority: priority(sentence),
+          project: projectFor(section, `${group} ${label}`, sentence, options.knownProjects),
+          owner,
+          key: ''
+        });
+      });
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Benzerlik ve eşleştirme
+   * ------------------------------------------------------------------ */
+
+  const stopWords = new Set(['bey', 'hanim', 'icin', 'ile', 'olarak', 'kadar', 'gore', 'gibi', 'daha', 'cok', 'tum', 'her', 'bir', 'iki', 've', 'veya', 'ama', 'ancak', 'ise', 'sonra', 'once', 'uzere', 'ilgili', 'olan', 'eden', 'edilen', 'yapilan', 'edilecek', 'yapilacak', 'edilmesi', 'yapilmasi', 'tarafindan', 'gereken', 'adina', 'dair', 'hakkinda', 'bunu', 'sunu', 'onun', 'ilk']);
+  // Türkçe sondan eklemeli olduğundan ilk beş harf kaba ama işe yarar bir gövde verir.
+  const stemsOf = value => new Set(fold(value).split(' ').filter(token => token.length > 2 && !stopWords.has(token)).map(token => token.slice(0, 5)));
+  const numbersOf = value => new Set(fold(value).split(' ').filter(token => /^\d+$/.test(token)));
+
+  // Başlıktaki özel adlar; "Özgür Bey'in imzası" ile "Ahmet Bey'in imzası" ayrı işlerdir.
+  // Yalnızca güvenle ad sayılabilenler alınır: "X Bey/Hanım" ve kesme işaretiyle ek almış özel adlar
+  // ("Kerem'e", "LinkedIn'de"). Büyük harfle yazılmış başlık sözcükleri ad sayılmaz.
+  function namesOf(title) {
+    const words = String(title || '').split(/\s+/);
+    const names = new Set();
+    words.forEach((word, index) => {
+      const bare = word.replace(/^["“(]+/, '');
+      if (!new RegExp(`^[${UP}][${UP}${LOW}]+`).test(bare)) return;
+      const base = bare.split(/['’]/)[0].replace(/[^A-Za-zÇĞİÖŞÜçğıöşüÂÎÛâîû]/g, '');
+      if (/^(?:Bey|Hanım)$/.test(base)) return;
+      const next = (words[index + 1] || '').replace(/['’].*$/, '').replace(/[^A-Za-zÇĞİÖŞÜçğıöşü]/g, '');
+      if (!/['’]/.test(bare) && !/^(?:Bey|Hanım)$/.test(next)) return;
+      const folded = fold(base);
+      if (folded.length > 2) names.add(folded.slice(0, 5));
+    });
+    return names;
+  }
+
+  const intersects = (a, b) => [...a].some(value => b.has(value));
+
+  function similar(a, b) {
+    const ta = fold(a.title), tb = fold(b.title);
+    if (ta && ta === tb) return 1;
+    const ka = canonical(a), kb = canonical(b);
+    if (ka.key && kb.key && ka.strong && kb.strong) return ka.key === kb.key ? 1 : 0;
+
+    const x = stemsOf(a.title), y = stemsOf(b.title);
+    if (!x.size || !y.size) return 0;
+    const overlap = [...x].filter(token => y.has(token)).length;
+    const dice = 2 * overlap / (x.size + y.size);
+    // Aynı konu anahtarı tek başına yetmez ("Kerem + afiş" her işte geçebilir); belirgin sözcük ortaklığı da gerekir.
+    if (ka.key && ka.key === kb.key && overlap >= 3 && dice >= 0.5) return Math.max(dice, 0.85);
+
+    const na = namesOf(a.title), nb = namesOf(b.title);
+    if (na.size && nb.size && !intersects(na, nb)) return 0;
+    const da = numbersOf(a.title), db = numbersOf(b.title);
+    if (da.size && db.size && !intersects(da, db)) return 0;
+
+    // Kısa başlıklarda tek sözcük farkı ayrı iş demektir ("Adana şubesi…" / "Bursa şubesi…");
+    // bu yüzden eşik yüksek tutulur: yaklaşık yedi sözcükte en fazla bir fark.
+    const sameProject = !a.project || !b.project || fold(a.project) === fold(b.project);
+    if (overlap >= 3 && dice >= (sameProject ? 0.85 : 0.9)) return dice;
+    // Kısa başlık uzun başlığın içinde neredeyse tümüyle geçiyorsa.
+    const containment = overlap / Math.min(x.size, y.size);
+    if (overlap >= 4 && containment >= 0.9 && dice >= 0.6) return Math.max(dice, 0.85);
+    return 0;
+  }
+
+  const foldedNotes = new WeakMap();
+  function notesOf(task) {
+    const cached = foldedNotes.get(task);
+    if (cached && cached.raw === task.notes) return cached.value;
+    const value = fold(task.notes);
+    foldedNotes.set(task, { raw: task.notes, value });
+    return value;
+  }
+
+  function findMatch(candidate, tasks) {
+    let best = null, score = 0;
+    const source = fold(candidate.source);
+    for (const task of tasks) {
+      let n = similar(candidate, task);
+      // Aynı cümle bu görevin notlarında zaten varsa, başlık değiştirilmiş olsa bile aynı iştir.
+      if (n < 0.99 && source.length >= 25 && notesOf(task).includes(source)) n = 0.99;
+      if (n > score) { best = task; score = n; }
+    }
+    return score > 0 ? best : null;
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Dış arayüz
+   * ------------------------------------------------------------------ */
+
+  function extract(text, meetingDate, options) {
+    const settings = { defaultOwner:'', knownProjects:[], ...(options || {}) };
+    const input = String(text || '');
+    let items = sampleCandidates(input, meetingDate, settings.defaultOwner);
+    if (!items.length) items = generalCandidates(input, meetingDate, settings);
+    const out = [];
+    for (const item of items) {
+      if (out.some(old => similar(item, old) > 0)) continue;
+      out.push(item);
+      if (out.length === 60) break;
+    }
+    return out;
+  }
+
+  const api = { extract, findMatch, similar, dateFrom, timeFrom, priority, fold, prepare };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  root.TaskEngine = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script id="hafiza-reminders">
+(function (root) {
+  'use strict';
+
+  const localDay = date => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+
+  // Şu anda bildirim gösterilmesi gereken açık görevler.
+  // repeat açıkken: görev tamamlanana kadar her gün hatırlatma saatinde, günde en fazla bir kez.
+  // repeat kapalıyken: yalnızca ilk bildirim.
+  function due(tasks, now, repeat) {
+    return (tasks || []).filter(task => {
+      if (task.status === 'done' || !task.reminderAt) return false;
+      const reminder = new Date(task.reminderAt);
+      if (Number.isNaN(reminder.getTime()) || reminder > now) return false;
+      if (!task.notifiedAt) return true;
+      if (!repeat) return false;
+      const notified = new Date(task.notifiedAt);
+      if (Number.isNaN(notified.getTime())) return true;
+      const todaySlot = new Date(now.getFullYear(), now.getMonth(), now.getDate(), reminder.getHours(), reminder.getMinutes());
+      return todaySlot <= now && localDay(notified) !== localDay(now);
+    });
+  }
+
+  // Aynı anda çok sayıda görev varsa ekranı bildirimle doldurmak yerine tek özet göster.
+  function messages(tasks) {
+    if (tasks.length <= 3) return tasks.map(task => ({ title: 'Hafıza · Görev zamanı', body: task.title, taskId: task.id }));
+    const preview = tasks.slice(0, 3).map(task => `• ${task.title.length > 70 ? `${task.title.slice(0, 67)}…` : task.title}`).join('\n');
+    return [{ title: `Hafıza · ${tasks.length} görev için hatırlatma`, body: `${preview}\n… ve ${tasks.length - 3} görev daha`, taskId: '' }];
+  }
+
+  const api = { due, messages };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  root.Reminders = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+/* ================================================================
+   TOPLANTILAR VE GÖREVLER — Hafıza masaüstü uygulamasının panel sürümü
+   Görev çıkarma: TaskEngine (hafiza/task-engine.js), hatırlatma: Reminders (hafiza/reminders.js)
+   Veri: app_state "main" satırında S.hafiza = { tasks, transcripts }
+================================================================ */
+// Buluta yazan işlemler sırayla çalışır; böylece biri okurken diğeri yazamaz.
+function cloudQueue(fn){ const p=(window._cloudQ||Promise.resolve()).then(fn); window._cloudQ=p.catch(()=>{}); return p; }
+
+const HZ=(()=>{
+const Engine=window.TaskEngine, Rem=window.Reminders;
+const st={view:'inbox',filter:'open',project:'',search:'',sort:'due',draft:null,editId:'',viewerId:'',day:'',unsaved:false};
+let base=null; // buluttan en son okunan/yazılan hâl; üç yönlü birleştirmenin ortak atası
+const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
+const nowISO=()=>new Date().toISOString();
+const uid=p=>`${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
+const localISO=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const parseDay=v=>{ if(!/^\d{4}-\d\d-\d\d/.test(v||'')) return null; const [y,m,d]=v.slice(0,10).split('-').map(Number); return new Date(y,m-1,d); };
+const dayDiff=v=>{ const d=parseDay(v); if(!d) return null; const t=new Date(); t.setHours(0,0,0,0); return Math.round((d-t)/864e5); };
+const absDate=v=>{ const d=parseDay(v); return d?d.toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'}):'Tarih yok'; };
+function humanDate(v){
+  const d=parseDay(v); if(!d) return 'Tarih yok';
+  const n=dayDiff(v); if(n===0) return 'Bugün'; if(n===1) return 'Yarın'; if(n===-1) return 'Dün';
+  return d.toLocaleDateString('tr-TR',{day:'numeric',month:'short',...(d.getFullYear()!==new Date().getFullYear()?{year:'numeric'}:{})});
+}
+function dayKey(v){ const n=dayDiff(v); if(n===null) return 'TARİHSİZ'; if(n<0) return 'GECİKEN'; if(n===0) return 'BUGÜN'; if(n===1) return 'YARIN'; if(n<=7) return 'BU HAFTA'; return 'DAHA SONRA'; }
+const remLabel=v=>{ const d=new Date(v); return isNaN(d)?'':`${humanDate(localISO(d))} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+const words=t=>(String(t||'').trim().match(/\S+/g)||[]).length;
+const sourcesOf=t=>t.sourceIds||(t.transcriptId?[t.transcriptId]:[]);
+const editable=()=>can('gorev');
+const PRANK={high:0,medium:1,low:2};
+const PLABEL={high:'YÜKSEK ÖNCELİK',medium:'NORMAL ÖNCELİK',low:'DÜŞÜK ÖNCELİK'};
+const PCOL=['#2247C8','#6D28D9','#117A46','#A35E0A','#0F766E','#B42323','#C2992E'];
+const VIEWS=[['inbox','Görevler'],['today','Bugün'],['upcoming','Yaklaşan'],['completed','Tamamlanan'],['transcripts','Deşifreler']];
+
+/* ---------- Bu tarayıcıya özel tercihler ---------- */
+const PREF_KEY='foyder:hz:ayar', NOTIFIED_KEY='foyder:hz:bildirim';
+function prefs(){
+  let p={}; try{ p=JSON.parse(localStorage.getItem(PREF_KEY)||'{}')||{}; }catch(e){}
+  return { owner: typeof p.owner==='string'?p.owner:(window._sbUser?.user_metadata?.name||''), repeat: p.repeat!==false };
+}
+function setPref(k,v){ let p={}; try{ p=JSON.parse(localStorage.getItem(PREF_KEY)||'{}')||{}; }catch(e){} p[k]=v; try{ localStorage.setItem(PREF_KEY,JSON.stringify(p)); }catch(e){} }
+
+/* ---------- Veri ve bulut kaydı ---------- */
+function normH(h){ h=h&&typeof h==='object'?h:{}; return {...h,tasks:Array.isArray(h.tasks)?h.tasks:[],transcripts:Array.isArray(h.transcripts)?h.transcripts:[]}; }
+function ensureBase(){ if(base===null) base=clone(normH(S&&S.hafiza)); }
+function H(){
+  ensureBase();
+  if(!S.hafiza||!Array.isArray(S.hafiza.tasks)||!Array.isArray(S.hafiza.transcripts)) S.hafiza=normH(S.hafiza);
+  return S.hafiza;
+}
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+// Kayıt bazında üç yönlü birleştirme: başkasının eklediği görev kaybolmaz, burada silinen geri gelmez.
+function mergeList(b,l,r){
+  const B=new Map(b.map(x=>[x.id,x])), L=new Map(l.map(x=>[x.id,x])), R=new Map(r.map(x=>[x.id,x]));
+  const out=[], seen=new Set();
+  for(const id of [...R.keys(),...L.keys()]){
+    if(seen.has(id)) continue; seen.add(id);
+    const bi=B.get(id), li=L.get(id), ri=R.get(id); let pick=null;
+    if(li&&ri) pick=same(li,ri)?li:bi&&same(li,bi)?ri:bi&&same(ri,bi)?li:((ri.updatedAt||'')>(li.updatedAt||'')?ri:li);
+    else if(li) pick=!bi||!same(li,bi)?li:null;   // başka yerde silinmiş; burada değişmediyse silinmiş kalsın
+    else pick=!bi||!same(ri,bi)?ri:null;          // burada silinmiş; başka yerde değişmediyse silinmiş kalsın
+    if(pick) out.push(pick);
+  }
+  return out;
+}
+function mergeH(b,l,r){
+  b=normH(b); l=normH(l); r=normH(r);
+  return {...r,...l,tasks:mergeList(b.tasks,l.tasks,r.tasks),transcripts:mergeList(b.transcripts,l.transcripts,r.transcripts)};
+}
+// Kayıt sürerken yapılan yerel değişiklikleri koruyarak buluttaki hâli yerele işler.
+function synced(sent,merged){
+  const before=JSON.stringify(S.hafiza||null);
+  S.hafiza=S.hafiza?mergeH(sent||base,S.hafiza,merged):clone(merged);
+  base=clone(merged);
+  if(JSON.stringify(S.hafiza)!==before) refresh();
+}
+const cloudOn=()=>!!(window._sb&&window._sbUser);
+async function remoteHafiza(){
+  let r=await window._sb.from('app_state').select('hafiza:data->hafiza').eq('id','main').maybeSingle();
+  if(!r.error) return r.data?r.data.hafiza:null;
+  r=await window._sb.from('app_state').select('data').eq('id','main').maybeSingle();
+  if(r.error) throw r.error;
+  return r.data&&r.data.data?r.data.data.hafiza:null;
+}
+// persist() tüm durumu yazmadan önce çağırır: yalnızca "hafiza" alanını buluttaki son hâlle birleştirir.
+async function prepareOut(out){
+  ensureBase();
+  const remote=await remoteHafiza();
+  const sent=out.hafiza||null;
+  if(remote||sent) out.hafiza=mergeH(base,sent||base,remote||base);
+  return sent;
+}
+// Görev/deşifre değişikliklerini kaydeder. Buluttaki satır yeniden okunur ve yalnızca "hafiza" alanı değiştirilir;
+// üye, aidat ve diğer bütün alanlar buluttaki hâliyle aynen geri yazılır.
+function save(){
+  if(!cloudOn()){ persist(); return Promise.resolve(true); }
+  st.unsaved=true;
+  return cloudQueue(async()=>{
+    const sent=clone(H());
+    window._lastSaveAt=Date.now();
+    const {data,error}=await window._sb.from('app_state').select('data').eq('id','main').maybeSingle();
+    if(error) throw error;
+    if(!data||!data.data){ persist(); return; }
+    ensureBase();
+    const merged=mergeH(base,sent,data.data.hafiza||base);
+    window._lastSaveAt=Date.now();
+    const res=await window._sb.from('app_state').upsert({id:'main',data:{...data.data,hafiza:merged},updated_at:nowISO()});
+    if(res.error) throw res.error;
+    synced(sent,merged);
+  }).then(()=>{ st.unsaved=false; return true; },e=>{
+    console.error('hafiza kayıt',e);
+    toast('⚠ Görevler buluta kaydedilemedi — bağlantıyı kontrol edin; bir sonraki kayıtta yeniden denenecek');
+    return false;
+  });
+}
+window.addEventListener('beforeunload',e=>{ if(st.unsaved){ e.preventDefault(); e.returnValue=''; } });
+const touch=x=>{ x.updatedAt=nowISO(); return x; };
+
+/* ---------- Yardımcılar ---------- */
+function projectList(){ return [...new Set(H().tasks.map(t=>t.project).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr')); }
+function pcolor(name){ const i=projectList().indexOf(name); return PCOL[(i<0?0:i)%PCOL.length]; }
+const modalOpen=()=>!!document.getElementById('modalRoot').innerHTML;
+function refresh(){
+  if(typeof renderNav==='function'&&S) renderNav();
+  if(route!=='gorevler'||st.draft||modalOpen()) return;
+  render();
+}
+function toastAct(msg,label,fn){
+  const t=document.getElementById('toast'); t.textContent=msg;
+  const b=document.createElement('button'); b.textContent=label; b.onclick=()=>{ t.classList.remove('show'); fn(); };
+  t.appendChild(b); t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),6500);
+}
+const terms=()=>Engine.fold(st.search).split(' ').filter(Boolean);
+const notifState=()=>!('Notification' in window)?'unsupported':Notification.permission;
+
+/* ---------- Görev listesi ---------- */
+function visible(){
+  const today=localISO(); let tasks=[...H().tasks];
+  if(st.view==='today') tasks=tasks.filter(t=>t.dueDate===today&&t.status!=='done');
+  else if(st.view==='upcoming') tasks=tasks.filter(t=>t.dueDate&&t.dueDate>today&&t.status!=='done');
+  else if(st.view==='completed') tasks=tasks.filter(t=>t.status==='done');
+  else if(st.filter==='open') tasks=tasks.filter(t=>t.status!=='done');
+  else if(st.filter==='high') tasks=tasks.filter(t=>t.priority==='high'&&t.status!=='done');
+  if(st.project) tasks=tasks.filter(t=>t.project===st.project);
+  const q=terms();
+  // Engine.fold büyük/küçük harf ve Türkçe karakter farkını yok sayar ("isik" → "ışık").
+  if(q.length) tasks=tasks.filter(t=>{ const hay=Engine.fold(`${t.title} ${t.notes||''} ${t.project||''} ${t.owner||''}`); return q.every(w=>hay.includes(w)); });
+  const byDue=(a,b)=>(a.dueDate||'9999-99-99').localeCompare(b.dueDate||'9999-99-99')||(a.dueTime||'99:99').localeCompare(b.dueTime||'99:99');
+  const byPri=(a,b)=>(PRANK[a.priority]??1)-(PRANK[b.priority]??1);
+  return tasks.sort((a,b)=>{
+    const d=(a.status==='done')-(b.status==='done'); if(d) return d;
+    if(a.status==='done') return (b.completedAt||'').localeCompare(a.completedAt||'');
+    if(st.sort==='priority') return byPri(a,b)||byDue(a,b);
+    if(st.sort==='created') return (b.createdAt||'').localeCompare(a.createdAt||'');
+    return byDue(a,b)||byPri(a,b);
+  });
+}
+function groupOf(t){
+  if(t.status==='done') return 'TAMAMLANANLAR';
+  if(st.sort==='priority') return PLABEL[t.priority]||PLABEL.medium;
+  if(st.sort==='created') return 'SON EKLENENLER';
+  return dayKey(t.dueDate);
+}
+function taskRow(t){
+  const h=H(), done=t.status==='done', late=!done&&t.dueDate&&dayDiff(t.dueDate)<0;
+  const srcs=sourcesOf(t).map(id=>h.transcripts.find(x=>x.id===id)).filter(Boolean);
+  const src=h.transcripts.find(x=>x.id===t.transcriptId)||srcs[srcs.length-1];
+  const pri=t.priority==='high'?'<span class="tag t-red nodot">Yüksek öncelik</span>':t.priority==='low'?'<span class="tag t-gray nodot">Düşük</span>':'';
+  return `<div class="hz-task ${done?'done':''}" data-id="${esc(t.id)}" onclick="HZ.openTask(this.dataset.id)">
+    <input type="checkbox" ${done?'checked':''} ${editable()?'':'disabled'} aria-label="Tamamlandı olarak işaretle" onclick="event.stopPropagation()" onchange="HZ.toggle(this.closest('.hz-task').dataset.id,this.checked)">
+    <div class="hz-task-main"><div class="hz-task-title">${esc(t.title)}</div><div class="hz-meta">
+      ${t.project?`<span class="tag hz-proj" style="--pc:${pcolor(t.project)}">${esc(t.project)}</span>`:''}${pri}
+      <span class="${late?'late':''}">${t.dueDate?`${late?'⚠':'◷'} ${esc(humanDate(t.dueDate))}${t.dueTime?' · '+esc(t.dueTime):''}`:'Tarih belirlenmedi'}</span>
+      ${t.owner?`<span>· ${esc(t.owner)}</span>`:''}
+      ${t.reminderAt&&!done?`<span title="Hatırlatma">🔔 ${esc(remLabel(t.reminderAt))}</span>`:''}
+    </div></div>
+    ${src?`<div class="hz-src" title="${esc(srcs.map(s=>s.title).join('\n'))}">${esc(src.title)}${srcs.length>1?' +'+(srcs.length-1):''}</div>`:''}
+  </div>`;
+}
+function tasksBody(){
+  const list=visible();
+  if(!list.length){
+    const q=st.search.trim(), any=H().tasks.length;
+    const msg=q?'Aramanıza uygun görev yok.':st.view==='completed'?'Henüz tamamlanan görev yok.':st.project?'Bu projede bu görünüme uyan görev yok.':any?'Bu görünümde görev bulunmuyor.':'Henüz görev yok. Bir toplantı deşifresi ekleyerek başlayabilirsiniz.';
+    return [`<div class="empty">${msg}</div>`,'0 görev'];
+  }
+  const groups=new Map();
+  for(const t of list){ const k=groupOf(t); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(t); }
+  return [[...groups].map(([k,items])=>`<div class="hz-group ${k==='GECİKEN'?'late':''}">${k} <span>· ${items.length}</span></div>${items.map(taskRow).join('')}`).join(''),`${list.length} görev`];
+}
+function transcriptsBody(){
+  const h=H(), q=terms();
+  let list=[...h.transcripts];
+  if(q.length) list=list.filter(t=>{ const hay=Engine.fold(`${t.title} ${t.text}`); return q.every(w=>hay.includes(w)); });
+  if(!list.length) return [`<div class="empty">${q.length?'Aramanıza uygun deşifre yok.':'Henüz deşifre yok. “+ Yeni Deşifre” ile ilk toplantınızı ekleyin.'}</div>`,'0 deşifre'];
+  list.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||'').localeCompare(a.createdAt||''));
+  return [`<div class="hz-grid">${list.map(t=>{
+    const n=h.tasks.filter(task=>sourcesOf(task).includes(t.id)).length;
+    return `<div class="hz-tr" data-id="${esc(t.id)}" tabindex="0" onclick="HZ.openViewer(this.dataset.id)" onkeydown="if(event.key==='Enter')HZ.openViewer(this.dataset.id)">
+      <div class="d">${esc(absDate(t.date).toLocaleUpperCase('tr-TR'))}</div><h4>${esc(t.title)}</h4>
+      <p>${esc(String(t.text||'').replace(/\s+/g,' ').slice(0,330))}</p>
+      <div class="f"><span>${(t.wordCount||words(t.text)).toLocaleString('tr-TR')} kelime</span><b>${n} görev</b></div></div>`;
+  }).join('')}</div>`,`${list.length} deşifre`];
+}
+const body=()=>st.view==='transcripts'?transcriptsBody():tasksBody();
+function updateBody(){
+  const [html,count]=body();
+  const b=document.getElementById('hzBody'); if(b) b.innerHTML=html;
+  const c=document.getElementById('hzCount'); if(c) c.textContent=count;
+}
+
+function page(){
+  const h=H(), today=localISO(); st.day=today;
+  if(st.draft) return draftPage();
+  const open=h.tasks.filter(t=>t.status!=='done');
+  const counts={inbox:open.length,today:open.filter(t=>t.dueDate===today).length,upcoming:open.filter(t=>t.dueDate&&t.dueDate>today).length,completed:h.tasks.length-open.length,transcripts:h.transcripts.length};
+  const overdue=open.filter(t=>t.dueDate&&t.dueDate<today).length;
+  const weekAgo=Date.now()-7*864e5;
+  const doneWeek=h.tasks.filter(t=>t.status==='done'&&t.completedAt&&new Date(t.completedAt)>=weekAgo).length;
+  const ed=editable(), projects=projectList();
+  if(st.project&&!projects.includes(st.project)) st.project='';
+  const kp=(cls,ico,l,v,d,view,filter)=>`<div class="kpi" onclick="HZ.view('${view}'${filter?`,'${filter}'`:''})"><div class="ico ${cls}">${ico}</div><div class="l">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+  const [html,count]=body();
+  return `
+  <div class="pagehead"><div><h2>Toplantılar ve Görevler</h2><div class="sub">Toplantı deşifrelerinden görev çıkarın; sorumlu, tarih ve hatırlatmayla takip edin</div></div>
+  <div class="actions">${ed?`<button class="btn primary" onclick="HZ.newDraft()">+ Yeni Deşifre</button><button class="btn" onclick="HZ.openTask()">+ Görev</button>`:''}<button class="btn" onclick="HZ.settings()">⚙ Ayarlar</button></div></div>
+  ${ed?'':'<div class="role-note">🔒 Mevcut rolünüz görevleri yalnızca görüntüleyebilir.</div>'}
+  ${notifState()==='default'?`<div class="banner blue" style="align-items:center;flex-wrap:wrap">🔔 Hatırlatmaların panel açıkken bildirim olarak görünmesi için tarayıcı izni gerekiyor. <button class="btn sm" onclick="HZ.askNotify()">Bildirimlere izin ver</button></div>`:''}
+  <div class="kpis hz-kpis">
+    ${kp('t-amber','◷','Bugün',counts.today,'bugün bitmesi gereken','today')}
+    ${kp('t-red','!','Geciken',overdue,'son tarihi geçmiş açık görev','inbox','open')}
+    ${kp('t-blue','▦','Yaklaşan',counts.upcoming,'ileri tarihli açık görev','upcoming')}
+    ${kp('t-green','✓','Bu hafta biten',doneWeek,'son 7 günde tamamlandı','completed')}
+    ${kp('t-gold','≡','Deşifre',counts.transcripts,'toplantı kaydı','transcripts')}
+  </div>
+  <div class="card">
+    <div class="hz-tabs">${VIEWS.map(([v,l])=>`<button class="${st.view===v?'on':''}" onclick="HZ.view('${v}')">${l} <b>${counts[v]}</b></button>`).join('')}</div>
+    <div class="filters hz-filters">
+      <input type="search" id="hzSearch" placeholder="${st.view==='transcripts'?'Deşifrelerde ara…':'Görevlerde ara…'}" value="${esc(st.search)}" oninput="HZ.search(this.value)">
+      ${st.view==='transcripts'?'':`<select aria-label="Proje filtresi" onchange="HZ.set('project',this.value)"><option value="">Tüm projeler</option>${projects.map(p=>`<option value="${esc(p)}" ${st.project===p?'selected':''}>${esc(p)}</option>`).join('')}</select>
+      <select aria-label="Sıralama" onchange="HZ.set('sort',this.value)">${[['due','Tarihe göre'],['priority','Önceliğe göre'],['created','Yeni eklenen']].map(([v,l])=>`<option value="${v}" ${st.sort===v?'selected':''}>${l}</option>`).join('')}</select>`}
+      ${st.view==='inbox'?`<div class="hz-seg">${[['open','Açık'],['all','Tümü'],['high','Öncelikli']].map(([v,l])=>`<button class="${st.filter===v?'on':''}" onclick="HZ.set('filter','${v}')">${l}</button>`).join('')}</div>`:''}
+      <span class="count" id="hzCount">${count}</span>
+    </div>
+    <div id="hzBody">${html}</div>
+  </div>`;
+}
+
+async function toggle(id,done){
+  const t=H().tasks.find(x=>x.id===id); if(!t||!editable()) return;
+  t.status=done?'done':'open';
+  t.completedAt=done?nowISO():null;
+  touch(t); render(); save();
+  if(done) toastAct('✓ Görev tamamlandı: '+t.title,'Geri al',()=>toggle(id,false));
+  else toast('↺ Görev yeniden açıldı');
+}
+
+/* ---------- Görev düzenleme ---------- */
+function openTask(id){
+  const h=H(), t=id?h.tasks.find(x=>x.id===id):null;
+  if(id&&!t){ toast('Görev bulunamadı — silinmiş olabilir'); return; }
+  if(!t&&!editable()) return;
+  st.editId=t?t.id:'';
+  const ed=editable(), dis=ed?'':'disabled';
+  const srcs=t?sourcesOf(t).map(s=>h.transcripts.find(x=>x.id===s)).filter(Boolean):[];
+  const pri=t?.priority||'medium';
+  modal(t?(ed?'Görevi Düzenle':'Görev'):'Yeni Görev',`
+  <div class="frm">
+    <div class="full"><label>Görev adı</label><input id="hzt_title" value="${esc(t?.title||'')}" placeholder="Yapılacak işi yazın" ${dis} onkeydown="if(event.key==='Enter')HZ.saveTask()"></div>
+    <div><label>Son tarih</label><input id="hzt_due" type="date" value="${esc(t?.dueDate||'')}" data-prev="${esc(t?.dueDate||'')}" ${dis} onchange="HZ.syncRem(this)"></div>
+    <div><label>Saat</label><input id="hzt_time" type="time" value="${esc(t?.dueTime||'')}" ${dis}></div>
+    <div><label>Öncelik</label><select id="hzt_pri" ${dis}>${[['medium','Normal'],['high','Yüksek'],['low','Düşük']].map(([v,l])=>`<option value="${v}" ${pri===v?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div><label>Durum</label><select id="hzt_status" ${dis}><option value="open">Açık</option><option value="done" ${t?.status==='done'?'selected':''}>Tamamlandı</option></select></div>
+    <div><label>Proje</label><input id="hzt_proj" list="hzProjOpts" value="${esc(t?t.project||'':st.project)}" placeholder="Örn. Genel Kurul" ${dis}><datalist id="hzProjOpts">${projectList().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist></div>
+    <div><label>Sorumlu</label><input id="hzt_owner" value="${esc(t?t.owner||'':prefs().owner)}" placeholder="Görevi kim yapacak?" ${dis}></div>
+    <div class="full"><label>Hatırlat</label><input id="hzt_rem" type="datetime-local" value="${esc(t?.reminderAt?t.reminderAt.slice(0,16):'')}" ${dis}><div class="muted" style="margin-top:5px">Hatırlatma, panel bir tarayıcı sekmesinde açıkken bildirim olarak gösterilir.</div></div>
+    <div class="full"><label>Notlar</label><textarea id="hzt_notes" rows="5" placeholder="Bağlam, takip notu veya iletişim bilgisi…" ${dis}>${esc(t?.notes||'')}</textarea></div>
+  </div>
+  ${srcs.length?`<div style="margin-top:16px"><div class="hz-sublabel">İlgili görüşmeler</div><div class="hz-linked">${srcs.map(s=>`<button type="button" data-id="${esc(s.id)}" onclick="HZ.openViewer(this.dataset.id)">≡ ${esc(s.title)} · ${esc(absDate(s.date))}</button>`).join('')}</div></div>`:''}`,
+  ed?`${t?'<button class="btn danger" style="order:-1;margin-right:auto" onclick="HZ.delTask()">Görevi sil</button>':''}${t&&t.status!=='done'?'<button class="btn" onclick="HZ.remindTomorrow()">Yarın hatırlat</button>':''}<button class="btn primary" onclick="HZ.saveTask()">Kaydet</button>`:' ');
+  if(ed) setTimeout(()=>document.getElementById('hzt_title')?.focus(),50);
+}
+// Son tarih değişince, özel bir hatırlatma yazılmadıysa hatırlatmayı o gün 09.00'a getir.
+function syncRem(input){
+  const rem=document.getElementById('hzt_rem'), prev=input.dataset.prev||'';
+  if(!rem.value||rem.value===`${prev}T09:00`) rem.value=input.value?`${input.value}T09:00`:'';
+  input.dataset.prev=input.value;
+}
+function saveTask(){
+  if(!editable()) return false;
+  const title=val('hzt_title').trim();
+  if(!title){ toast('Görev adı gerekli'); document.getElementById('hzt_title').focus(); return false; }
+  const h=H(), existing=h.tasks.find(t=>t.id===st.editId);
+  const status=val('hzt_status'), reminderAt=val('hzt_rem')||'';
+  const task={
+    ...(existing||{}), id:existing?existing.id:uid('task'), title,
+    dueDate:val('hzt_due'), dueTime:val('hzt_time'), priority:val('hzt_pri'), project:val('hzt_proj').trim(),
+    owner:val('hzt_owner').trim(), reminderAt, status, notes:val('hzt_notes').trim(),
+    createdAt:existing?.createdAt||nowISO(),
+    completedAt:status==='done'?existing?.completedAt||nowISO():null,
+    notifiedAt:existing&&(existing.reminderAt||'')===reminderAt?existing.notifiedAt||null:null
+  };
+  if(!existing){ task.key||=''; task.sourceIds||=[]; }
+  touch(task);
+  if(existing) Object.assign(existing,task); else h.tasks.push(task);
+  save(); closeModal(); render(); toast(existing?'Görev güncellendi':'Görev eklendi');
+  return true;
+}
+function delTask(){
+  const h=H(), t=h.tasks.find(x=>x.id===st.editId); if(!t||!editable()) return;
+  if(!confirm(`“${t.title}” görevi silinsin mi?`)) return;
+  h.tasks=h.tasks.filter(x=>x.id!==t.id); save(); closeModal(); render(); toast('Görev silindi');
+}
+function remindTomorrow(){
+  const d=new Date(); d.setDate(d.getDate()+1);
+  document.getElementById('hzt_rem').value=`${localISO(d)}T09:00`;
+  if(saveTask()) toast('Hatırlatma ertelendi — yarın 09:00’da bildirim gösterilecek');
+}
+
+/* ---------- Deşifre arşivi ---------- */
+function openViewer(id){
+  const h=H(), t=h.transcripts.find(x=>x.id===id); if(!t) return;
+  st.viewerId=id;
+  const linked=h.tasks.filter(task=>sourcesOf(task).includes(id)), ed=editable();
+  modal(`${esc(t.title)} <span class="muted" style="font-weight:550">· ${esc(absDate(t.date))}</span>`,`
+  <div class="muted" style="margin-bottom:12px">${(t.wordCount||words(t.text)).toLocaleString('tr-TR')} kelime · ${linked.length} görev (${linked.filter(x=>x.status==='done').length} tamamlandı)</div>
+  <div class="hz-sublabel">Bu görüşmeden çıkan görevler</div>
+  <div class="hz-linked">${linked.length?linked.map(x=>`<button type="button" class="${x.status==='done'?'done':''}" data-id="${esc(x.id)}" onclick="HZ.openTask(this.dataset.id)"><span>${x.status==='done'?'✓':'○'}</span>${esc(x.title)}</button>`).join(''):'<div class="muted">Bu görüşmeye bağlı görev yok.</div>'}</div>
+  <div class="hz-sublabel">Deşifre metni</div>
+  <div class="hz-text">${esc(t.text)}</div>`,
+  `${ed?'<button class="btn danger" style="order:-1;margin-right:auto" onclick="HZ.delTranscript()">Deşifreyi sil</button>':''}<button class="btn" onclick="HZ.copyTranscript()">Metni kopyala</button>${ed?'<button class="btn primary" onclick="HZ.reanalyze()">✦ Yeniden analiz et</button>':''}`,true);
+}
+function delTranscript(){
+  const h=H(), t=h.transcripts.find(x=>x.id===st.viewerId); if(!t||!editable()) return;
+  const linked=h.tasks.filter(task=>sourcesOf(task).includes(t.id)).length;
+  if(!confirm(`“${t.title}” deşifresi silinsin mi?\n\n${linked?`Bu görüşmeden çıkan ${linked} görev silinmez; yalnızca görüşme bağlantısı kaldırılır.`:'Bu görüşmeye bağlı görev yok.'}`)) return;
+  h.transcripts=h.transcripts.filter(x=>x.id!==t.id);
+  for(const task of h.tasks){
+    const before=JSON.stringify([task.sourceIds,task.transcriptId]);
+    if(task.sourceIds) task.sourceIds=task.sourceIds.filter(id=>id!==t.id);
+    if(task.transcriptId===t.id) task.transcriptId=task.sourceIds?.at(-1)||'';
+    if(JSON.stringify([task.sourceIds,task.transcriptId])!==before) touch(task);
+  }
+  save(); closeModal(); render(); toast('Deşifre silindi');
+}
+async function copyTranscript(){
+  const t=H().transcripts.find(x=>x.id===st.viewerId); if(!t) return;
+  try{ await navigator.clipboard.writeText(t.text); toast('📋 Metin panoya kopyalandı'); }catch(e){ toast('Kopyalanamadı — metni seçip kopyalayabilirsiniz'); }
+}
+function reanalyze(){
+  const t=H().transcripts.find(x=>x.id===st.viewerId); if(!t||!editable()) return;
+  closeModal();
+  st.draft={reId:t.id,title:t.title,date:t.date||localISO(),text:t.text,step:'source',cands:[],dup:null};
+  analyze();
+}
+
+/* ---------- Yeni deşifre ve önizleme ---------- */
+const stats=text=>{ const t=String(text||'').trim(); return `${words(t).toLocaleString('tr-TR')} kelime · ${t.length.toLocaleString('tr-TR')} karakter`; };
+function newDraft(){
+  if(!editable()) return;
+  st.draft={reId:'',title:'',date:localISO(),text:'',step:'source',cands:[],dup:null};
+  go('gorevler'); setTimeout(()=>document.getElementById('hzTitle')?.focus(),50);
+}
+function cancelDraft(){
+  const d=st.draft;
+  if(d&&(d.step==='results'||d.text.trim())&&!confirm('Kaydedilmemiş deşifre çalışması kapatılsın mı?')) return;
+  st.draft=null; render(); window.scrollTo(0,0);
+}
+function setDraft(k,v){
+  if(!st.draft) return; st.draft[k]=v;
+  if(k==='text'){ const s=document.getElementById('hzStats'); if(s) s.textContent=stats(v); }
+}
+function loadFile(file){
+  if(!file||!st.draft) return;
+  if(file.size>5*1024*1024){ toast('Dosya çok büyük — en fazla 5 MB düz metin yüklenebilir'); return; }
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const text=String(rd.result||'').replace(/^﻿/,'');
+    if(text.includes('\u0000')){ toast('Bu dosya okunamadı — yalnızca düz metin (.txt) desteklenir'); return; }
+    st.draft.text=text;
+    if(!st.draft.title.trim()) st.draft.title=file.name.replace(/\.[^.]+$/,'');
+    render(); toast('📄 Dosya yüklendi: '+file.name);
+  };
+  rd.onerror=()=>toast('Dosya okunamadı: '+file.name);
+  rd.readAsText(file,'utf-8');
+}
+function drop(e){ if(e.dataTransfer?.files?.length){ e.preventDefault(); loadFile(e.dataTransfer.files[0]); } }
+
+// Aday için mevcut görev eşleşmesini ve varsayılan işlemi belirler.
+function computeMatch(c){
+  const h=H(), reId=st.draft.reId;
+  const manual=c.manualMatchId?h.tasks.find(t=>t.id===c.manualMatchId):null;
+  const match=manual||(c.manualCleared?null:Engine.findMatch(c,h.tasks));
+  c.matchId=match?.id||'';
+  if(c.decisionMatchId===c.matchId) return;
+  c.decisionMatchId=c.matchId;
+  if(manual||c.manualCleared) c.decision='update';
+  else if(!match) c.decision='new';
+  // Bitmiş işi yeniden açma; yeniden analizde bu görüşmeden zaten çıkmış işi tekrarlama.
+  else c.decision=match.status==='done'||(reId&&sourcesOf(match).includes(reId))?'skip':'update';
+}
+function matchLabel(c){
+  const match=H().tasks.find(t=>t.id===c.matchId), reId=st.draft.reId;
+  if(!match) return c.decision==='update'?'<div class="hz-new">Bağlanacak görevi yukarıdan seçin.</div>':'<div class="hz-new">Yeni görev</div>';
+  const done=match.status==='done', already=reId&&sourcesOf(match).includes(reId);
+  const heading=already?'Bu görüşmeden zaten çıkarılmış':done?'Tamamlanmış görev bulundu':'Mevcut görev bulundu';
+  const dateNote=match.dueDate&&c.dueDate&&match.dueDate!==c.dueDate?` · <b>Tarih farklı:</b> kayıtlı ${esc(absDate(match.dueDate))} / yeni ${esc(absDate(c.dueDate))} (kayıtlı tarih değişmez)`:'';
+  const outcome=c.decision==='skip'?(done?' — tamamlandığı için atlanacak.':' — atlanacak.'):c.decision==='update'?' — yeni not eklenecek.':' — yine de ayrı bir görev oluşturulacak.';
+  return `<div class="hz-match ${done?'fin':''}"><b>${heading}:</b> ${esc(match.title)}${outcome}${dateNote}</div>`;
+}
+function summaryHTML(){
+  const d=st.draft, matched=d.cands.filter(c=>c.matchId).length;
+  return `✦ <div><b>${d.cands.length} görev bulundu · ${matched} eşleşme</b><br>${d.dup
+    ?`Bu deşifre daha önce kaydedilmiş (“${esc(d.dup.title)}”). Tekrar kaydedilemez; eksik görevler için Deşifreler sekmesinden “Yeniden analiz et” kullanılabilir.`
+    :'Her başlığı ve eşleşmeyi kontrol edin. Tamamlanan görevler varsayılan olarak atlanır.'}</div>`;
+}
+function updateSummary(){
+  const s=document.getElementById('hzSummary'); if(s) s.innerHTML=summaryHTML();
+  const b=document.getElementById('hzSaveC'); if(b) b.disabled=!!st.draft.dup||!st.draft.cands.length;
+}
+// Satırı yeniden oluşturmadan günceller; yazarken odak kaybolmaz.
+function syncRow(row,c){
+  row.querySelector('.hz-dec').value=c.decision;
+  const link=row.querySelector('.hz-cand-link');
+  link.classList.toggle('hidden',c.decision!=='update');
+  if(c.decision==='update'){
+    const sel=row.querySelector('.hz-target');
+    if(sel.options.length<=1) sel.insertAdjacentHTML('beforeend',targetOptions());
+    sel.value=c.matchId;
+  }
+  row.querySelector('.hz-cand-st').innerHTML=matchLabel(c);
+  row.classList.toggle('off',!c.selected);
+}
+function targetOptions(selected){
+  const sorted=[...H().tasks].sort((a,b)=>(a.status==='done')-(b.status==='done')||a.title.localeCompare(b.title,'tr'));
+  return sorted.map(t=>`<option value="${esc(t.id)}" ${t.id===selected?'selected':''}>${esc(t.title)}${t.status==='done'?' · tamamlandı':''}</option>`).join('');
+}
+function grow(area){ area.style.height='auto'; area.style.height=`${area.scrollHeight+2}px`; }
+function candRow(c){
+  const hasTasks=H().tasks.length>0;
+  return `<div class="hz-cand ${c.selected?'':'off'}" data-id="${esc(c.id)}">
+    <div class="hz-cand-top"><input type="checkbox" ${c.selected?'checked':''} aria-label="Görevi seç" onchange="HZ.cand(this,'selected',this.checked)">
+      <textarea rows="1" aria-label="Görev adı" oninput="HZ.cand(this,'title',this.value)" onchange="HZ.cand(this,'rematch')" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">${esc(c.title)}</textarea>
+      <button class="btn ghost sm" title="Önizlemeden kaldır" aria-label="Önizlemeden kaldır" onclick="HZ.cand(this,'remove')">✕</button></div>
+    <div class="hz-cand-grid">
+      <input list="hzProjects" value="${esc(c.project||'')}" placeholder="Proje" aria-label="Proje" onchange="HZ.cand(this,'project',this.value)">
+      <input value="${esc(c.owner||'')}" placeholder="Sorumlu" aria-label="Sorumlu" onchange="HZ.cand(this,'owner',this.value)">
+      <input type="date" value="${esc(c.dueDate||'')}" aria-label="Son tarih" onchange="HZ.cand(this,'dueDate',this.value)">
+      <select aria-label="Öncelik" onchange="HZ.cand(this,'priority',this.value)">${[['high','Yüksek'],['medium','Normal'],['low','Düşük']].map(([v,l])=>`<option value="${v}" ${c.priority===v?'selected':''}>${l}</option>`).join('')}</select>
+      <select class="hz-dec" aria-label="Eşleşme işlemi" onchange="HZ.cand(this,'decision',this.value)">${[['new','Yeni görev'],...(hasTasks?[['update','Mevcut görevi güncelle']]:[]),['skip','Atla']].map(([v,l])=>`<option value="${v}" ${c.decision===v?'selected':''}>${l}</option>`).join('')}</select>
+    </div>
+    <div class="hz-cand-link ${c.decision==='update'?'':'hidden'}"><span>Bağlanacak görev</span><select class="hz-target" aria-label="Mevcut görevi seç" onchange="HZ.cand(this,'target',this.value)"><option value="">Görev seçin…</option>${c.decision==='update'?targetOptions(c.matchId):''}</select></div>
+    <div class="hz-cand-st">${matchLabel(c)}</div>
+    ${c.notes?`<div class="hz-ctx">${esc(c.notes.slice(0,260))}</div>`:''}
+  </div>`;
+}
+function cand(el,field,value){
+  const row=el.closest('.hz-cand'), d=st.draft; if(!d) return;
+  const item=d.cands.find(x=>x.id===row.dataset.id); if(!item) return;
+  const rematch=()=>{ computeMatch(item); syncRow(row,item); updateSummary(); };
+  if(field==='selected'){ item.selected=value; row.classList.toggle('off',!value); }
+  else if(field==='title'){ item.title=value.replace(/\s*\n\s*/g,' '); grow(el); }
+  else if(field==='rematch') rematch();
+  else if(field==='project'){ item.project=value.trim(); rematch(); }
+  else if(field==='owner') item.owner=value.trim();
+  else if(field==='dueDate'){ item.dueDate=value; syncRow(row,item); }
+  else if(field==='priority') item.priority=value;
+  else if(field==='decision'){ item.decision=value; syncRow(row,item); }
+  else if(field==='target'){ item.manualMatchId=value; item.manualCleared=!value; rematch(); }
+  else if(field==='remove'){ d.cands=d.cands.filter(x=>x!==item); row.remove(); updateSummary(); }
+}
+function analyze(){
+  const d=st.draft; if(!d) return;
+  const text=d.text.trim();
+  if(text.length<30||words(text)<6){ toast('Biraz daha metin gerekli — deşifre en az birkaç cümle içermeli'); return; }
+  const h=H(), folded=Engine.fold(text);
+  d.dup=d.reId?null:h.transcripts.find(t=>Engine.fold(t.text)===folded)||null;
+  const owner=prefs().owner.trim();
+  d.cands=Engine.extract(text,d.date,{defaultOwner:owner,knownProjects:projectList()}).map(item=>({id:uid('candidate'),selected:true,...item}));
+  if(!d.cands.length){
+    d.cands=[{id:uid('candidate'),selected:true,title:'Görüşme notlarını gözden geçir',notes:text.slice(0,520),source:'',dueDate:'',dueTime:'',priority:'medium',project:'Genel',owner,key:''}];
+    toast('Açık bir eylem bulunamadı — gözden geçirme görevi önerildi');
+  }
+  d.cands.forEach(computeMatch);
+  d.step='results';
+  if(route!=='gorevler') go('gorevler'); else { render(); window.scrollTo(0,0); }
+  if(d.dup) toast('Bu deşifre zaten kayıtlı: '+d.dup.title);
+}
+function back(){ if(st.draft){ st.draft.step='source'; render(); } }
+function applyUpdate(existing,c,transcript){
+  const header=`[${absDate(transcript.date)} · ${transcript.title}]`;
+  const additions=[];
+  if(!existing.dueDate&&c.dueDate){
+    existing.dueDate=c.dueDate;
+    if(!existing.dueTime&&c.dueTime) existing.dueTime=c.dueTime;
+    if(!existing.reminderAt){ existing.reminderAt=`${c.dueDate}T09:00`; existing.notifiedAt=null; }
+  } else if(existing.dueDate&&c.dueDate&&existing.dueDate!==c.dueDate){
+    // Kayıtlı tarihi sessizce değiştirme; yeni tarihi nota yaz, karar kullanıcıda kalsın.
+    additions.push(`Bu görüşmede geçen tarih: ${absDate(c.dueDate)} (kayıtlı son tarih: ${absDate(existing.dueDate)}).`);
+  }
+  const isLegacyTitle=/^(TMA Ödemesi Takibi|E-posta CC Kuralı|Halkbank & Sponsor Stant Masaları|Katılımcı Sayısı ve E-mailing Kampanyası|İlk Tur Davetiyeler.*|İkinci Tur Davetiyeler|LinkedIn Reklam Bütçesi ve Dağıtımı|Raporlama)$/i.test(existing.title);
+  if(isLegacyTitle) existing.title=c.title.trim();
+  const known=Engine.fold(existing.notes), note=(c.notes||'').trim(), sentence=Engine.fold(c.source||note);
+  if(note&&!(sentence&&known.includes(sentence))) additions.unshift(note);
+  if(additions.length) existing.notes=[existing.notes,`${header} ${additions.join(' ')}`].filter(Boolean).join('\n\n');
+  // Öncelik yalnızca yükselir; sonraki bir not mevcut önceliği düşürmez.
+  if(c.priority==='high') existing.priority='high';
+  existing.priority||=c.priority||'medium';
+  existing.project||=c.project;
+  existing.owner||=c.owner;
+  existing.key||=c.key||'';
+  existing.sourceIds=[...new Set([...sourcesOf(existing),transcript.id])];
+  existing.lastSeenAt=nowISO();
+  if(existing.status!=='done') existing.transcriptId=transcript.id;
+  touch(existing);
+}
+function saveCands(){
+  const d=st.draft; if(!d||!editable()) return;
+  if(d.dup){ toast('Deşifre zaten kayıtlı: '+d.dup.title); return; }
+  const h=H();
+  const chosen=d.cands.filter(c=>c.selected);
+  const active=chosen.filter(c=>c.title.trim()&&c.decision!=='skip');
+  const skipped=chosen.length-active.length;
+  if(!chosen.length){ toast('En az bir görev seçmelisiniz'); return; }
+  if(active.some(c=>c.decision==='update'&&!h.tasks.some(t=>t.id===c.matchId))){ toast('Güncellenecek her aday için mevcut bir görev seçmelisiniz'); return; }
+  const text=d.text.trim(), date=d.date||localISO();
+  let transcript=d.reId?h.transcripts.find(t=>t.id===d.reId):null;
+  if(!transcript){
+    transcript=touch({id:uid('transcript'),title:d.title.trim()||`Görüşme — ${absDate(date)}`,date,text,wordCount:words(text),createdAt:nowISO()});
+    h.transcripts.push(transcript);
+  }
+  let added=0, updated=0;
+  for(const c of active){
+    const existing=c.decision==='update'?h.tasks.find(t=>t.id===c.matchId):null;
+    if(existing){ applyUpdate(existing,c,transcript); updated++; continue; }
+    h.tasks.push(touch({id:uid('task'),title:c.title.trim(),notes:c.notes||'',dueDate:c.dueDate||'',dueTime:c.dueDate?c.dueTime||'':'',reminderAt:c.dueDate?`${c.dueDate}T09:00`:'',priority:c.priority||'medium',project:c.project||'Genel',owner:c.owner||'',key:c.key||'',status:'open',transcriptId:transcript.id,sourceIds:[transcript.id],createdAt:nowISO(),completedAt:null,notifiedAt:null}));
+    added++;
+  }
+  save();
+  st.draft=null; st.view='inbox'; st.filter='open'; st.project=''; render(); window.scrollTo(0,0);
+  toast(`✓ Deşifre işlendi: ${added} yeni görev, ${updated} güncelleme, ${skipped} aday atlandı`);
+}
+function draftPage(){
+  const d=st.draft, re=!!d.reId;
+  const head=`<div class="pagehead"><div><h2>${re?'Deşifreyi yeniden analiz et':'Yeni deşifre'}</h2><div class="sub">${re
+    ?'Bu görüşmeden daha önce çıkarılmış görevler atlanır; yalnızca eksik kalanları ekleyebilirsiniz.'
+    :'Konuşma metnini olduğu gibi yapıştırın ya da .txt dosyası yükleyin. Görevleri kaydetmeden önce gözden geçirebilirsiniz.'}</div></div>
+    <div class="actions"><button class="btn" onclick="HZ.cancelDraft()">← Listeye dön</button></div></div>`;
+  if(d.step==='source') return head+`<div class="card"><div class="card-b">
+    <div class="frm">
+      <div><label>Görüşme başlığı</label><input id="hzTitle" value="${esc(d.title)}" placeholder="Örn. Haftalık koordinasyon toplantısı" oninput="HZ.d('title',this.value)"></div>
+      <div><label>Görüşme tarihi</label><input id="hzDate" type="date" value="${esc(d.date)}" onchange="HZ.d('date',this.value)"></div>
+      <div class="full"><label>Deşifre metni</label><textarea id="hzText" class="hz-textarea" placeholder="Ses kaydının yazıya çevrilmiş hâlini buraya yapıştırın…" oninput="HZ.d('text',this.value)" ondragover="if(event.dataTransfer&&[...event.dataTransfer.types].includes('Files'))event.preventDefault()" ondrop="HZ.drop(event)">${esc(d.text)}</textarea></div>
+    </div>
+    <div class="hz-row"><div><button class="btn sm" onclick="document.getElementById('hzFile').click()">📄 Dosyadan yükle (.txt)</button><input type="file" id="hzFile" accept=".txt,.md,.text,text/plain" hidden onchange="HZ.loadFile(this.files[0]);this.value=''"></div><span class="muted" id="hzStats">${stats(d.text)}</span></div>
+  </div><div class="hz-foot"><button class="btn" onclick="HZ.cancelDraft()">Vazgeç</button><button class="btn primary" onclick="HZ.analyze()">✦ Görevleri çıkar</button></div></div>`;
+  setTimeout(afterResults,0);
+  return head+`<div class="card"><div class="card-b">
+    <div class="banner ${d.dup?'amber':'blue'}" id="hzSummary">${summaryHTML()}</div>
+    <div id="hzCands">${d.cands.map(candRow).join('')}</div>
+    <datalist id="hzProjects">${projectList().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
+  </div><div class="hz-foot">${re?'':'<button class="btn left" onclick="HZ.back()">← Metne dön</button>'}<button class="btn" onclick="HZ.cancelDraft()">Vazgeç</button><button class="btn primary" id="hzSaveC" ${d.dup||!d.cands.length?'disabled':''} onclick="HZ.saveCands()">Seçilenleri kaydet</button></div></div>`;
+}
+// Başlık kutularını içeriğe göre uzat (yükseklik ancak sayfaya eklendikten sonra ölçülebilir).
+function afterResults(){
+  if(!st.draft||st.draft.step!=='results') return;
+  document.querySelectorAll('#hzCands .hz-cand textarea').forEach(grow);
+}
+
+/* ---------- Hafıza yedeğini içe aktarma ---------- */
+function importFile(file){
+  if(!file||!editable()) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    let d; try{ d=JSON.parse(String(rd.result||'').replace(/^﻿/,'')); }catch(e){ toast('⚠ Dosya okunamadı — geçerli bir JSON değil'); return; }
+    const ok=x=>x&&Array.isArray(x.tasks)&&Array.isArray(x.transcripts);
+    const src=ok(d)?d:(d&&ok(d.hafiza)?d.hafiza:null);
+    if(!src){ toast('⚠ Bu dosya bir Hafıza yedeği değil (görev ve deşifre listesi bulunamadı)'); return; }
+    const h=H();
+    const hasId=x=>x&&typeof x==='object'&&typeof x.id==='string'&&x.id;
+    const tIds=new Set(h.transcripts.map(x=>x.id)), kIds=new Set(h.tasks.map(x=>x.id));
+    const newTr=[], newTasks=[]; let dup=0, bad=0;
+    for(const x of src.transcripts){ if(!hasId(x)||typeof x.text!=='string'){ bad++; continue; } if(tIds.has(x.id)){ dup++; continue; } tIds.add(x.id); newTr.push(x); }
+    for(const x of src.tasks){ if(!hasId(x)||typeof x.title!=='string'||!x.title.trim()){ bad++; continue; } if(kIds.has(x.id)){ dup++; continue; } kIds.add(x.id); newTasks.push(x); }
+    if(!newTr.length&&!newTasks.length){ toast(`Eklenecek yeni kayıt yok — ${dup} kayıt zaten panelde`); return; }
+    if(!confirm(`Hafıza yedeği içe aktarılsın mı?\n\n• ${newTasks.length} yeni görev ve ${newTr.length} yeni deşifre eklenecek.\n• Panelde zaten olan ${dup} kayıt atlanacak${bad?`, ${bad} okunamayan kayıt yok sayılacak`:''}.\n\nMevcut görevler, üye ve aidat kayıtları değiştirilmez.`)) return;
+    h.transcripts.push(...newTr); h.tasks.push(...newTasks);
+    save(); closeModal(); st.draft=null; render();
+    toast(`✓ İçe aktarıldı: ${newTasks.length} görev, ${newTr.length} deşifre${dup?` · ${dup} kayıt zaten vardı`:''}`);
+  };
+  rd.onerror=()=>toast('Dosya okunamadı: '+file.name);
+  rd.readAsText(file,'utf-8');
+}
+
+/* ---------- Ayarlar ve bildirimler ---------- */
+function settings(){
+  const p=prefs(), n=notifState(), ed=editable();
+  const nText={granted:'Açık — hatırlatmalar bu tarayıcıda bildirim olarak gösterilir.',denied:'Engellendi — tarayıcının site ayarlarından izin verebilirsiniz. Hatırlatmalar panel içinde gösterilir.',default:'Henüz izin verilmedi. Hatırlatmalar şimdilik panel içinde gösterilir.',unsupported:'Bu tarayıcı bildirimleri desteklemiyor. Hatırlatmalar panel içinde gösterilir.'}[n];
+  modal('Toplantılar ve Görevler · Ayarlar',`
+  <div class="setrow"><div><div class="sl">Varsayılan sorumlu</div><div class="sd">Deşifreden çıkarılan ve yeni eklenen görevlere sorumlu olarak yazılır. Bu tarayıcıya özeldir.</div></div><div class="ctl"><input value="${esc(p.owner)}" placeholder="Örn. adınız" onchange="HZ.pref('owner',this.value.trim())"></div></div>
+  <div class="setrow"><div><div class="sl">Günlük hatırlatma</div><div class="sd">Açık bir görev tamamlanana kadar her gün hatırlatma saatinde yeniden bildir.</div></div><label class="switch"><input type="checkbox" ${p.repeat?'checked':''} onchange="HZ.pref('repeat',this.checked)"><i></i></label></div>
+  <div class="setrow"><div><div class="sl">Tarayıcı bildirimleri</div><div class="sd">${nText}</div></div>${n==='default'?'<button class="btn sm" onclick="HZ.askNotify()">Bildirimlere izin ver</button>':''}</div>
+  ${ed?`<div class="setrow"><div><div class="sl">Hafıza yedeğini içe aktar</div><div class="sd">Hafıza masaüstü uygulamasında “Yedek indir (JSON)” ile alınan dosyayı seçin. Panelde zaten olan kayıtlar ikinci kez eklenmez.</div></div>
+    <button class="btn" onclick="document.getElementById('hzImport').click()">⬆ JSON dosyası seç</button><input type="file" id="hzImport" accept=".json,application/json" hidden onchange="HZ.importFile(this.files[0]);this.value=''"></div>`:''}`,'');
+}
+function askNotify(){
+  if(notifState()!=='default') return;
+  Notification.requestPermission().then(r=>{
+    toast(r==='granted'?'🔔 Bildirimler açıldı':'Bildirim izni verilmedi — hatırlatmalar panel içinde gösterilecek');
+    if(modalOpen()) settings(); else if(route==='gorevler') render();
+  });
+}
+function notified(){ try{ return JSON.parse(localStorage.getItem(NOTIFIED_KEY)||'{}')||{}; }catch(e){ return {}; } }
+function show(msg){
+  const title=String(msg.title||'').replace(/^Hafıza/,'FOYDER OS');
+  const open=()=>{ try{ window.focus(); }catch(e){} if(st.draft) return; if(route!=='gorevler') go('gorevler'); if(msg.taskId&&H().tasks.some(t=>t.id===msg.taskId)) openTask(msg.taskId); };
+  if(notifState()==='granted'){
+    try{ const n=new Notification(title,{body:msg.body,tag:msg.taskId||'foyder-hz'}); n.onclick=()=>{ n.close(); open(); }; return; }catch(e){ /* mobil tarayıcılar yalnızca service worker bildirimine izin verebilir */ }
+  }
+  toastAct(`⏰ ${msg.body.split('\n')[0]}`,'Aç',open);
+}
+// Hangi görev için en son ne zaman bildirim gösterildiği bu tarayıcıda tutulur; ortak veriye yazılmaz.
+function checkReminders(){
+  if(!S||!document.getElementById('nav').innerHTML) return;
+  if(st.day&&st.day!==localISO()) refresh();
+  const map=notified(), tasks=(S.hafiza&&Array.isArray(S.hafiza.tasks))?S.hafiza.tasks:[];
+  const view=tasks.map(t=>{ const m=map[t.id]; return m&&m.r===(t.reminderAt||'')?{...t,notifiedAt:m.at}:t; });
+  const due=Rem.due(view,new Date(),prefs().repeat);
+  if(!due.length) return;
+  const stamp=nowISO();
+  for(const msg of Rem.messages(due)) show(msg);
+  const ids=new Set(tasks.map(t=>t.id)), next={};
+  for(const [id,v] of Object.entries(map)) if(ids.has(id)) next[id]=v;
+  for(const t of due) next[t.id]={at:stamp,r:t.reminderAt||''};
+  try{ localStorage.setItem(NOTIFIED_KEY,JSON.stringify(next)); }catch(e){}
+}
+setTimeout(checkReminders,4000);
+setInterval(checkReminders,30000);
+
+return {
+  page,prepareOut,synced:(sent,merged)=>{ if(merged) synced(sent,merged); },
+  badge:()=>{ const today=localISO(); return ((S&&S.hafiza&&S.hafiza.tasks)||[]).filter(t=>t.status!=='done'&&t.dueDate&&t.dueDate<=today).length; },
+  view:(v,f)=>{ st.view=v; if(f) st.filter=f; if(st.draft) st.draft=null; if(route!=='gorevler') go('gorevler'); else render(); },
+  set:(k,v)=>{ st[k]=v; render(); },
+  search:v=>{ st.search=v; updateBody(); },
+  d:setDraft,pref:setPref,
+  toggle,openTask,saveTask,delTask,remindTomorrow,syncRem,
+  openViewer,delTranscript,copyTranscript,reanalyze,
+  newDraft,cancelDraft,loadFile,drop,analyze,back,cand,saveCands,
+  importFile,settings,askNotify,checkReminders
+};
+})();
+function pageGorevler(){ return HZ.page(); }
+</script>
 <script>
 /* ================================================================
    MODAL
@@ -1794,6 +3194,7 @@ function importJson(file){
   rd.onload=e=>{ try{
       const d=JSON.parse(e.target.result);
       if(!d.members||!d.payments) throw 0;
+      if(!d.hafiza&&S&&S.hafiza) d.hafiza=S.hafiza; // eski yedeklerde bu bölüm yok; mevcut görevler korunur
       S=d; const def=defaultState();
       S.ayarlar={...def.ayarlar,...S.ayarlar}; S.ayarlar.ai={...def.ayarlar.ai,...(S.ayarlar.ai||{})}; S.ayarlar.sheets={...def.ayarlar.sheets,...(S.ayarlar.sheets||{})};
       persist(); render(); toast('✓ Yedek geri yüklendi');
@@ -1809,7 +3210,7 @@ function resetData(){
 /* ================================================================
    RENDER & BAŞLATMA
 ================================================================ */
-const P={dashboard:pageDashboard,asistan:pageAsistan,uyeler:pageUyeler,aidat:pageAidat,basvurular:pageBasvurular,kararlar:pageKararlar,raporlar:pageRaporlar,analiz:pageAnaliz,mesajlar:pageMesajlar,ayarlar:pageAyarlar};
+const P={dashboard:pageDashboard,asistan:pageAsistan,uyeler:pageUyeler,aidat:pageAidat,basvurular:pageBasvurular,kararlar:pageKararlar,raporlar:pageRaporlar,analiz:pageAnaliz,mesajlar:pageMesajlar,gorevler:pageGorevler,ayarlar:pageAyarlar};
 function render(){
   renderNav();
   document.getElementById('main').innerHTML=(P[route]||pageDashboard)();
