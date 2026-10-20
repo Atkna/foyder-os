@@ -868,6 +868,7 @@ function pageDashboard(){
   </div>
   <div class="grid2">
     <div>
+      ${HZ.dashCard()}
       <div class="card"><div class="card-h"><h3>Yıllara Göre Aidat Tahsilatı</h3><button class="btn ghost sm" onclick="go('raporlar')">Detaylı rapor →</button></div>
       <div class="card-b"><div class="bars">${yearTotals.map(([y,t])=>`<div class="bar-col"><div class="vv">${fmt(t)}</div><div class="b ${y===THIS_YEAR?'g':''}" style="height:${Math.max(6,t/maxT*100)}%"></div><div class="yl">${y}</div></div>`).join('')}</div></div></div>
       <div class="card"><div class="card-h"><h3>Son Ödemeler</h3></div><div class="card-b np tbl-wrap">
@@ -995,7 +996,8 @@ function openMember(id){
     ${hist.map(p=>`<tr><td>${p.yil}</td><td>${p.tip}</td><td class="num">${fmt(p.tutar)}${p.durum==='KISMİ'?`<div class="sb" style="font-size:11px;color:var(--faint)">ödenen ${fmt(p.odenenTutar)}</div>`:''}</td>
       <td><span class="tag ${payTag(p.durum)}">${p.durum}</span></td><td>${dfmt(p.odemeTarihi)}</td>
       ${can('aidat')?`<td><button class="btn sm ghost" onclick="editPayment('${p.id}')">Düzenle</button></td>`:''}</tr>`).join('')}
-    </tbody></table></div>`:'<div class="empty">Ödeme kaydı yok.</div>'}`,
+    </tbody></table></div>`:'<div class="empty">Ödeme kaydı yok.</div>'}
+    ${HZ.relatedHTML('member',id)}`,
   can('uye')?`<button class="btn" onclick="closeModal();editMember('${id}')">Üyeyi Düzenle</button>`:'');
 }
 function editMember(id){
@@ -1210,7 +1212,7 @@ function pageKararlar(){
     <span class="count">${list.length} karar</span>
   </div><div class="card-b np tbl-wrap">
   ${list.length?`<table><thead><tr><th>No</th><th>Tarih</th><th>Konu</th><th>İlgili Üye / Şirket</th><th>Tür</th><th>Statü</th><th>Not</th>${can('karar')?'<th></th>':''}</tr></thead><tbody>
-  ${list.map(k=>`<tr><td class="num"><b>${k.no??'—'}</b></td><td>${dfmt(k.tarih)}</td><td>${esc(k.konu||'—')}</td><td>${esc(k.uyeAdi||'—')}</td>
+  ${list.map(k=>`<tr><td class="num"><b>${k.no??'—'}</b></td><td>${dfmt(k.tarih)}</td><td>${esc(k.konu||'—')}${HZ.relChip('karar',k.id)}</td><td>${esc(k.uyeAdi||'—')}</td>
   <td>${esc(k.uyelikTuru||'—')}</td><td>${k.durum?`<span class="tag ${k.durum==='AKTİF'?'t-green':(k.durum==='PASİF'?'t-gray':'t-amber')}">${esc(k.durum)}</span>`:'—'}</td>
   <td style="max-width:230px">${esc(k.not||'')}</td>${can('karar')?`<td><button class="btn sm ghost" onclick="editKarar('${k.id}')">Düzenle</button></td>`:''}</tr>`).join('')}
   </tbody></table>`:'<div class="empty">Karar bulunamadı.</div>'}</div></div>`;
@@ -1227,7 +1229,8 @@ function editKarar(id){
     <div><label>Statü</label><select id="k_durum"><option value="">—</option>${['AKTİF','PASİF','MÜKERRER'].map(d=>`<option ${k.durum===d?'selected':''}>${d}</option>`).join('')}</select></div>
     <div class="full"><label>Açıklama / Not</label><textarea id="k_not" rows="2">${esc(k.not||'')}</textarea></div>
   </div>
-  <p class="muted" style="margin-top:10px">Bu kayıt takip amaçlıdır; resmî karar metni karar defterinde tutulur (hukuki kontrol önerilir).</p>`,
+  <p class="muted" style="margin-top:10px">Bu kayıt takip amaçlıdır; resmî karar metni karar defterinde tutulur (hukuki kontrol önerilir).</p>
+  ${id?HZ.relatedHTML('karar',id):''}`,
   `<button class="btn primary" onclick="saveKarar('${id||''}')">Kaydet</button>`);
 }
 function saveKarar(id){
@@ -1444,9 +1447,10 @@ function pageMesajlar(){
     aidat_wp:{t:'Aidat Hatırlatma · WhatsApp',m:`Sayın ${ad},\n\nFOYDER Derneği ${y} yılı üyelik aidatınız (${tutar}) kayıtlarımızda henüz görünmemektedir.${ibanLine}Ödemenizi yaptıysanız dekontu paylaşmanız yeterlidir.\n\nDesteğiniz için teşekkür ederiz.\nFOYDER Yönetimi`},
     aidat_mail:{t:'Aidat Hatırlatma · E-posta',m:`Konu: FOYDER ${y} Yılı Üyelik Aidatı Hakkında\n\nSayın ${ad},\n\nDerneğimizin ${y} yılı üyelik aidatı ${tutar} olarak belirlenmiş olup, kayıtlarımızda ödemenizin henüz tamamlanmadığı görülmektedir.\n${ibanLine}\nÖdemenizi gerçekleştirdiyseniz dekontunuzu bu e-postaya yanıt olarak iletmeniz yeterli olacaktır.\n\nDerneğimize verdiğiniz destek için teşekkür eder, iyi çalışmalar dileriz.\n\nSaygılarımızla,\nFOYDER Derneği Yönetim Kurulu`},
     evrak:{t:'Eksik Evrak Bildirimi · E-posta',m:`Konu: FOYDER Üyelik Başvurunuz – Eksik Evrak Bilgilendirmesi\n\nSayın ${ad},\n\nFOYDER Derneği üyelik başvurunuz değerlendirme sürecindedir. Sürecin tamamlanabilmesi için aşağıdaki evrakların iletilmesini rica ederiz:\n\n• [Eksik evrakları buraya listeleyiniz]\n\nSorularınız için bize her zaman ulaşabilirsiniz.\n\nSaygılarımızla,\nFOYDER Derneği`},
+    ...HZ.msgTemplates(msj.gorev),
     hosgeldin:{t:'Yeni Üye Hoş Geldiniz',m:`Sayın ${ad},\n\nYönetim Kurulumuzun kararıyla FOYDER Derneği üyeliğinize kabul edildiğinizi bildirmekten memnuniyet duyarız. Aramıza hoş geldiniz!\n\nÖnümüzdeki günlerde üye rehberi, iletişim grupları ve etkinlik takvimiyle ilgili bilgilendirmeler iletilecektir.\n\nBirlikte güzel çalışmalara imza atmak dileğiyle,\nFOYDER Yönetim Kurulu`}
   };
-  const cur=T[msj.tip];
+  const cur=T[msj.tip]||T.aidat_wp; const gorevTip=/^gorev_/.test(msj.tip);
   return `
   <div class="pagehead"><div><h2>Mesaj Şablonları</h2><div class="sub">Aidat hatırlatma, eksik evrak ve üye iletişimi</div></div>
   <div class="card" style="border-left:3px solid var(--gold)">
@@ -1459,8 +1463,9 @@ function pageMesajlar(){
   </div></div>
   <div class="card"><div class="filters">
     <select onchange="msj.tip=this.value;render()">${Object.entries(T).map(([k,v])=>`<option value="${k}" ${msj.tip===k?'selected':''}>${v.t}</option>`).join('')}</select>
-    <select onchange="msj.uye=this.value;render()"><option value="">Üye seç (otomatik doldur)…</option>${opts}</select>
-    <span class="count">${acik.length} üyenin ${y} aidatı açık</span>
+    ${gorevTip?`<select onchange="msj.gorev=this.value;render()"><option value="">Görev seç (otomatik doldur)…</option>${HZ.taskOptions(msj.gorev)}</select>
+    <span class="count">Açık görevler · Toplantılar ve Görevler</span>`:`<select onchange="msj.uye=this.value;render()"><option value="">Üye seç (otomatik doldur)…</option>${opts}</select>
+    <span class="count">${acik.length} üyenin ${y} aidatı açık</span>`}
   </div><div class="card-b">
     <div class="tpl" id="tplText">${esc(cur.m)}</div>
     <div style="margin-top:12px"><button class="btn primary" onclick="navigator.clipboard.writeText(document.getElementById('tplText').textContent).then(()=>toast('📋 Panoya kopyalandı'))">📋 Kopyala</button></div>
@@ -1474,6 +1479,13 @@ function pageMesajlar(){
 .toast:not(.show){pointer-events:none}
 .toast button{margin-left:12px;background:var(--gold);border:0;color:#fff;border-radius:7px;padding:4px 11px;font-weight:650;font-size:12px}
 .modal-f{flex-wrap:wrap}
+.hz-sync{display:none;align-items:center;gap:6px;font-size:11.5px;font-weight:650;border-radius:99px;padding:4px 10px;white-space:nowrap}
+.hz-sync.on{display:inline-flex}
+.hz-sync.saving{background:var(--blue-soft);color:var(--blue)}
+.hz-sync.saving i{width:10px;height:10px;border:2px solid currentColor;border-right-color:transparent;border-radius:99px;animation:hzspin .8s linear infinite;display:inline-block}
+.hz-sync.saved{background:var(--green-soft);color:var(--green)}
+.hz-sync.pending{background:var(--amber-soft);color:var(--amber);cursor:pointer}
+@keyframes hzspin{to{transform:rotate(360deg)}}
 .hz-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
 .hz-tabs::-webkit-scrollbar{display:none}
 .hz-tabs button{background:none;border:0;padding:13px 11px 11px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;display:flex;align-items:center;gap:6px}
@@ -1481,42 +1493,133 @@ function pageMesajlar(){
 .hz-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}
 .hz-tabs button b{font-size:10.5px;background:#EEF1F5;color:var(--muted);border-radius:99px;padding:1px 7px;font-weight:700}
 .hz-tabs button.on b{background:var(--gold-soft);color:var(--gold)}
-.hz-seg{display:inline-flex;background:#EEF1F5;border-radius:9px;padding:3px;gap:2px}
-.hz-seg button{border:0;background:none;padding:5px 11px;border-radius:7px;font-size:12px;font-weight:600;color:var(--muted)}
+.hz-seg{display:inline-flex;background:#EEF1F5;border-radius:9px;padding:3px;gap:2px;flex-wrap:wrap}
+.hz-seg button{border:0;background:none;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
 .hz-seg button.on{background:#fff;color:var(--text);box-shadow:var(--sh)}
+.hz-seg button.late.on{color:var(--red)}
+.hz-filters select{min-width:0!important;max-width:190px}
+.hz-filters .btn{white-space:nowrap}
 .hz-group{padding:14px 18px 6px;font-size:10.5px;font-weight:700;letter-spacing:.9px;color:var(--faint);display:flex;gap:6px;align-items:center;border-bottom:1px solid #F0F2F6}
-.hz-group.late{color:var(--red)}
-.hz-task{display:flex;align-items:flex-start;gap:12px;padding:12px 18px;border-bottom:1px solid #F0F2F6;cursor:pointer;transition:background .12s}
+.hz-group.late{color:var(--red)} .hz-group.today{color:var(--amber)}
+.hz-task{display:flex;align-items:flex-start;gap:10px;padding:11px 18px;border-bottom:1px solid #F0F2F6;cursor:pointer;transition:background .12s;border-left:3px solid transparent}
 .hz-task:hover{background:#F9FAFD}
-.hz-task input[type=checkbox]{width:18px;height:18px;margin-top:1px;flex:none;accent-color:var(--green);cursor:pointer;padding:0}
+.hz-task.late{border-left-color:var(--red);background:#FFFBFB}
+.hz-task.today{border-left-color:var(--gold);background:#FFFDF6}
+.hz-task.sel{background:var(--blue-soft)}
+.hz-task .hz-sel{width:15px;height:15px;margin-top:3px;flex:none;padding:0;accent-color:var(--blue);cursor:pointer;opacity:.55}
+.hz-task:hover .hz-sel,.hz-task .hz-sel:checked{opacity:1}
+.hz-done-btn{width:21px;height:21px;border-radius:99px;border:1.5px solid #B9C2D0;background:#fff;color:transparent;font-size:12px;font-weight:800;line-height:1;flex:none;display:flex;align-items:center;justify-content:center;padding:0}
+.hz-done-btn:hover{border-color:var(--green);color:var(--green)}
+.hz-done-btn.on{background:var(--green);border-color:var(--green);color:#fff}
+.hz-done-btn:disabled{cursor:default;opacity:.6}
 .hz-task-main{flex:1;min-width:0}
 .hz-task-title{font-weight:620;line-height:1.4;overflow-wrap:anywhere}
 .hz-task.done .hz-task-title{text-decoration:line-through;color:var(--faint)}
-.hz-meta{display:flex;flex-wrap:wrap;gap:5px 10px;align-items:center;margin-top:5px;font-size:11.5px;color:var(--muted)}
-.hz-meta .late{color:var(--red);font-weight:650}
+.hz-meta{display:flex;flex-wrap:wrap;gap:5px 9px;align-items:center;margin-top:5px;font-size:11.5px;color:var(--muted)}
+.hz-meta .late{color:var(--red);font-weight:650} .hz-meta .today{color:var(--amber);font-weight:650}
 .hz-src{flex:none;max-width:210px;font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-top:2px}
 .tag.hz-proj{background:#F2F4F8;color:var(--text)}
 .tag.hz-proj::before{background:var(--pc,#95A0B4)}
-.hz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:13px;padding:16px 18px}
+.hz-more{display:flex;justify-content:center;padding:12px}
+.hz-bulk{position:sticky;top:calc(var(--tb) + 6px);z-index:30;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;margin:10px 12px;background:var(--ink);color:#fff;border-radius:12px;box-shadow:var(--sh2)}
+.hz-bulk b{font-size:12.5px;margin-right:4px}
+.hz-bulk select,.hz-bulk input{width:auto;min-width:0;max-width:170px;padding:6px 9px;font-size:12px;background:#fff}
+.hz-bulk .btn{padding:5px 10px;font-size:11.5px}
+.hz-bulk .btn.ghost{color:#C7CEDC}
+.hz-bulk .btn.ghost:hover{background:rgba(255,255,255,.08);color:#fff}
+/* Pano */
+.hz-board{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:12px;padding:14px;overflow-x:auto}
+.hz-col{background:#F6F7FA;border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:220px;transition:background .12s,border-color .12s}
+.hz-col.over{background:var(--gold-soft);border-color:var(--gold)}
+.hz-col-h{display:flex;align-items:center;gap:8px;padding:11px 13px;font-weight:700;font-size:12.5px}
+.hz-col-h i{width:9px;height:9px;border-radius:99px;background:var(--sc)}
+.hz-col-h b{margin-left:auto;font-size:11px;color:var(--muted);background:#fff;border:1px solid var(--line);border-radius:99px;padding:1px 8px}
+.hz-col-b{display:flex;flex-direction:column;gap:8px;padding:0 10px 12px;flex:1}
+.hz-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 11px;cursor:pointer;box-shadow:var(--sh);border-left:3px solid transparent}
+.hz-card:hover{border-color:#C6CEDB}
+.hz-card.late{border-left-color:var(--red)} .hz-card.today{border-left-color:var(--gold)}
+.hz-card.dragging{opacity:.4}
+.hz-card .hz-task-title{font-size:12.8px}
+.hz-card .hz-meta{font-size:11px;margin-top:6px}
+.hz-card select{display:none;margin-top:8px;padding:5px 8px;font-size:12px}
+.hz-col-empty{font-size:11.5px;color:var(--faint);text-align:center;padding:16px 6px;border:1.5px dashed var(--line2);border-radius:10px}
+/* Takvim */
+.hz-cal-h{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.hz-cal-h h4{font-size:14px;font-weight:720;min-width:130px;text-align:center}
+.hz-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-left:1px solid var(--line)}
+.hz-cal .wd{font-size:10.5px;font-weight:700;letter-spacing:.7px;color:var(--faint);padding:8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:#FBFCFD}
+.hz-day{min-height:104px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:5px 6px;display:flex;flex-direction:column;gap:3px;cursor:pointer;min-width:0}
+.hz-day:hover{background:#FAFBFD}
+.hz-day.out{background:#FAFBFC;color:var(--faint)}
+.hz-day.today{background:#FFFBEF}
+.hz-day.on{box-shadow:inset 0 0 0 2px var(--gold)}
+.hz-day.over{background:var(--gold-soft)}
+.hz-day .n{font-size:11.5px;font-weight:700;color:var(--muted);display:flex;justify-content:space-between}
+.hz-day.today .n span:first-child{background:var(--gold);color:#fff;border-radius:99px;padding:0 6px}
+.hz-chip{font-size:11px;line-height:1.3;padding:2px 6px;border-radius:5px;background:var(--blue-soft);color:var(--blue);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.hz-chip.late{background:var(--red-soft);color:var(--red)} .hz-chip.done{background:#EEF1F5;color:var(--faint);text-decoration:line-through}
+.hz-chip.waiting{background:var(--amber-soft);color:var(--amber)}
+.hz-chip.more{background:none;color:var(--muted);padding:0 4px}
+.hz-dots{display:none;gap:3px;flex-wrap:wrap}
+.hz-dots i{width:6px;height:6px;border-radius:99px;background:var(--blue)} .hz-dots i.late{background:var(--red)} .hz-dots i.done{background:#B9C2D0}
+.hz-dayp{border-top:1px solid var(--line)}
+.hz-dayp-h{display:flex;justify-content:space-between;align-items:center;padding:12px 18px 4px;gap:10px;flex-wrap:wrap}
+/* Toplantılar */
+.hz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:13px;padding:16px 18px}
 .hz-tr{border:1px solid var(--line);border-radius:12px;padding:14px 15px;cursor:pointer;background:#fff;display:flex;flex-direction:column;gap:7px;transition:border-color .14s,box-shadow .14s}
 .hz-tr:hover{border-color:#C6CEDB;box-shadow:var(--sh2)}
 .hz-tr .d{font-size:10.5px;font-weight:700;letter-spacing:.8px;color:var(--gold)}
 .hz-tr h4{font-size:13.5px;font-weight:700;line-height:1.35;overflow-wrap:anywhere}
-.hz-tr p{font-size:12px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
-.hz-tr .f{display:flex;justify-content:space-between;font-size:11.5px;color:var(--faint);margin-top:auto;padding-top:4px}
+.hz-tr p{font-size:12px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.hz-tr .f{display:flex;justify-content:space-between;font-size:11.5px;color:var(--faint);margin-top:auto;padding-top:4px;gap:8px}
 .hz-tr .f b{color:var(--text)}
-.hz-text{white-space:pre-wrap;line-height:1.6;font-size:12.8px;background:#F8F9FC;border:1px solid var(--line);border-radius:11px;padding:14px;max-height:46vh;overflow:auto;overflow-wrap:anywhere}
-.hz-sublabel{font-size:11.5px;font-weight:650;color:var(--muted);margin-bottom:6px}
-.hz-linked{display:flex;flex-direction:column;gap:5px;margin-bottom:16px}
-.hz-linked button{text-align:left;background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start;color:var(--text)}
+.hz-prog{height:7px;background:#EEF1F5;border-radius:99px;overflow:hidden}
+.hz-prog i{display:block;height:100%;background:linear-gradient(90deg,var(--green),#3BA36A);border-radius:99px}
+.hz-prog.lg{height:10px}
+.hz-text{white-space:pre-wrap;line-height:1.6;font-size:12.8px;background:#F8F9FC;border:1px solid var(--line);border-radius:11px;padding:14px;max-height:40vh;overflow:auto;overflow-wrap:anywhere}
+.hz-sublabel{font-size:11.5px;font-weight:650;color:var(--muted);margin:16px 0 7px;display:flex;align-items:center;gap:8px}
+.hz-sublabel:first-child{margin-top:0}
+.hz-linked{display:flex;flex-direction:column;gap:5px}
+.hz-linked button{text-align:left;background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:12.5px;display:flex;gap:8px;align-items:center;color:var(--text)}
 .hz-linked button:hover{border-color:var(--gold)}
-.hz-linked button.done{color:var(--faint);text-decoration:line-through}
+.hz-linked button.done span.t{color:var(--faint);text-decoration:line-through}
+.hz-linked button .tag{margin-left:auto}
+/* Görev ayrıntısı */
+.hz-detail{display:grid;grid-template-columns:1.55fr 1fr;gap:22px}
+.hz-detail .frm{gap:12px}
+.hz-side{display:flex;flex-direction:column;gap:0;min-width:0}
+.hz-ck-row{display:flex;gap:8px;align-items:center;padding:3px 0}
+.hz-ck-row input[type=checkbox]{width:17px;height:17px;flex:none;accent-color:var(--green);padding:0}
+.hz-ck-row input[type=text]{padding:6px 9px;border-color:transparent;background:transparent}
+.hz-ck-row input[type=text]:hover{border-color:var(--line2);background:#fff}
+.hz-ck-row.done input[type=text]{text-decoration:line-through;color:var(--faint)}
+.hz-ck-row button{background:none;border:0;color:var(--faint);font-size:14px;padding:2px 6px}
+.hz-ck-row button:hover{color:var(--red)}
+.hz-comments{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow:auto;margin-bottom:8px}
+.hz-cm{background:#F6F7FA;border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-size:12.5px;line-height:1.5}
+.hz-cm .h{display:flex;gap:6px;align-items:baseline;font-size:11px;color:var(--faint);margin-bottom:2px}
+.hz-cm .h b{color:var(--text);font-size:11.5px}
+.hz-cm .h button{margin-left:auto;background:none;border:0;color:var(--faint);font-size:11px}
+.hz-cm p{white-space:pre-wrap;overflow-wrap:anywhere}
+.hz-hist{font-size:11.5px;color:var(--muted);line-height:1.5;max-height:220px;overflow:auto}
+.hz-hist div{padding:5px 0;border-bottom:1px solid #F0F2F6}
+.hz-hist b{color:var(--text);font-weight:650}
+.hz-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.hz-chips .tag button{background:none;border:0;color:inherit;padding:0 0 0 3px;font-size:12px;line-height:1}
+.hz-chips .tag.link{cursor:pointer}
+details.hz-det summary{cursor:pointer;font-size:11.5px;font-weight:650;color:var(--muted);margin:16px 0 7px;list-style:none}
+details.hz-det summary::-webkit-details-marker{display:none}
+details.hz-det summary::before{content:'▸ '}
+details.hz-det[open] summary::before{content:'▾ '}
+.hz-note{font-size:11px;color:var(--faint);margin-top:4px}
+/* Deşifre önizlemesi */
 .hz-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
 .hz-foot{padding:13px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;background:#FBFCFD;flex-wrap:wrap}
 .hz-foot .left{margin-right:auto}
-.hz-textarea{min-height:300px;resize:vertical;line-height:1.55}
+.hz-textarea{min-height:280px;resize:vertical;line-height:1.55}
 .hz-cand{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:#fff}
 .hz-cand.off{opacity:.55;background:#FAFBFC}
+.hz-cand.ai{border-color:var(--violet);box-shadow:inset 3px 0 0 var(--violet)}
 .hz-cand-top{display:flex;gap:10px;align-items:flex-start}
 .hz-cand-top input[type=checkbox]{width:18px;height:18px;margin-top:9px;flex:none;accent-color:var(--green);padding:0}
 .hz-cand-top textarea{flex:1;resize:none;overflow:hidden;font-weight:620;line-height:1.4;min-height:36px}
@@ -1528,26 +1631,82 @@ function pageMesajlar(){
 .hz-match.fin{background:var(--green-soft);color:var(--green)}
 .hz-new{color:var(--green);font-weight:600}
 .hz-ctx{margin-top:6px;padding-left:28px;font-size:11.5px;color:var(--faint);line-height:1.5;overflow-wrap:anywhere}
+.hz-ai{border:1px solid #DCCDF6;background:var(--violet-soft);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.hz-ai h4{font-size:13px;color:var(--violet);margin-bottom:8px;display:flex;gap:8px;align-items:center}
+.hz-ai-item{background:#fff;border:1px solid #E5DAF8;border-radius:9px;padding:9px 11px;margin-top:7px;display:flex;gap:10px;align-items:flex-start;font-size:12.5px}
+.hz-ai-item div{flex:1;min-width:0}
+.hz-ai-item small{display:block;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+.hz-ai-item.applied{opacity:.55}
+.hz-meet{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.hz-kbd{display:grid;grid-template-columns:auto 1fr;gap:9px 16px;align-items:center;font-size:13px}
+kbd{font-family:inherit;font-size:11.5px;font-weight:700;background:#F2F4F8;border:1px solid var(--line2);border-bottom-width:2px;border-radius:6px;padding:2px 7px;color:var(--text);white-space:nowrap}
+.hz-dash{display:flex;gap:10px;flex-wrap:wrap}
+.hz-dash button{flex:1 1 120px;text-align:left;border:1px solid var(--line);background:#fff;border-radius:11px;padding:11px 13px;font-family:inherit}
+.hz-dash button:hover{border-color:var(--gold);box-shadow:var(--sh)}
+.hz-dash small{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.hz-dash strong{display:block;font-size:21px;font-weight:760;margin-top:2px;letter-spacing:-.02em}
+.hz-rel{margin-top:16px}
+.hz-rel h3{font-size:13.5px;margin:0 0 9px;font-weight:700;display:flex;align-items:center;gap:8px}
+.hz-relchip{display:inline-flex;margin-left:6px;cursor:pointer}
+.hz-week h4{font-size:13px;font-weight:720;padding:14px 18px 8px;display:flex;align-items:center;gap:8px}
+.hz-week h4 small{font-weight:550;color:var(--faint);font-size:11.5px}
+.hz-week .empty{padding:10px 18px 14px;text-align:left}
+#hzPrint{display:none}
+@media print{
+  body.hz-printing>*:not(#hzPrint){display:none!important}
+  body.hz-printing #hzPrint{display:block!important}
+  body.hz-printing{background:#fff}
+}
+#hzPrint{font-family:"Inter","Segoe UI",sans-serif;color:#161D2E;font-size:11.5pt;line-height:1.5}
+#hzPrint .ph{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #0E1A33;padding-bottom:10px;margin-bottom:16px}
+#hzPrint .ph .org{font-size:10pt;color:#69768C;letter-spacing:1px;text-transform:uppercase;font-weight:700}
+#hzPrint .ph h1{font-size:18pt;font-weight:760;margin-top:2px}
+#hzPrint .ph .dt{font-size:9.5pt;color:#69768C;text-align:right}
+#hzPrint h2{font-size:12pt;font-weight:720;margin:18px 0 7px;color:#0E1A33;border-bottom:1px solid #DDE2EA;padding-bottom:4px}
+#hzPrint table{width:100%;border-collapse:collapse;font-size:10pt}
+#hzPrint th{background:#F4F5F8;color:#4A5568;text-align:left;padding:6px 8px;font-size:8.5pt;text-transform:uppercase;letter-spacing:.6px;border:1px solid #DDE2EA;position:static}
+#hzPrint td{padding:6px 8px;border:1px solid #DDE2EA;vertical-align:top}
+#hzPrint .info td:first-child{width:28%;font-weight:650;background:#FAFBFC}
+#hzPrint ol,#hzPrint ul{padding-left:20px} #hzPrint li{margin-bottom:3px}
+#hzPrint .pf{margin-top:28px;font-size:8.5pt;color:#95A0B4;border-top:1px solid #DDE2EA;padding-top:6px;display:flex;justify-content:space-between}
+#hzPrint .sig{display:flex;gap:40px;margin-top:34px} #hzPrint .sig div{flex:1;border-top:1px solid #95A0B4;padding-top:5px;font-size:9pt;color:#69768C;text-align:center}
+#hzPrint .muted{color:#69768C}
+@media(max-width:1100px){.hz-detail{grid-template-columns:1fr}}
 @media(max-width:920px){
   .hz-cand-grid{grid-template-columns:1fr 1fr;padding-left:0}
   .hz-cand-link,.hz-cand-st,.hz-ctx{padding-left:0}
   .hz-src{display:none}
-  .hz-task{padding:12px 14px}
-  .hz-group{padding:12px 14px 6px}
-  .hz-grid{padding:12px 14px}
-  .hz-filters input,.hz-filters select{flex:1 1 150px;min-width:0!important}
+  .hz-task{padding:11px 12px}
+  .hz-group{padding:12px 12px 6px}
+  .hz-grid{padding:12px}
+  .hz-filters input,.hz-filters select{flex:1 1 120px;min-width:0!important;max-width:none}
+  .hz-filters input[type=search]{flex-basis:100%}
   .hz-filters .count{margin-left:0}
+  .hz-board{grid-template-columns:1fr;overflow:visible;padding:10px}
+  .hz-col{min-height:0}
+  .hz-card select{display:block}
+  .hz-bulk{top:calc(var(--tb) + 4px);margin:8px}
+  .hz-meet{grid-template-columns:1fr}
 }
-@media(max-width:560px){
+@media(hover:none){.hz-card select{display:block}.hz-task .hz-sel{opacity:1}}
+@media(max-width:600px){
   .hz-cand-grid{grid-template-columns:1fr}
   .hz-grid{grid-template-columns:1fr}
   .hz-cand-link{flex-wrap:wrap;white-space:normal}
-  .hz-textarea{min-height:220px}
-  .hz-kpis{grid-template-columns:1fr 1fr;gap:9px}
-  .hz-kpis .kpi{padding:12px}
-  .hz-kpis .kpi .ico{width:26px;height:26px;margin-bottom:6px;font-size:13px}
-  .hz-kpis .kpi .v{font-size:19px}
-  .hz-kpis .kpi .d{display:none}
+  .hz-textarea{min-height:200px}
+  .hz-kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .hz-kpis .kpi{padding:10px}
+  .hz-kpis .kpi .ico,.hz-kpis .kpi .d{display:none}
+  .hz-kpis .kpi .l{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hz-kpis .kpi .v{font-size:19px;margin-top:2px}
+  .hz-day{min-height:52px;padding:4px}
+  .hz-day .hz-chip{display:none}
+  .hz-dots{display:flex}
+  .hz-cal .wd{padding:6px 2px;text-align:center;letter-spacing:0}
+  .hz-sync{padding:4px 7px}
+  .hz-sync span{display:none}
+  #modalRoot .modal-f{gap:6px;padding:12px 14px}
+  #modalRoot .modal-f .btn{padding:6px 9px;font-size:11.5px}
 }
 </style>
 <!-- hafiza/task-engine.js ve hafiza/reminders.js değiştirilmeden gömülüdür; güncellemek için: node tools/hafiza-gom.js -->
@@ -2208,59 +2367,48 @@ function pageMesajlar(){
   root.Reminders = api;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
-<script>
+<script id="hz-core">
 /* ================================================================
-   TOPLANTILAR VE GÖREVLER — Hafıza masaüstü uygulamasının panel sürümü
-   Görev çıkarma: TaskEngine (hafiza/task-engine.js), hatırlatma: Reminders (hafiza/reminders.js)
-   Veri: app_state "main" satırında S.hafiza = { tasks, transcripts }
+   TOPLANTILAR VE GÖREVLER — çekirdek (ekrana bağlı değil)
+   Durumlar, eski veriyi taşıma, birleştirme, tekrar, filtre, .ics ve haftalık özet.
+   tests/gorevler.test.js bu bloğu index.html içinden okuyup doğrudan çalıştırır.
 ================================================================ */
-// Buluta yazan işlemler sırayla çalışır; böylece biri okurken diğeri yazamaz.
-function cloudQueue(fn){ const p=(window._cloudQ||Promise.resolve()).then(fn); window._cloudQ=p.catch(()=>{}); return p; }
-
-const HZ=(()=>{
-const Engine=window.TaskEngine, Rem=window.Reminders;
-const st={view:'inbox',filter:'open',project:'',search:'',sort:'due',draft:null,editId:'',viewerId:'',day:'',unsaved:false};
-let base=null; // buluttan en son okunan/yazılan hâl; üç yönlü birleştirmenin ortak atası
-const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
-const nowISO=()=>new Date().toISOString();
-const uid=p=>`${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
-const localISO=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-const parseDay=v=>{ if(!/^\d{4}-\d\d-\d\d/.test(v||'')) return null; const [y,m,d]=v.slice(0,10).split('-').map(Number); return new Date(y,m-1,d); };
-const dayDiff=v=>{ const d=parseDay(v); if(!d) return null; const t=new Date(); t.setHours(0,0,0,0); return Math.round((d-t)/864e5); };
-const absDate=v=>{ const d=parseDay(v); return d?d.toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'}):'Tarih yok'; };
-function humanDate(v){
-  const d=parseDay(v); if(!d) return 'Tarih yok';
-  const n=dayDiff(v); if(n===0) return 'Bugün'; if(n===1) return 'Yarın'; if(n===-1) return 'Dün';
-  return d.toLocaleDateString('tr-TR',{day:'numeric',month:'short',...(d.getFullYear()!==new Date().getFullYear()?{year:'numeric'}:{})});
-}
-function dayKey(v){ const n=dayDiff(v); if(n===null) return 'TARİHSİZ'; if(n<0) return 'GECİKEN'; if(n===0) return 'BUGÜN'; if(n===1) return 'YARIN'; if(n<=7) return 'BU HAFTA'; return 'DAHA SONRA'; }
-const remLabel=v=>{ const d=new Date(v); return isNaN(d)?'':`${humanDate(localISO(d))} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
-const words=t=>(String(t||'').trim().match(/\S+/g)||[]).length;
-const sourcesOf=t=>t.sourceIds||(t.transcriptId?[t.transcriptId]:[]);
-const editable=()=>can('gorev');
+(function(root){
+'use strict';
+const STATUSES=[['todo','Yapılacak'],['doing','Devam ediyor'],['waiting','Beklemede'],['done','Tamamlandı']];
+const STATUS_LABEL=Object.fromEntries(STATUSES);
+const RECUR=[['','Tekrarlanmaz'],['weekly','Her hafta'],['monthly','Her ay'],['monthEnd','Her ay sonu']];
+const RECUR_LABEL=Object.fromEntries(RECUR);
+const PRIORITIES=[['high','Yüksek'],['medium','Normal'],['low','Düşük']];
+const PRIORITY_LABEL=Object.fromEntries(PRIORITIES);
 const PRANK={high:0,medium:1,low:2};
-const PLABEL={high:'YÜKSEK ÖNCELİK',medium:'NORMAL ÖNCELİK',low:'DÜŞÜK ÖNCELİK'};
-const PCOL=['#2247C8','#6D28D9','#117A46','#A35E0A','#0F766E','#B42323','#C2992E'];
-const VIEWS=[['inbox','Görevler'],['today','Bugün'],['upcoming','Yaklaşan'],['completed','Tamamlanan'],['transcripts','Deşifreler']];
 
-/* ---------- Bu tarayıcıya özel tercihler ---------- */
-const PREF_KEY='foyder:hz:ayar', NOTIFIED_KEY='foyder:hz:bildirim';
-function prefs(){
-  let p={}; try{ p=JSON.parse(localStorage.getItem(PREF_KEY)||'{}')||{}; }catch(e){}
-  return { owner: typeof p.owner==='string'?p.owner:(window._sbUser?.user_metadata?.name||''), repeat: p.repeat!==false };
-}
-function setPref(k,v){ let p={}; try{ p=JSON.parse(localStorage.getItem(PREF_KEY)||'{}')||{}; }catch(e){} p[k]=v; try{ localStorage.setItem(PREF_KEY,JSON.stringify(p)); }catch(e){} }
+const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
+const pad=n=>String(n).padStart(2,'0');
+const localISO=(d=new Date())=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseDay=v=>{ if(!/^\d{4}-\d\d-\d\d/.test(v||'')) return null; const [y,m,d]=v.slice(0,10).split('-').map(Number); return new Date(y,m-1,d); };
+const addDays=(iso,n)=>{ const d=parseDay(iso); d.setDate(d.getDate()+n); return localISO(d); };
+const isDone=t=>t.status==='done';
 
-/* ---------- Veri ve bulut kaydı ---------- */
-function normH(h){ h=h&&typeof h==='object'?h:{}; return {...h,tasks:Array.isArray(h.tasks)?h.tasks:[],transcripts:Array.isArray(h.transcripts)?h.transcripts:[]}; }
-function ensureBase(){ if(base===null) base=clone(normH(S&&S.hafiza)); }
-function H(){
-  ensureBase();
-  if(!S.hafiza||!Array.isArray(S.hafiza.tasks)||!Array.isArray(S.hafiza.transcripts)) S.hafiza=normH(S.hafiza);
-  return S.hafiza;
+/* ---------- Eski veriyle uyum ----------
+   Hafıza ve ilk panel sürümü yalnızca "open"/"done" kullanıyordu. Taşıma deterministiktir
+   (rastgele kimlik ya da zaman üretmez); böylece aynı kayıt her yerde aynı sonuca dönüşür ve
+   birleştirme bunu "değişiklik" saymaz. */
+function migrateTask(t){
+  if(t&&typeof t==='object'&&!STATUS_LABEL[t.status]) t.status='todo';
+  return t;
 }
+function normH(h){
+  h=h&&typeof h==='object'?h:{};
+  const out={...h,tasks:Array.isArray(h.tasks)?h.tasks:[],transcripts:Array.isArray(h.transcripts)?h.transcripts:[]};
+  out.tasks.forEach(migrateTask);
+  return out;
+}
+
+/* ---------- Üç yönlü birleştirme ----------
+   b: son eşitlenen hâl, l: bu tarayıcı, r: bulut. Başkasının eklediği kayıt kaybolmaz,
+   burada silinen kayıt geri gelmez; iki tarafta da değişen kayıtta en son güncellenen kazanır. */
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-// Kayıt bazında üç yönlü birleştirme: başkasının eklediği görev kaybolmaz, burada silinen geri gelmez.
 function mergeList(b,l,r){
   const B=new Map(b.map(x=>[x.id,x])), L=new Map(l.map(x=>[x.id,x])), R=new Map(r.map(x=>[x.id,x]));
   const out=[], seen=new Set();
@@ -2268,20 +2416,270 @@ function mergeList(b,l,r){
     if(seen.has(id)) continue; seen.add(id);
     const bi=B.get(id), li=L.get(id), ri=R.get(id); let pick=null;
     if(li&&ri) pick=same(li,ri)?li:bi&&same(li,bi)?ri:bi&&same(ri,bi)?li:((ri.updatedAt||'')>(li.updatedAt||'')?ri:li);
-    else if(li) pick=!bi||!same(li,bi)?li:null;   // başka yerde silinmiş; burada değişmediyse silinmiş kalsın
-    else pick=!bi||!same(ri,bi)?ri:null;          // burada silinmiş; başka yerde değişmediyse silinmiş kalsın
+    else if(li) pick=!bi||!same(li,bi)?li:null;
+    else pick=!bi||!same(ri,bi)?ri:null;
     if(pick) out.push(pick);
   }
   return out;
 }
 function mergeH(b,l,r){
-  b=normH(b); l=normH(l); r=normH(r);
+  b=normH(clone(b)); l=normH(l); r=normH(r);
   return {...r,...l,tasks:mergeList(b.tasks,l.tasks,r.tasks),transcripts:mergeList(b.transcripts,l.transcripts,r.transcripts)};
 }
-// Kayıt sürerken yapılan yerel değişiklikleri koruyarak buluttaki hâli yerele işler.
+
+/* ---------- Tekrarlayan görevler ---------- */
+// Bir sonraki son tarih. Geç tamamlanan görevde geçmişte kalan tarihler atlanır.
+function nextDue(iso,freq,today,anchorDay){
+  today=today||localISO();
+  let cur=parseDay(iso)||parseDay(today);
+  const day=anchorDay||cur.getDate();
+  const step=d=>{
+    if(freq==='weekly'){ const n=new Date(d); n.setDate(n.getDate()+7); return n; }
+    if(freq==='monthly'){ const n=new Date(d.getFullYear(),d.getMonth()+1,1); n.setDate(Math.min(day,new Date(n.getFullYear(),n.getMonth()+1,0).getDate())); return n; }
+    if(freq==='monthEnd'){ const end=new Date(d.getFullYear(),d.getMonth()+1,0); return end>d?end:new Date(d.getFullYear(),d.getMonth()+2,0); }
+    return null;
+  };
+  let next=step(cur); if(!next) return '';
+  for(let i=0;i<500&&localISO(next)<today;i++) next=step(next);
+  return localISO(next);
+}
+// Tamamlanan tekrarlı görevin bir sonraki kopyası.
+function spawnNext(t,{id,now,by,today}){
+  const due=nextDue(t.dueDate,t.recur,today,t.recurDay);
+  if(!due) return null;
+  let reminderAt='';
+  if(t.reminderAt&&t.dueDate){
+    const offset=Math.round((parseDay(t.reminderAt.slice(0,10))-parseDay(t.dueDate))/864e5);
+    reminderAt=`${addDays(due,offset)}${t.reminderAt.slice(10,16)||'T09:00'}`;
+  } else if(t.reminderAt) reminderAt=`${due}T09:00`;
+  const n=clone(t);
+  Object.assign(n,{id,status:'todo',waitingFor:'',dueDate:due,reminderAt,completedAt:null,notifiedAt:null,createdAt:now,updatedAt:now,
+    recurPrevId:t.id,recurNextId:undefined,recurDay:t.recurDay||(t.recur==='monthly'?(parseDay(t.dueDate)||new Date()).getDate():undefined),
+    checklist:(t.checklist||[]).map(c=>({...c,done:false})),comments:[],
+    history:[{at:now,by,text:'Tekrarlayan görev: bir önceki tamamlandığı için oluşturuldu'}]});
+  delete n.recurNextId;
+  return n;
+}
+
+/* ---------- Değişiklik geçmişi ---------- */
+const FIELD_LABELS={title:'Başlık',status:'Durum',waitingFor:'Beklenen',dueDate:'Son tarih',dueTime:'Saat',priority:'Öncelik',project:'Proje',owner:'Sorumlu',reminderAt:'Hatırlatma',recur:'Tekrar',notes:'Notlar',event:'Etkinlik',memberIds:'İlgili üyeler',kararIds:'İlgili kararlar'};
+function describeChanges(before,after,fmt){
+  fmt=fmt||((k,v)=>Array.isArray(v)?v.join(', '):String(v||''));
+  const out=[];
+  for(const k of Object.keys(FIELD_LABELS)){
+    const a=before?before[k]:undefined, b=after[k];
+    if(same(a??'',b??'')||(Array.isArray(a)||Array.isArray(b))&&same(a||[],b||[])) continue;
+    if(k==='notes'){ out.push('Notlar güncellendi'); continue; }
+    const fa=fmt(k,a)||'—', fb=fmt(k,b)||'—';
+    out.push(`${FIELD_LABELS[k]}: ${fa} → ${fb}`);
+  }
+  return out;
+}
+
+/* ---------- Filtre ve sıralama ---------- */
+// f: {scope, project, owner, priority, status, q}. fold: Türkçe karakterleri sadeleştiren işlev.
+const hayCache=new WeakMap();
+function haystack(t,fold){
+  const key=`${t.updatedAt||''}|${t.title}|${t.owner||''}|${t.project||''}`;
+  const c=hayCache.get(t); if(c&&c.key===key) return c.value;
+  const value=fold(`${t.title} ${t.notes||''} ${t.project||''} ${t.owner||''} ${t.event||''} ${t.waitingFor||''} ${(t.checklist||[]).map(x=>x.text).join(' ')}`);
+  hayCache.set(t,{key,value}); return value;
+}
+function inScope(t,scope,today){
+  if(scope==='done') return isDone(t);
+  if(scope==='all'||!scope) return true;
+  if(isDone(t)) return false;
+  if(scope==='today') return t.dueDate===today;
+  if(scope==='overdue') return !!t.dueDate&&t.dueDate<today;
+  if(scope==='upcoming') return !!t.dueDate&&t.dueDate>today;
+  return true; // open
+}
+function filterTasks(tasks,f,{today,fold,ignoreScope}={}){
+  today=today||localISO();
+  const terms=f.q&&fold?fold(f.q).split(' ').filter(Boolean):[];
+  return tasks.filter(t=>(ignoreScope||inScope(t,f.scope,today))
+    &&(!f.project||(f.project==='-'?!t.project:t.project===f.project))
+    &&(!f.owner||(f.owner==='-'?!t.owner:t.owner===f.owner))
+    &&(!f.priority||(t.priority||'medium')===f.priority)
+    &&(!f.status||t.status===f.status)
+    &&(!terms.length||terms.every(w=>haystack(t,fold).includes(w))));
+}
+function sortTasks(tasks,sort){
+  const byDue=(a,b)=>(a.dueDate||'9999-99-99').localeCompare(b.dueDate||'9999-99-99')||(a.dueTime||'99:99').localeCompare(b.dueTime||'99:99');
+  const byPri=(a,b)=>(PRANK[a.priority]??1)-(PRANK[b.priority]??1);
+  return tasks.sort((a,b)=>{
+    const d=isDone(a)-isDone(b); if(d) return d;
+    if(isDone(a)) return (b.completedAt||'').localeCompare(a.completedAt||'');
+    if(sort==='priority') return byPri(a,b)||byDue(a,b);
+    if(sort==='created') return (b.createdAt||'').localeCompare(a.createdAt||'');
+    if(sort==='status') return STATUSES.findIndex(s=>s[0]===a.status)-STATUSES.findIndex(s=>s[0]===b.status)||byDue(a,b);
+    return byDue(a,b)||byPri(a,b);
+  });
+}
+
+/* ---------- Takvim dosyası (.ics) ---------- */
+function icsText(tasks,{now=new Date(),name='FOYDER OS Görevler'}={}){
+  const e=s=>String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');
+  const enc=typeof TextEncoder!=='undefined'?new TextEncoder():null;
+  const bytes=ch=>enc?enc.encode(ch).length:unescape(encodeURIComponent(ch)).length;
+  const fold=line=>{ const out=[]; let cur='', n=0; for(const ch of line){ const b=bytes(ch); if(n+b>75){ out.push(cur); cur=' '+ch; n=1+b; } else { cur+=ch; n+=b; } } out.push(cur); return out.join('\r\n'); };
+  const utc=d=>d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//FOYDER OS//Gorevler//TR','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:'+e(name)];
+  for(const t of tasks){
+    if(!/^\d{4}-\d\d-\d\d$/.test(t.dueDate||'')) continue;
+    const ymd=t.dueDate.replace(/-/g,'');
+    L.push('BEGIN:VEVENT','UID:'+String(t.id).replace(/[^\w.-]/g,'')+'@foyder-os','DTSTAMP:'+utc(now));
+    if(/^\d\d:\d\d$/.test(t.dueTime||'')) L.push(`DTSTART:${ymd}T${t.dueTime.replace(':','')}00`,'DURATION:PT30M');
+    else L.push('DTSTART;VALUE=DATE:'+ymd,'DTEND;VALUE=DATE:'+addDays(t.dueDate,1).replace(/-/g,''));
+    L.push('SUMMARY:'+e(t.title));
+    const desc=[t.project&&`Proje: ${t.project}`,t.owner&&`Sorumlu: ${t.owner}`,`Durum: ${STATUS_LABEL[t.status]||''}`,t.status==='waiting'&&t.waitingFor&&`Beklenen: ${t.waitingFor}`,t.notes].filter(Boolean).join('\n');
+    L.push('DESCRIPTION:'+e(desc.slice(0,1500)));
+    if(t.recur==='weekly') L.push('RRULE:FREQ=WEEKLY');
+    else if(t.recur==='monthly') L.push('RRULE:FREQ=MONTHLY');
+    else if(t.recur==='monthEnd') L.push('RRULE:FREQ=MONTHLY;BYMONTHDAY=-1');
+    const rem=t.reminderAt?new Date(t.reminderAt):null;
+    if(rem&&!isNaN(rem)) L.push('BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+e(t.title),'TRIGGER;VALUE=DATE-TIME:'+utc(rem),'END:VALARM');
+    L.push('END:VEVENT');
+  }
+  L.push('END:VCALENDAR');
+  return L.map(fold).join('\r\n')+'\r\n';
+}
+
+/* ---------- Haftalık özet ----------
+   Son 7 günde tamamlananlar, şu an devam eden/bekleyenler, gecikenler ve önümüzdeki 7 gün. */
+function weekly(tasks,today){
+  today=today||localISO();
+  const from=addDays(today,-6), to=addDays(today,7), tomorrow=addDays(today,1);
+  const doneDay=t=>t.completedAt?localISO(new Date(t.completedAt)):'';
+  const open=tasks.filter(t=>!isDone(t));
+  const byDue=(a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999');
+  return {
+    from,today,tomorrow,to,
+    done:tasks.filter(t=>isDone(t)&&doneDay(t)>=from&&doneDay(t)<=today).sort((a,b)=>(a.completedAt||'').localeCompare(b.completedAt||'')),
+    overdue:open.filter(t=>t.dueDate&&t.dueDate<today).sort(byDue),
+    active:open.filter(t=>(t.status==='doing'||t.status==='waiting')&&!(t.dueDate&&t.dueDate<today)).sort(byDue),
+    next:open.filter(t=>t.dueDate&&t.dueDate>=today&&t.dueDate<=to&&t.status!=='doing'&&t.status!=='waiting').sort(byDue)
+  };
+}
+function weeklyText(r,{title,fmtDate}){
+  fmtDate=fmtDate||(v=>v);
+  const line=t=>`• ${t.title}${t.owner?` — ${t.owner}`:''}${t.dueDate?` (${fmtDate(t.dueDate)})`:''}${t.status==='waiting'&&t.waitingFor?` · beklenen: ${t.waitingFor}`:''}`;
+  const part=(h,list,empty)=>`${h} (${list.length})\n${list.length?list.map(line).join('\n'):empty}`;
+  return [title,'',
+    part(`✅ Tamamlananlar · ${fmtDate(r.from)} – ${fmtDate(r.today)}`,r.done,'— Bu dönemde tamamlanan görev yok.'),'',
+    part('🔄 Devam edenler',r.active,'— Devam eden görev yok.'),'',
+    part('⚠️ Gecikenler',r.overdue,'— Geciken görev yok.'),'',
+    part(`📅 Yapılacaklar · ${fmtDate(r.today)} – ${fmtDate(r.to)}`,r.next,'— Bu dönem için planlanmış görev yok.')].join('\n');
+}
+
+const api={STATUSES,STATUS_LABEL,RECUR,RECUR_LABEL,PRIORITIES,PRIORITY_LABEL,clone,localISO,parseDay,addDays,
+  migrateTask,normH,mergeList,mergeH,nextDue,spawnNext,describeChanges,FIELD_LABELS,filterTasks,sortTasks,inScope,icsText,weekly,weeklyText};
+if(typeof module!=='undefined'&&module.exports) module.exports=api;
+root.HZCore=api;
+})(typeof window!=='undefined'?window:globalThis);
+</script>
+<script>
+/* ================================================================
+   TOPLANTILAR VE GÖREVLER — arayüz
+   Görev çıkarma: TaskEngine (hafiza/task-engine.js), hatırlatma: Reminders (hafiza/reminders.js),
+   iş kuralları: HZCore (yukarıdaki hz-core bloğu).
+   Veri: app_state "main" satırında S.hafiza = { tasks, transcripts }. Üye, aidat ve karar
+   verileri burada yalnızca okunur; görev yalnızca o kayıtların kimliğini saklar.
+================================================================ */
+// Buluta yazan işlemler sırayla çalışır; böylece biri okurken diğeri yazamaz.
+function cloudQueue(fn){ const p=(window._cloudQ||Promise.resolve()).then(fn); window._cloudQ=p.catch(()=>{}); return p; }
+
+const HZ=(()=>{
+const Engine=window.TaskEngine, Rem=window.Reminders, C=window.HZCore;
+const {STATUSES,STATUS_LABEL,RECUR,RECUR_LABEL,PRIORITIES,PRIORITY_LABEL,clone,localISO,parseDay,addDays}=C;
+const STATUS_TAG={todo:'t-gray',doing:'t-blue',waiting:'t-amber',done:'t-green'};
+const STATUS_COLOR={todo:'#95A0B4',doing:'#2247C8',waiting:'#A35E0A',done:'#117A46'};
+const PCOL=['#2247C8','#6D28D9','#117A46','#A35E0A','#0F766E','#B42323','#C2992E'];
+const TABS=[['list','Liste'],['board','Pano'],['calendar','Takvim'],['meetings','Toplantılar'],['weekly','Haftalık Özet']];
+const SCOPES=[['open','Açık'],['today','Bugün'],['overdue','Geciken'],['upcoming','Yaklaşan'],['done','Tamamlanan'],['all','Tümü']];
+const PAGE=200;
+const VIEW_KEY='foyder:hz:gorunum', PREF_KEY='foyder:hz:ayar', NOTIFIED_KEY='foyder:hz:bildirim', PENDING_KEY='foyder:hz:bekleyen';
+const defaultFilters=()=>({scope:'open',project:'',owner:'',priority:'',status:'',q:''});
+
+const st={tab:'list',f:defaultFilters(),sort:'due',limit:PAGE,sel:new Set(),cal:null,calDay:'',boardMore:{},meetQ:'',
+  draft:null,editId:'',viewerId:'',day:'',dragId:''};
+try{ const v=JSON.parse(localStorage.getItem(VIEW_KEY)||'null'); if(v){ if(TABS.some(t=>t[0]===v.tab)) st.tab=v.tab; st.f={...st.f,...(v.f||{}),q:''}; if(v.sort) st.sort=v.sort; } }catch(e){}
+const saveView=()=>{ try{ localStorage.setItem(VIEW_KEY,JSON.stringify({tab:st.tab,f:{...st.f,q:''},sort:st.sort})); }catch(e){} };
+
+/* ---------- Küçük yardımcılar ---------- */
+const nowISO=()=>new Date().toISOString();
+const uid=p=>`${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
+const today=()=>localISO();
+const dayDiff=v=>{ const d=parseDay(v); if(!d) return null; const t=new Date(); t.setHours(0,0,0,0); return Math.round((d-t)/864e5); };
+const absDate=v=>{ const d=parseDay(v); return d?d.toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'}):'Tarih yok'; };
+const shortDate=v=>{ const d=parseDay(v); return d?d.toLocaleDateString('tr-TR',{day:'numeric',month:'short'}):''; };
+function humanDate(v){
+  const d=parseDay(v); if(!d) return 'Tarih yok';
+  const n=dayDiff(v); if(n===0) return 'Bugün'; if(n===1) return 'Yarın'; if(n===-1) return 'Dün';
+  return d.toLocaleDateString('tr-TR',{day:'numeric',month:'short',...(d.getFullYear()!==new Date().getFullYear()?{year:'numeric'}:{})});
+}
+const remLabel=v=>{ const d=new Date(v); return isNaN(d)?'':`${humanDate(localISO(d))} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+const stamp=v=>{ const d=new Date(v); return isNaN(d)?'':d.toLocaleString('tr-TR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}); };
+const words=t=>(String(t||'').trim().match(/\S+/g)||[]).length;
+const sourcesOf=t=>t.sourceIds||(t.transcriptId?[t.transcriptId]:[]);
+const isDone=t=>t.status==='done';
+const editable=()=>can('gorev');
+const me=()=>({id:window._sbUser?.id||'',name:window._sbUser?.user_metadata?.name||window._sbUser?.email||'Kullanıcı'});
+const modalOpen=()=>!!document.getElementById('modalRoot').innerHTML;
+const statusTag=s=>`<span class="tag ${STATUS_TAG[s]||'t-gray'}">${STATUS_LABEL[s]||'Yapılacak'}</span>`;
+const lateOf=t=>!isDone(t)&&t.dueDate&&t.dueDate<today();
+const todayOf=t=>!isDone(t)&&t.dueDate===today();
+function toastAct(msg,label,fn){
+  const t=document.getElementById('toast'); t.textContent=msg;
+  const b=document.createElement('button'); b.textContent=label; b.onclick=()=>{ t.classList.remove('show'); fn(); };
+  t.appendChild(b); t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),7000);
+}
+function dl(text,name,type){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); }
+async function copyText(text,okMsg){
+  try{ await navigator.clipboard.writeText(text); toast(okMsg||'📋 Panoya kopyalandı'); }
+  catch(e){ modal('Metni kopyalayın',`<p class="muted" style="margin-bottom:8px">Tarayıcı panoya erişime izin vermedi. Metni seçip kopyalayabilirsiniz.</p><textarea rows="14" onclick="this.select()">${esc(text)}</textarea>`); }
+}
+
+/* ---------- Bu tarayıcıya özel tercihler ---------- */
+function prefs(){
+  let p={}; try{ p=JSON.parse(localStorage.getItem(PREF_KEY)||'{}')||{}; }catch(e){}
+  return {owner:typeof p.owner==='string'?p.owner:(window._sbUser?.user_metadata?.name||''),repeat:p.repeat!==false};
+}
+function setPref(k,v){ let p={}; try{ p=JSON.parse(localStorage.getItem(PREF_KEY)||'{}')||{}; }catch(e){} p[k]=v; try{ localStorage.setItem(PREF_KEY,JSON.stringify(p)); }catch(e){} }
+
+/* ---------- Veri, eşitleme ve çevrimdışı koruma ---------- */
+let base=null;        // buluttan en son okunan/yazılan hâl (üç yönlü birleştirmenin ortak atası)
+let restored=false;
+function ensureBase(){
+  if(base!==null) return;
+  if(S.hafiza) S.hafiza=C.normH(S.hafiza);
+  base=clone(C.normH(S.hafiza));
+  restorePending();
+}
+function H(){
+  ensureBase();
+  if(!S.hafiza||!Array.isArray(S.hafiza.tasks)||!Array.isArray(S.hafiza.transcripts)) S.hafiza=C.normH(S.hafiza);
+  return S.hafiza;
+}
+// Önceki oturumda buluta gidemeyen değişiklikler tarayıcıda saklanır; açılışta buluttaki hâlle birleştirilir.
+function restorePending(){
+  if(restored) return; restored=true;
+  let p=null; try{ p=JSON.parse(localStorage.getItem(PENDING_KEY)||'null'); }catch(e){}
+  if(!p||!p.local) return;
+  S.hafiza=C.mergeH(p.base||base,p.local,S.hafiza||base);
+  sync.dirty=true;
+  setTimeout(()=>{ toast('⟳ Bağlantı kesikken yapılan değişiklikler kaydediliyor'); save(); },300);
+}
+function stashPending(){
+  if(!S||!S.hafiza) return;
+  try{ localStorage.setItem(PENDING_KEY,JSON.stringify({at:nowISO(),base,local:S.hafiza})); }
+  catch(e){ console.warn('bekleyen değişiklik saklanamadı',e); }
+}
+const clearPending=()=>{ try{ localStorage.removeItem(PENDING_KEY); }catch(e){} };
+
 function synced(sent,merged){
   const before=JSON.stringify(S.hafiza||null);
-  S.hafiza=S.hafiza?mergeH(sent||base,S.hafiza,merged):clone(merged);
+  S.hafiza=S.hafiza?C.mergeH(sent||base,S.hafiza,merged):clone(merged);
   base=clone(merged);
   if(JSON.stringify(S.hafiza)!==before) refresh();
 }
@@ -2298,289 +2696,785 @@ async function prepareOut(out){
   ensureBase();
   const remote=await remoteHafiza();
   const sent=out.hafiza||null;
-  if(remote||sent) out.hafiza=mergeH(base,sent||base,remote||base);
+  if(remote||sent) out.hafiza=C.mergeH(base,sent||base,remote||base);
   return sent;
 }
+
+const sync={saving:0,dirty:false,failed:false,savedAt:0,chain:0};
+let queued=null, retryTimer=null;
 // Görev/deşifre değişikliklerini kaydeder. Buluttaki satır yeniden okunur ve yalnızca "hafiza" alanı değiştirilir;
 // üye, aidat ve diğer bütün alanlar buluttaki hâliyle aynen geri yazılır.
-function save(){
-  if(!cloudOn()){ persist(); return Promise.resolve(true); }
-  st.unsaved=true;
-  return cloudQueue(async()=>{
+function save(auto){
+  if(!auto) sync.chain=0;
+  sync.dirty=true; updSync();
+  if(!cloudOn()){ persist(); sync.dirty=false; updSync(); return Promise.resolve(true); }
+  if(!navigator.onLine){ fail(); return Promise.resolve(false); }
+  if(queued) return queued;
+  sync.saving++; updSync();
+  const p=cloudQueue(async()=>{
+    queued=null;
     const sent=clone(H());
     window._lastSaveAt=Date.now();
     const {data,error}=await window._sb.from('app_state').select('data').eq('id','main').maybeSingle();
     if(error) throw error;
     if(!data||!data.data){ persist(); return; }
     ensureBase();
-    const merged=mergeH(base,sent,data.data.hafiza||base);
+    const merged=C.mergeH(base,sent,data.data.hafiza||base);
     window._lastSaveAt=Date.now();
     const res=await window._sb.from('app_state').upsert({id:'main',data:{...data.data,hafiza:merged},updated_at:nowISO()});
     if(res.error) throw res.error;
     synced(sent,merged);
-  }).then(()=>{ st.unsaved=false; return true; },e=>{
-    console.error('hafiza kayıt',e);
-    toast('⚠ Görevler buluta kaydedilemedi — bağlantıyı kontrol edin; bir sonraki kayıtta yeniden denenecek');
-    return false;
-  });
+    if(JSON.stringify(S.hafiza)===JSON.stringify(merged)){ sync.dirty=false; clearPending(); }
+  }).then(()=>{ sync.saving--; const wasFailed=sync.failed; sync.failed=false; sync.savedAt=Date.now(); updSync(); if(wasFailed) toast('✓ Bağlantı geldi, bekleyen değişiklikler kaydedildi'); if(sync.dirty){ if(++sync.chain<4) save(true); else { sync.dirty=false; sync.chain=0; } } else sync.chain=0; return true; },
+    e=>{ sync.saving--; console.error('görev kaydı',e); fail(); return false; });
+  queued=p;
+  return p;
 }
-window.addEventListener('beforeunload',e=>{ if(st.unsaved){ e.preventDefault(); e.returnValue=''; } });
-const touch=x=>{ x.updatedAt=nowISO(); return x; };
+function fail(){
+  const first=!sync.failed;
+  sync.failed=true; stashPending(); updSync();
+  if(first) toast(navigator.onLine?'⚠ Değişiklikler şu an buluta kaydedilemedi. Bu tarayıcıda saklandı, birazdan yeniden denenecek.':'⚠ İnternet bağlantısı yok. Değişiklikler bu tarayıcıda saklanıyor; bağlantı gelince kaydedilecek.');
+  clearTimeout(retryTimer); retryTimer=setTimeout(()=>{ if(sync.failed) save(); },20000);
+}
+window.addEventListener('online',()=>{ if(sync.failed||sync.dirty) save(); });
+window.addEventListener('offline',()=>updSync());
+const leaving=()=>{ if(sync.dirty||sync.failed||sync.saving) stashPending(); };
+window.addEventListener('pagehide',leaving);
+window.addEventListener('beforeunload',e=>{ leaving(); if(sync.saving||sync.failed){ e.preventDefault(); e.returnValue=''; } });
+// Üst çubuktaki kayıt durumu (her sayfada görünür).
+function updSync(){
+  let el=document.getElementById('hzSync');
+  if(!el){ const host=document.querySelector('.topnav .top-actions'); if(!host) return; el=document.createElement('span'); el.id='hzSync'; el.className='hz-sync'; el.onclick=()=>{ if(sync.failed) save(); }; host.prepend(el); }
+  let cls='', html='';
+  if(sync.failed||(!navigator.onLine&&sync.dirty)){ cls='pending'; html=`⚠ <span>${navigator.onLine?'Kaydedilemedi — tekrar denemek için dokunun':'Çevrimdışı — değişiklikler bekliyor'}</span>`; el.title='Görev değişiklikleri bu tarayıcıda saklanıyor'; }
+  else if(sync.saving||sync.dirty){ cls='saving'; html='<i></i><span>Kaydediliyor…</span>'; el.title='Görevler kaydediliyor'; }
+  else if(Date.now()-sync.savedAt<2500){ cls='saved'; html='✓ <span>Kaydedildi</span>'; el.title='Görevler kaydedildi'; setTimeout(updSync,2600); }
+  el.className='hz-sync'+(cls?' on '+cls:''); el.innerHTML=html;
+}
 
-/* ---------- Yardımcılar ---------- */
+/* ---------- Kayıt üzerinde değişiklik, geçmiş ve geri alma ---------- */
+const touch=x=>{ x.updatedAt=nowISO(); x.updatedBy=me().name; return x; };
+function fmtField(k,v){
+  if(k==='status') return STATUS_LABEL[v]||'';
+  if(k==='priority') return PRIORITY_LABEL[v]||'';
+  if(k==='recur') return v?RECUR_LABEL[v]:'';
+  if(k==='dueDate') return v?absDate(v):'';
+  if(k==='reminderAt') return v?remLabel(v):'';
+  if(k==='memberIds') return (v||[]).map(id=>member(id)?.ad||'(silinmiş üye)').join(', ');
+  if(k==='kararIds') return (v||[]).map(id=>{ const k=(S.kararlar||[]).find(x=>x.id===id); return k?`Karar ${k.no??''}`.trim():'(silinmiş karar)'; }).join(', ');
+  return Array.isArray(v)?v.join(', '):String(v||'');
+}
+function log(t,text){ (t.history||(t.history=[])).push({at:nowISO(),by:me().name,text}); if(t.history.length>150) t.history.splice(0,t.history.length-150); }
+function logDiff(before,t){ C.describeChanges(before,t,fmtField).forEach(x=>log(t,x)); }
+// Geri alma: işlemden önceki hâller saklanır, yalnızca etkilenen kayıtlar eski hâline döner.
+function snap(kind,ids){ const list=H()[kind]; return ids.map(id=>({kind,id,before:clone(list.find(x=>x.id===id)||null)})); }
+function undo(entries,msg){
+  const h=H();
+  for(const {kind,id,before} of entries){
+    const list=h[kind], i=list.findIndex(x=>x.id===id);
+    if(before){ touch(before); if(i>=0) list[i]=before; else list.push(before); }
+    else if(i>=0) list.splice(i,1);
+  }
+  save(); render(); toast(msg||'↺ Geri alındı');
+}
+
+/* ---------- Listeler ve filtre ---------- */
 function projectList(){ return [...new Set(H().tasks.map(t=>t.project).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr')); }
-function pcolor(name){ const i=projectList().indexOf(name); return PCOL[(i<0?0:i)%PCOL.length]; }
-const modalOpen=()=>!!document.getElementById('modalRoot').innerHTML;
+function ownerList(){ return [...new Set(H().tasks.map(t=>t.owner).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr')); }
+function eventList(){ return [...new Set(H().tasks.map(t=>t.event).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr')); }
+let pcache={key:'',map:new Map()};
+function pcolor(name){
+  const list=projectList(), key=list.join('|');
+  if(pcache.key!==key) pcache={key,map:new Map(list.map((p,i)=>[p,PCOL[i%PCOL.length]]))};
+  return pcache.map.get(name)||PCOL[0];
+}
+const filtered=(opts={})=>C.filterTasks(H().tasks,st.f,{today:today(),fold:Engine.fold,...opts});
+const activeFilters=()=>['project','owner','priority','status'].filter(k=>st.f[k]).length+(st.f.q.trim()?1:0);
 function refresh(){
   if(typeof renderNav==='function'&&S) renderNav();
   if(route!=='gorevler'||st.draft||modalOpen()) return;
   render();
 }
-function toastAct(msg,label,fn){
-  const t=document.getElementById('toast'); t.textContent=msg;
-  const b=document.createElement('button'); b.textContent=label; b.onclick=()=>{ t.classList.remove('show'); fn(); };
-  t.appendChild(b); t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),6500);
-}
-const terms=()=>Engine.fold(st.search).split(' ').filter(Boolean);
-const notifState=()=>!('Notification' in window)?'unsupported':Notification.permission;
 
-/* ---------- Görev listesi ---------- */
-function visible(){
-  const today=localISO(); let tasks=[...H().tasks];
-  if(st.view==='today') tasks=tasks.filter(t=>t.dueDate===today&&t.status!=='done');
-  else if(st.view==='upcoming') tasks=tasks.filter(t=>t.dueDate&&t.dueDate>today&&t.status!=='done');
-  else if(st.view==='completed') tasks=tasks.filter(t=>t.status==='done');
-  else if(st.filter==='open') tasks=tasks.filter(t=>t.status!=='done');
-  else if(st.filter==='high') tasks=tasks.filter(t=>t.priority==='high'&&t.status!=='done');
-  if(st.project) tasks=tasks.filter(t=>t.project===st.project);
-  const q=terms();
-  // Engine.fold büyük/küçük harf ve Türkçe karakter farkını yok sayar ("isik" → "ışık").
-  if(q.length) tasks=tasks.filter(t=>{ const hay=Engine.fold(`${t.title} ${t.notes||''} ${t.project||''} ${t.owner||''}`); return q.every(w=>hay.includes(w)); });
-  const byDue=(a,b)=>(a.dueDate||'9999-99-99').localeCompare(b.dueDate||'9999-99-99')||(a.dueTime||'99:99').localeCompare(b.dueTime||'99:99');
-  const byPri=(a,b)=>(PRANK[a.priority]??1)-(PRANK[b.priority]??1);
-  return tasks.sort((a,b)=>{
-    const d=(a.status==='done')-(b.status==='done'); if(d) return d;
-    if(a.status==='done') return (b.completedAt||'').localeCompare(a.completedAt||'');
-    if(st.sort==='priority') return byPri(a,b)||byDue(a,b);
-    if(st.sort==='created') return (b.createdAt||'').localeCompare(a.createdAt||'');
-    return byDue(a,b)||byPri(a,b);
-  });
+/* ---------- Görev satırı ve kartı ---------- */
+function metaHTML(t,{compact}={}){
+  const done=isDone(t), late=lateOf(t), tod=todayOf(t);
+  const ck=t.checklist||[], ckDone=ck.filter(c=>c.done).length;
+  const parts=[];
+  if(t.status!=='todo'&&!done) parts.push(statusTag(t.status)+(t.status==='waiting'&&t.waitingFor?`<span title="Beklenen">⏳ ${esc(t.waitingFor)}</span>`:''));
+  if(t.project) parts.push(`<span class="tag hz-proj" style="--pc:${pcolor(t.project)}">${esc(t.project)}</span>`);
+  if(t.priority==='high') parts.push('<span class="tag t-red nodot">Yüksek</span>'); else if(t.priority==='low'&&!compact) parts.push('<span class="tag t-gray nodot">Düşük</span>');
+  parts.push(`<span class="${late?'late':tod?'today':''}">${t.dueDate?`${late?'⚠':'◷'} ${esc(humanDate(t.dueDate))}${t.dueTime?' · '+esc(t.dueTime):''}`:compact?'':'Tarih yok'}</span>`);
+  if(t.owner) parts.push(`<span>👤 ${esc(t.owner)}</span>`);
+  if(ck.length) parts.push(`<span title="Alt adımlar">☑ ${ckDone}/${ck.length}</span>`);
+  if((t.comments||[]).length) parts.push(`<span title="Yorumlar">💬 ${t.comments.length}</span>`);
+  if(t.recur) parts.push(`<span title="${esc(RECUR_LABEL[t.recur])}">↻</span>`);
+  const links=(t.memberIds||[]).length+(t.kararIds||[]).length+(t.event?1:0);
+  if(links&&!compact) parts.push(`<span title="İlişkili kayıtlar">🔗 ${links}</span>`);
+  if(t.reminderAt&&!done&&!compact) parts.push(`<span title="Hatırlatma">🔔 ${esc(remLabel(t.reminderAt))}</span>`);
+  return parts.join('');
 }
-function groupOf(t){
-  if(t.status==='done') return 'TAMAMLANANLAR';
-  if(st.sort==='priority') return PLABEL[t.priority]||PLABEL.medium;
-  if(st.sort==='created') return 'SON EKLENENLER';
-  return dayKey(t.dueDate);
-}
-function taskRow(t){
-  const h=H(), done=t.status==='done', late=!done&&t.dueDate&&dayDiff(t.dueDate)<0;
-  const srcs=sourcesOf(t).map(id=>h.transcripts.find(x=>x.id===id)).filter(Boolean);
-  const src=h.transcripts.find(x=>x.id===t.transcriptId)||srcs[srcs.length-1];
-  const pri=t.priority==='high'?'<span class="tag t-red nodot">Yüksek öncelik</span>':t.priority==='low'?'<span class="tag t-gray nodot">Düşük</span>':'';
-  return `<div class="hz-task ${done?'done':''}" data-id="${esc(t.id)}" onclick="HZ.openTask(this.dataset.id)">
-    <input type="checkbox" ${done?'checked':''} ${editable()?'':'disabled'} aria-label="Tamamlandı olarak işaretle" onclick="event.stopPropagation()" onchange="HZ.toggle(this.closest('.hz-task').dataset.id,this.checked)">
-    <div class="hz-task-main"><div class="hz-task-title">${esc(t.title)}</div><div class="hz-meta">
-      ${t.project?`<span class="tag hz-proj" style="--pc:${pcolor(t.project)}">${esc(t.project)}</span>`:''}${pri}
-      <span class="${late?'late':''}">${t.dueDate?`${late?'⚠':'◷'} ${esc(humanDate(t.dueDate))}${t.dueTime?' · '+esc(t.dueTime):''}`:'Tarih belirlenmedi'}</span>
-      ${t.owner?`<span>· ${esc(t.owner)}</span>`:''}
-      ${t.reminderAt&&!done?`<span title="Hatırlatma">🔔 ${esc(remLabel(t.reminderAt))}</span>`:''}
-    </div></div>
-    ${src?`<div class="hz-src" title="${esc(srcs.map(s=>s.title).join('\n'))}">${esc(src.title)}${srcs.length>1?' +'+(srcs.length-1):''}</div>`:''}
+function taskRow(t,srcMap){
+  const done=isDone(t), ed=editable(), sel=st.sel.has(t.id);
+  const src=srcMap.get(t.transcriptId)||srcMap.get(sourcesOf(t).at(-1));
+  return `<div class="hz-task ${done?'done':''} ${lateOf(t)?'late':todayOf(t)?'today':''} ${sel?'sel':''}" data-id="${esc(t.id)}" onclick="HZ.openTask(this.dataset.id)">
+    ${ed?`<input type="checkbox" class="hz-sel" ${sel?'checked':''} aria-label="Toplu işlem için seç" onclick="event.stopPropagation()" onchange="HZ.select(this.closest('.hz-task').dataset.id,this.checked)">`:''}
+    <button class="hz-done-btn ${done?'on':''}" ${ed?'':'disabled'} title="${done?'Yeniden aç':'Tamamlandı olarak işaretle'}" aria-label="${done?'Yeniden aç':'Tamamla'}" onclick="event.stopPropagation();HZ.complete(this.closest('.hz-task').dataset.id)">✓</button>
+    <div class="hz-task-main"><div class="hz-task-title">${esc(t.title)}</div><div class="hz-meta">${metaHTML(t)}</div></div>
+    ${src?`<div class="hz-src" title="Toplantı">≡ ${esc(src.title)}</div>`:''}
   </div>`;
 }
-function tasksBody(){
-  const list=visible();
-  if(!list.length){
-    const q=st.search.trim(), any=H().tasks.length;
-    const msg=q?'Aramanıza uygun görev yok.':st.view==='completed'?'Henüz tamamlanan görev yok.':st.project?'Bu projede bu görünüme uyan görev yok.':any?'Bu görünümde görev bulunmuyor.':'Henüz görev yok. Bir toplantı deşifresi ekleyerek başlayabilirsiniz.';
-    return [`<div class="empty">${msg}</div>`,'0 görev'];
-  }
-  const groups=new Map();
-  for(const t of list){ const k=groupOf(t); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(t); }
-  return [[...groups].map(([k,items])=>`<div class="hz-group ${k==='GECİKEN'?'late':''}">${k} <span>· ${items.length}</span></div>${items.map(taskRow).join('')}`).join(''),`${list.length} görev`];
+function groupOf(t){
+  if(isDone(t)) return 'TAMAMLANANLAR';
+  if(st.sort==='priority') return ({high:'YÜKSEK ÖNCELİK',medium:'NORMAL ÖNCELİK',low:'DÜŞÜK ÖNCELİK'})[t.priority]||'NORMAL ÖNCELİK';
+  if(st.sort==='created') return 'SON EKLENENLER';
+  if(st.sort==='status') return STATUS_LABEL[t.status].toLocaleUpperCase('tr-TR');
+  const n=dayDiff(t.dueDate);
+  if(n===null) return 'TARİHSİZ'; if(n<0) return 'GECİKEN'; if(n===0) return 'BUGÜN'; if(n===1) return 'YARIN'; if(n<=7) return 'BU HAFTA'; return 'DAHA SONRA';
 }
-function transcriptsBody(){
-  const h=H(), q=terms();
+function emptyMsg(){
+  const h=H();
+  if(!h.tasks.length) return `<div class="empty"><div style="font-size:26px;margin-bottom:8px">📋</div><b>Henüz görev yok.</b><br>Bir toplantı deşifresi ekleyin; görevler otomatik çıkarılsın. Ya da “+ Görev” ile elle ekleyin.${editable()?`<div class="actions" style="justify-content:center;margin-top:14px"><button class="btn primary" onclick="HZ.newDraft()">+ Yeni Toplantı</button><button class="btn" onclick="HZ.newTask()">+ Görev</button></div>`:''}</div>`;
+  if(activeFilters()) return `<div class="empty">Seçili filtrelere uyan görev yok.<div style="margin-top:12px"><button class="btn sm" onclick="HZ.clearFilters()">Filtreleri temizle</button></div></div>`;
+  const m={open:'Açık görev kalmadı. 🎉',today:'Bugün bitmesi gereken görev yok.',overdue:'Geciken görev yok. 👏',upcoming:'İleri tarihli açık görev yok.',done:'Henüz tamamlanan görev yok.',all:'Görev yok.'};
+  return `<div class="empty">${m[st.f.scope]||'Bu görünümde görev yok.'}</div>`;
+}
+function listBody(){
+  const list=C.sortTasks(filtered(),st.sort);
+  for(const id of st.sel) if(!H().tasks.some(t=>t.id===id)) st.sel.delete(id);
+  if(!list.length) return [emptyMsg(),'0 görev'];
+  const srcMap=new Map(H().transcripts.map(x=>[x.id,x]));
+  const shown=list.slice(0,st.limit);
+  let html='', last='';
+  for(const t of shown){
+    const g=groupOf(t);
+    if(g!==last){ const n=list.filter(x=>groupOf(x)===g).length; html+=`<div class="hz-group ${g==='GECİKEN'?'late':g==='BUGÜN'?'today':''}">${g} <span>· ${n}</span></div>`; last=g; }
+    html+=taskRow(t,srcMap);
+  }
+  if(list.length>shown.length) html+=`<div class="hz-more"><button class="btn" onclick="HZ.more()">Daha fazla göster (${(list.length-shown.length).toLocaleString('tr-TR')} görev daha)</button></div>`;
+  return [html,`${list.length.toLocaleString('tr-TR')} görev`];
+}
+function bulkBar(){
+  if(!editable()||!st.sel.size||st.tab!=='list') return '';
+  const opts=(list,ph)=>`<option value="">${ph}</option>${list.map(([v,l])=>`<option value="${esc(v)}">${esc(l)}</option>`).join('')}`;
+  return `<div class="hz-bulk" id="hzBulk"><b>${st.sel.size} görev seçili</b>
+    <select aria-label="Durum" onchange="HZ.bulk('status',this.value)">${opts(STATUSES,'Durum…')}</select>
+    <input type="date" aria-label="Son tarih" title="Son tarih" onchange="HZ.bulk('dueDate',this.value)">
+    <input list="hzOwners" placeholder="Sorumlu…" aria-label="Sorumlu" onchange="HZ.bulk('owner',this.value)">
+    <input list="hzProjs" placeholder="Proje…" aria-label="Proje" onchange="HZ.bulk('project',this.value)">
+    <select aria-label="Öncelik" onchange="HZ.bulk('priority',this.value)">${opts(PRIORITIES,'Öncelik…')}</select>
+    <button class="btn ghost" onclick="HZ.selectAll()">Görünenlerin tümü</button>
+    <button class="btn ghost" onclick="HZ.bulk('delete')">🗑 Sil</button>
+    <button class="btn ghost" onclick="HZ.selectNone()">✕ Seçimi kaldır</button></div>`;
+}
+
+/* ---------- Pano ---------- */
+function boardBody(){
+  const list=C.sortTasks(filtered({ignoreScope:true}),'due');
+  const ed=editable();
+  const cols=STATUSES.map(([s,l])=>{
+    let items=list.filter(t=>t.status===s);
+    // Tamamlananlar sütununda son 30 gün; eski işler listede "Tamamlanan" altında durur.
+    if(s==='done'){ const from=new Date(Date.now()-30*864e5).toISOString(); items=items.filter(t=>(t.completedAt||'')>=from); }
+    const lim=50+(st.boardMore[s]||0), shown=items.slice(0,lim);
+    return `<div class="hz-col" data-status="${s}" ${ed?`ondragover="HZ.dragOver(event,this)" ondragleave="this.classList.remove('over')" ondrop="HZ.dropStatus(event,this)"`:''}>
+      <div class="hz-col-h" style="--sc:${STATUS_COLOR[s]}"><i></i>${l}${s==='done'?' <span class="muted" style="font-weight:550">· son 30 gün</span>':''}<b>${items.length}</b></div>
+      <div class="hz-col-b">${shown.map(t=>`<div class="hz-card ${lateOf(t)?'late':todayOf(t)?'today':''}" data-id="${esc(t.id)}" ${ed?'draggable="true" ondragstart="HZ.dragStart(event,this)" ondragend="this.classList.remove(\'dragging\')"':''} onclick="HZ.openTask(this.dataset.id)">
+          <div class="hz-task-title">${esc(t.title)}</div><div class="hz-meta">${metaHTML({...t,status:'todo'},{compact:true})}${t.status==='waiting'&&t.waitingFor?`<span>⏳ ${esc(t.waitingFor)}</span>`:''}</div>
+          ${ed?`<select aria-label="Durumu değiştir" onclick="event.stopPropagation()" onchange="HZ.setStatus(this.closest('.hz-card').dataset.id,this.value)">${STATUSES.map(([v,x])=>`<option value="${v}" ${v===s?'selected':''}>${x}</option>`).join('')}</select>`:''}
+        </div>`).join('')||`<div class="hz-col-empty">${ed?'Görev yok — buraya sürükleyin':'Görev yok'}</div>`}
+        ${items.length>shown.length?`<button class="btn sm" onclick="HZ.boardMore('${s}')">+${items.length-shown.length} görev daha</button>`:''}
+      </div></div>`;
+  }).join('');
+  return [`<div class="hz-board">${cols}</div>`,`${list.length.toLocaleString('tr-TR')} görev`];
+}
+
+/* ---------- Takvim ---------- */
+const MONTHS=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+function calBody(){
+  if(!st.cal){ const d=new Date(); st.cal={y:d.getFullYear(),m:d.getMonth()}; }
+  const {y,m}=st.cal, first=new Date(y,m,1), startOffset=(first.getDay()+6)%7;
+  const start=new Date(y,m,1-startOffset), td=today(), ed=editable();
+  const cells=[], from=localISO(start);
+  for(let i=0;i<42;i++){ const d=new Date(start); d.setDate(start.getDate()+i); cells.push(d); }
+  const to=localISO(cells[41]);
+  const tasks=filtered({ignoreScope:true}).filter(t=>t.dueDate&&t.dueDate>=from&&t.dueDate<=to);
+  const byDay=new Map();
+  for(const t of C.sortTasks(tasks,'due')){ if(!byDay.has(t.dueDate)) byDay.set(t.dueDate,[]); byDay.get(t.dueDate).push(t); }
+  const undated=filtered({ignoreScope:true}).filter(t=>!t.dueDate&&!isDone(t)).length;
+  const chipCls=t=>isDone(t)?'done':lateOf(t)?'late':t.status==='waiting'?'waiting':'';
+  const grid=cells.map(d=>{
+    const iso=localISO(d), list=byDay.get(iso)||[], out=d.getMonth()!==m;
+    const shown=list.slice(0,3);
+    return `<div class="hz-day ${out?'out':''} ${iso===td?'today':''} ${st.calDay===iso?'on':''}" data-day="${iso}" onclick="HZ.calPick(this.dataset.day)" ${ed?'ondragover="HZ.dragOver(event,this)" ondragleave="this.classList.remove(\'over\')" ondrop="HZ.dropDay(event,this)"':''}>
+      <div class="n"><span>${d.getDate()}</span>${list.length?`<span>${list.length}</span>`:''}</div>
+      ${shown.map(t=>`<div class="hz-chip ${chipCls(t)}" data-id="${esc(t.id)}" title="${esc(t.title)}" ${ed?'draggable="true" ondragstart="HZ.dragStart(event,this)"':''} onclick="event.stopPropagation();HZ.openTask(this.dataset.id)">${esc(t.title)}</div>`).join('')}
+      ${list.length>3?`<div class="hz-chip more">+${list.length-3} daha</div>`:''}
+      ${list.length?`<div class="hz-dots">${list.slice(0,6).map(t=>`<i class="${chipCls(t)}"></i>`).join('')}</div>`:''}
+    </div>`;
+  }).join('');
+  let dayPanel='';
+  if(st.calDay){
+    const list=C.sortTasks(filtered({ignoreScope:true}).filter(t=>t.dueDate===st.calDay),'due');
+    const srcMap=new Map(H().transcripts.map(x=>[x.id,x]));
+    dayPanel=`<div class="hz-dayp"><div class="hz-dayp-h"><b>${esc(absDate(st.calDay))} · ${list.length} görev</b>${ed?`<button class="btn sm" onclick="HZ.newTask({dueDate:'${st.calDay}'})">+ Bu güne görev ekle</button>`:''}</div>
+      ${list.length?list.map(t=>taskRow(t,srcMap)).join(''):'<div class="empty" style="padding:18px">Bu güne ait görev yok.</div>'}</div>`;
+  }
+  return [`<div class="hz-cal-h"><button class="btn sm" onclick="HZ.calMove(-1)" aria-label="Önceki ay">‹</button><h4>${MONTHS[m]} ${y}</h4><button class="btn sm" onclick="HZ.calMove(1)" aria-label="Sonraki ay">›</button><button class="btn sm ghost" onclick="HZ.calMove(0)">Bugün</button>
+      <span class="muted" style="margin-left:auto">${undated?`${undated} açık görevin tarihi yok`:''}${ed?' · Görevi sürükleyip başka güne bırakabilirsiniz':''}</span></div>
+    <div class="hz-cal">${['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'].map(x=>`<div class="wd">${x}</div>`).join('')}${grid}</div>${dayPanel}`,`${tasks.length} görev bu ayda`];
+}
+
+/* ---------- Toplantılar ---------- */
+function meetingStats(id,tasks){ const linked=tasks.filter(t=>sourcesOf(t).includes(id)); return {linked,done:linked.filter(isDone).length}; }
+const progHTML=(done,total,lg)=>`<div class="hz-prog ${lg?'lg':''}" title="${done}/${total} görev tamamlandı"><i style="width:${total?Math.round(done/total*100):0}%"></i></div>`;
+function meetingsBody(){
+  const h=H(), q=Engine.fold(st.meetQ).split(' ').filter(Boolean);
   let list=[...h.transcripts];
-  if(q.length) list=list.filter(t=>{ const hay=Engine.fold(`${t.title} ${t.text}`); return q.every(w=>hay.includes(w)); });
-  if(!list.length) return [`<div class="empty">${q.length?'Aramanıza uygun deşifre yok.':'Henüz deşifre yok. “+ Yeni Deşifre” ile ilk toplantınızı ekleyin.'}</div>`,'0 deşifre'];
+  if(q.length) list=list.filter(t=>{ const hay=Engine.fold(`${t.title} ${t.topic||''} ${(t.participants||[]).join(' ')} ${t.decisions||''} ${t.text}`); return q.every(w=>hay.includes(w)); });
+  if(!list.length) return [`<div class="empty">${q.length?'Aramaya uygun toplantı yok.':`<div style="font-size:26px;margin-bottom:8px">≡</div><b>Henüz toplantı kaydı yok.</b><br>Toplantı deşifresini yapıştırın; tarih, katılımcılar, kararlar ve çıkan görevler tek kayıtta toplansın.${editable()?'<div style="margin-top:14px"><button class="btn primary" onclick="HZ.newDraft()">+ Yeni Toplantı</button></div>':''}`}</div>`,'0 toplantı'];
   list.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||'').localeCompare(a.createdAt||''));
   return [`<div class="hz-grid">${list.map(t=>{
-    const n=h.tasks.filter(task=>sourcesOf(task).includes(t.id)).length;
-    return `<div class="hz-tr" data-id="${esc(t.id)}" tabindex="0" onclick="HZ.openViewer(this.dataset.id)" onkeydown="if(event.key==='Enter')HZ.openViewer(this.dataset.id)">
+    const {linked,done}=meetingStats(t.id,h.tasks), dec=String(t.decisions||'').split('\n').filter(x=>x.trim()).length;
+    return `<div class="hz-tr" data-id="${esc(t.id)}" tabindex="0" onclick="HZ.openMeeting(this.dataset.id)" onkeydown="if(event.key==='Enter')HZ.openMeeting(this.dataset.id)">
       <div class="d">${esc(absDate(t.date).toLocaleUpperCase('tr-TR'))}</div><h4>${esc(t.title)}</h4>
-      <p>${esc(String(t.text||'').replace(/\s+/g,' ').slice(0,330))}</p>
-      <div class="f"><span>${(t.wordCount||words(t.text)).toLocaleString('tr-TR')} kelime</span><b>${n} görev</b></div></div>`;
-  }).join('')}</div>`,`${list.length} deşifre`];
+      <p>${esc(t.summary||t.topic||String(t.text||'').replace(/\s+/g,' ').slice(0,260))}</p>
+      ${progHTML(done,linked.length)}
+      <div class="f"><span>${(t.participants||[]).length?`👥 ${t.participants.length} katılımcı`:''}${dec?` · ${dec} karar`:''}</span><b>${done}/${linked.length} görev bitti</b></div></div>`;
+  }).join('')}</div>`,`${list.length} toplantı`];
 }
-const body=()=>st.view==='transcripts'?transcriptsBody():tasksBody();
+
+/* ---------- Haftalık özet ---------- */
+function weeklyReport(){ return C.weekly(filtered({ignoreScope:true}),today()); }
+function weeklyTitle(){ const parts=[st.f.project,st.f.owner].filter(x=>x&&x!=='-'); return `${S.ayarlar?.dernekAdi||'FOYDER'} · Haftalık Görev Özeti — ${absDate(today())}${parts.length?` (${parts.join(', ')})`:''}`; }
+function weeklyBody(){
+  const r=weeklyReport(), srcMap=new Map(H().transcripts.map(x=>[x.id,x]));
+  const sec=(icon,title,sub,list,empty)=>`<h4>${icon} ${title} <small>${sub} · ${list.length} görev</small></h4>${list.length?list.slice(0,300).map(t=>taskRow(t,srcMap)).join(''):`<div class="empty">${empty}</div>`}`;
+  return [`<div class="hz-week">
+    <div class="hz-row" style="padding:12px 18px 0;margin:0"><span class="muted">Proje, sorumlu ve öncelik filtreleri özete de uygulanır.</span>
+      <div class="actions"><button class="btn sm" onclick="HZ.copyWeekly()">📋 Metni kopyala</button><button class="btn sm" onclick="HZ.printWeekly()">🖨 PDF</button></div></div>
+    ${sec('✅','Tamamlananlar',`${shortDate(r.from)} – ${shortDate(r.today)}`,r.done,'Son 7 günde tamamlanan görev yok.')}
+    ${sec('🔄','Devam edenler','Devam ediyor / Beklemede',r.active,'Şu an devam eden görev yok.')}
+    ${sec('⚠️','Gecikenler','son tarihi geçmiş',r.overdue,'Geciken görev yok. 👏')}
+    ${sec('📅','Yapılacaklar',`${shortDate(r.today)} – ${shortDate(r.to)}`,r.next,'Önümüzdeki 7 gün için planlanmış görev yok.')}
+  </div>`,''];
+}
+
+/* ---------- Sayfa ---------- */
+const body=()=>({list:listBody,board:boardBody,calendar:calBody,meetings:meetingsBody,weekly:weeklyBody}[st.tab]||listBody)();
 function updateBody(){
   const [html,count]=body();
   const b=document.getElementById('hzBody'); if(b) b.innerHTML=html;
   const c=document.getElementById('hzCount'); if(c) c.textContent=count;
+  const bb=document.getElementById('hzBulkHost'); if(bb) bb.innerHTML=bulkBar();
 }
-
+function filtersHTML(){
+  if(st.tab==='meetings') return `<div class="filters hz-filters"><input type="search" id="hzSearch" placeholder="Toplantılarda ara (başlık, katılımcı, karar, metin)…" value="${esc(st.meetQ)}" oninput="HZ.meetSearch(this.value)"><span class="count" id="hzCount"></span></div>`;
+  const sel=(k,label,list)=>`<select aria-label="${label}" onchange="HZ.setF('${k}',this.value)" ${st.f[k]?'style="border-color:var(--gold);background:#FFFCF2"':''}><option value="">${label}: Tümü</option>${list.map(([v,l])=>`<option value="${esc(v)}" ${st.f[k]===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
+  const n=activeFilters();
+  return `<div class="filters hz-filters">
+    <input type="search" id="hzSearch" placeholder="Görevlerde ara…  ( / )" value="${esc(st.f.q)}" oninput="HZ.search(this.value)">
+    ${st.tab==='list'?`<div class="hz-seg">${SCOPES.map(([v,l])=>`<button class="${st.f.scope===v?'on':''} ${v==='overdue'?'late':''}" onclick="HZ.setF('scope','${v}')">${l}</button>`).join('')}</div>`:''}
+    ${sel('project','Proje',[...projectList().map(p=>[p,p]),['-','(Projesiz)']])}
+    ${sel('owner','Sorumlu',[...ownerList().map(p=>[p,p]),['-','(Atanmamış)']])}
+    ${sel('priority','Öncelik',PRIORITIES)}
+    ${st.tab==='board'?'':sel('status','Durum',STATUSES)}
+    ${st.tab==='list'?`<select aria-label="Sıralama" onchange="HZ.setSort(this.value)">${[['due','Sıra: Tarih'],['priority','Sıra: Öncelik'],['status','Sıra: Durum'],['created','Sıra: Yeni eklenen']].map(([v,l])=>`<option value="${v}" ${st.sort===v?'selected':''}>${l}</option>`).join('')}</select>`:''}
+    ${n?`<button class="btn sm ghost" onclick="HZ.clearFilters()">✕ Filtreleri temizle (${n})</button>`:''}
+    <span class="count" id="hzCount"></span>
+  </div>`;
+}
 function page(){
-  const h=H(), today=localISO(); st.day=today;
+  const h=H(), td=today(); st.day=td;
   if(st.draft) return draftPage();
-  const open=h.tasks.filter(t=>t.status!=='done');
-  const counts={inbox:open.length,today:open.filter(t=>t.dueDate===today).length,upcoming:open.filter(t=>t.dueDate&&t.dueDate>today).length,completed:h.tasks.length-open.length,transcripts:h.transcripts.length};
-  const overdue=open.filter(t=>t.dueDate&&t.dueDate<today).length;
-  const weekAgo=Date.now()-7*864e5;
-  const doneWeek=h.tasks.filter(t=>t.status==='done'&&t.completedAt&&new Date(t.completedAt)>=weekAgo).length;
-  const ed=editable(), projects=projectList();
-  if(st.project&&!projects.includes(st.project)) st.project='';
-  const kp=(cls,ico,l,v,d,view,filter)=>`<div class="kpi" onclick="HZ.view('${view}'${filter?`,'${filter}'`:''})"><div class="ico ${cls}">${ico}</div><div class="l">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+  const open=h.tasks.filter(t=>!isDone(t));
+  const overdue=open.filter(t=>t.dueDate&&t.dueDate<td).length, dueToday=open.filter(t=>t.dueDate===td).length;
+  const doing=open.filter(t=>t.status==='doing'||t.status==='waiting').length;
+  const weekAgo=new Date(Date.now()-7*864e5).toISOString();
+  const doneWeek=h.tasks.filter(t=>isDone(t)&&(t.completedAt||'')>=weekAgo).length;
+  const ed=editable();
+  const kp=(cls,ico,l,v,d,on)=>`<div class="kpi" onclick="${on}"><div class="ico ${cls}">${ico}</div><div class="l">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
   const [html,count]=body();
+  setTimeout(()=>{ const c=document.getElementById('hzCount'); if(c) c.textContent=count; },0);
   return `
-  <div class="pagehead"><div><h2>Toplantılar ve Görevler</h2><div class="sub">Toplantı deşifrelerinden görev çıkarın; sorumlu, tarih ve hatırlatmayla takip edin</div></div>
-  <div class="actions">${ed?`<button class="btn primary" onclick="HZ.newDraft()">+ Yeni Deşifre</button><button class="btn" onclick="HZ.openTask()">+ Görev</button>`:''}<button class="btn" onclick="HZ.settings()">⚙ Ayarlar</button></div></div>
+  <div class="pagehead"><div><h2>Toplantılar ve Görevler</h2><div class="sub">Toplantılardan çıkan işleri sorumlu, tarih ve durumuyla takip edin</div></div>
+  <div class="actions">${ed?`<button class="btn primary" onclick="HZ.newTask()" title="Kısayol: N">+ Görev</button><button class="btn" onclick="HZ.newDraft()" title="Kısayol: Shift+N">+ Yeni Toplantı</button>`:''}
+    <button class="btn" onclick="HZ.exportICS()" title="Tarihli açık görevleri Google/Outlook takvimine aktarın">📅 Takvime aktar</button>
+    <button class="btn ghost" onclick="HZ.help()" title="Klavye kısayolları (?)">⌨</button><button class="btn ghost" onclick="HZ.settings()">⚙ Ayarlar</button></div></div>
   ${ed?'':'<div class="role-note">🔒 Mevcut rolünüz görevleri yalnızca görüntüleyebilir.</div>'}
   ${notifState()==='default'?`<div class="banner blue" style="align-items:center;flex-wrap:wrap">🔔 Hatırlatmaların panel açıkken bildirim olarak görünmesi için tarayıcı izni gerekiyor. <button class="btn sm" onclick="HZ.askNotify()">Bildirimlere izin ver</button></div>`:''}
   <div class="kpis hz-kpis">
-    ${kp('t-amber','◷','Bugün',counts.today,'bugün bitmesi gereken','today')}
-    ${kp('t-red','!','Geciken',overdue,'son tarihi geçmiş açık görev','inbox','open')}
-    ${kp('t-blue','▦','Yaklaşan',counts.upcoming,'ileri tarihli açık görev','upcoming')}
-    ${kp('t-green','✓','Bu hafta biten',doneWeek,'son 7 günde tamamlandı','completed')}
-    ${kp('t-gold','≡','Deşifre',counts.transcripts,'toplantı kaydı','transcripts')}
+    ${kp('t-amber','◷','Bugün',dueToday,'bugün bitmesi gereken',"HZ.quick('today')")}
+    ${kp('t-red','!','Geciken',overdue,'son tarihi geçmiş',"HZ.quick('overdue')")}
+    ${kp('t-blue','↻','Devam eden',doing,'devam ediyor / beklemede',"HZ.quick('doing')")}
+    ${kp('t-green','✓','Bu hafta biten',doneWeek,'son 7 günde tamamlandı',"HZ.quick('done')")}
+    ${kp('t-gold','≡','Toplantı',h.transcripts.length,'kayıtlı toplantı',"HZ.tab('meetings')")}
   </div>
   <div class="card">
-    <div class="hz-tabs">${VIEWS.map(([v,l])=>`<button class="${st.view===v?'on':''}" onclick="HZ.view('${v}')">${l} <b>${counts[v]}</b></button>`).join('')}</div>
-    <div class="filters hz-filters">
-      <input type="search" id="hzSearch" placeholder="${st.view==='transcripts'?'Deşifrelerde ara…':'Görevlerde ara…'}" value="${esc(st.search)}" oninput="HZ.search(this.value)">
-      ${st.view==='transcripts'?'':`<select aria-label="Proje filtresi" onchange="HZ.set('project',this.value)"><option value="">Tüm projeler</option>${projects.map(p=>`<option value="${esc(p)}" ${st.project===p?'selected':''}>${esc(p)}</option>`).join('')}</select>
-      <select aria-label="Sıralama" onchange="HZ.set('sort',this.value)">${[['due','Tarihe göre'],['priority','Önceliğe göre'],['created','Yeni eklenen']].map(([v,l])=>`<option value="${v}" ${st.sort===v?'selected':''}>${l}</option>`).join('')}</select>`}
-      ${st.view==='inbox'?`<div class="hz-seg">${[['open','Açık'],['all','Tümü'],['high','Öncelikli']].map(([v,l])=>`<button class="${st.filter===v?'on':''}" onclick="HZ.set('filter','${v}')">${l}</button>`).join('')}</div>`:''}
-      <span class="count" id="hzCount">${count}</span>
-    </div>
+    <div class="hz-tabs">${TABS.map(([v,l],i)=>`<button class="${st.tab===v?'on':''}" onclick="HZ.tab('${v}')" title="Kısayol: ${i+1}">${l}${v==='meetings'?` <b>${h.transcripts.length}</b>`:v==='list'?` <b>${open.length}</b>`:''}</button>`).join('')}</div>
+    ${filtersHTML()}
+    <div id="hzBulkHost">${bulkBar()}</div>
     <div id="hzBody">${html}</div>
+    <datalist id="hzOwners">${ownerList().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
+    <datalist id="hzProjs">${projectList().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
   </div>`;
 }
 
-async function toggle(id,done){
-  const t=H().tasks.find(x=>x.id===id); if(!t||!editable()) return;
-  t.status=done?'done':'open';
-  t.completedAt=done?nowISO():null;
-  touch(t); render(); save();
-  if(done) toastAct('✓ Görev tamamlandı: '+t.title,'Geri al',()=>toggle(id,false));
-  else toast('↺ Görev yeniden açıldı');
+/* ---------- Durum, tamamlama ve tekrar ---------- */
+function applyStatus(t,status,extra){
+  const before=clone(t);
+  t.status=status;
+  if(status==='done'){ t.completedAt=t.completedAt&&isDone(before)?t.completedAt:nowISO(); }
+  else t.completedAt=null;
+  if(status!=='waiting') t.waitingFor=''; else if(extra!=null) t.waitingFor=extra;
+  touch(t); logDiff(before,t);
+  // Tekrarlayan görev bittiğinde bir sonraki kopya oluşur (bir kez).
+  if(status==='done'&&t.recur&&!t.recurNextId){
+    const n=C.spawnNext(t,{id:uid('task'),now:nowISO(),by:me().name,today:today()});
+    if(n){ H().tasks.push(n); t.recurNextId=n.id; log(t,`Sonraki tekrar oluşturuldu: ${absDate(n.dueDate)}`); return n; }
+  }
+  return null;
+}
+function setStatus(id,status,waitingFor){
+  const t=H().tasks.find(x=>x.id===id); if(!t||!editable()||!STATUS_LABEL[status]) return;
+  if(status==='waiting'&&waitingFor==null){ askWaiting(id); return; }
+  if(t.status===status&&status!=='waiting'){ render(); return; }
+  const undoSnap=snap('tasks',[id]);
+  const n=applyStatus(t,status,waitingFor);
+  if(n) undoSnap.push({kind:'tasks',id:n.id,before:null});
+  save(); render();
+  const msg=status==='done'?`✓ Tamamlandı: ${t.title}${n?` · sonraki tekrar ${shortDate(n.dueDate)}`:''}`:`Durum: ${STATUS_LABEL[status]}`;
+  toastAct(msg,'Geri al',()=>undo(undoSnap));
+}
+function askWaiting(id){
+  const t=H().tasks.find(x=>x.id===id); if(!t) return;
+  modal('Beklemeye al',`<div class="frm"><div class="full"><label>Kimi veya neyi bekliyor?</label><input id="hzWait" value="${esc(t.waitingFor||'')}" placeholder="Örn. muhasebeden onay, karşı tarafın yanıtı" onkeydown="if(event.key==='Enter')HZ.confirmWaiting()"></div></div><p class="muted" style="margin-top:8px">Boş bırakabilirsiniz.</p>`,
+    `<button class="btn primary" onclick="HZ.confirmWaiting()">Beklemeye al</button>`);
+  st.editId=id; document.getElementById('hzWait')?.focus();
+}
+function confirmWaiting(){ const id=st.editId, v=val('hzWait').trim(); closeModal(); setStatus(id,'waiting',v); }
+function complete(id){ const t=H().tasks.find(x=>x.id===id); if(t) setStatus(id,isDone(t)?'todo':'done'); }
+
+/* ---------- Seçim ve toplu işlem ---------- */
+function select(id,on){ on?st.sel.add(id):st.sel.delete(id); updateBody(); }
+function selectAll(){ C.sortTasks(filtered(),st.sort).slice(0,st.limit).forEach(t=>st.sel.add(t.id)); updateBody(); }
+function selectNone(){ st.sel.clear(); updateBody(); }
+function bulk(field,value){
+  if(!editable()||!st.sel.size) return;
+  const h=H(), ids=[...st.sel].filter(id=>h.tasks.some(t=>t.id===id));
+  if(field==='delete'){
+    if(!confirm(`${ids.length} görev silinsin mi?`)) return;
+    const u=snap('tasks',ids); h.tasks=h.tasks.filter(t=>!st.sel.has(t.id)); st.sel.clear();
+    save(); render(); toastAct(`🗑 ${ids.length} görev silindi`,'Geri al',()=>undo(u,'↺ Görevler geri getirildi')); return;
+  }
+  if(field!=='dueDate'&&field!=='owner'&&field!=='project'&&!value) return;
+  if(field==='status'&&value==='waiting'){ const w=prompt('Seçili görevler kimi veya neyi bekliyor? (boş bırakabilirsiniz)',''); if(w===null){ render(); return; } return bulkApply(ids,field,value,w.trim()); }
+  bulkApply(ids,field,typeof value==='string'?value.trim():value);
+}
+function bulkApply(ids,field,value,extra){
+  const h=H(), u=snap('tasks',ids);
+  let n=0;
+  for(const id of ids){
+    const t=h.tasks.find(x=>x.id===id); if(!t) continue;
+    if(field==='status'){ if(t.status===value&&value!=='waiting') continue; const nx=applyStatus(t,value,extra); if(nx) u.push({kind:'tasks',id:nx.id,before:null}); n++; continue; }
+    if((t[field]||'')===value) continue;
+    const before=clone(t); t[field]=value;
+    if(field==='dueDate'&&(!t.reminderAt||t.reminderAt===`${before.dueDate}T09:00`)){ t.reminderAt=value?`${value}T09:00`:''; t.notifiedAt=null; }
+    touch(t); logDiff(before,t); n++;
+  }
+  save(); render();
+  const label={status:'durum',dueDate:'son tarih',owner:'sorumlu',project:'proje',priority:'öncelik'}[field];
+  toastAct(`✓ ${n} görevin ${label} bilgisi güncellendi`,'Geri al',()=>undo(u));
 }
 
-/* ---------- Görev düzenleme ---------- */
+/* ---------- Sürükle-bırak ---------- */
+function dragStart(e,el){ st.dragId=el.dataset.id; el.classList.add('dragging'); try{ e.dataTransfer.setData('text/plain',el.dataset.id); e.dataTransfer.effectAllowed='move'; }catch(_){} e.stopPropagation(); }
+function dragOver(e,el){ if(!st.dragId) return; e.preventDefault(); el.classList.add('over'); }
+function dropStatus(e,el){ e.preventDefault(); el.classList.remove('over'); const id=st.dragId; st.dragId=''; if(id) setStatus(id,el.dataset.status); }
+function dropDay(e,el){
+  e.preventDefault(); el.classList.remove('over'); const id=st.dragId; st.dragId='';
+  const t=H().tasks.find(x=>x.id===id); if(!t||t.dueDate===el.dataset.day) return;
+  const u=snap('tasks',[id]);
+  bulkApplySilent(t,'dueDate',el.dataset.day);
+  save(); render(); toastAct(`📅 ${t.title} → ${absDate(t.dueDate)}`,'Geri al',()=>undo(u));
+}
+function bulkApplySilent(t,field,value){
+  const before=clone(t); t[field]=value;
+  if(field==='dueDate'&&(!t.reminderAt||t.reminderAt===`${before.dueDate}T09:00`)){ t.reminderAt=value?`${value}T09:00`:''; t.notifiedAt=null; }
+  touch(t); logDiff(before,t);
+}
+
+/* ---------- Yeni görev ---------- */
+function newTask(preset){
+  if(!editable()) return;
+  preset=preset||{};
+  const f=st.f, p=prefs();
+  const project=preset.project??(f.project&&f.project!=='-'?f.project:'');
+  const owner=preset.owner??(f.owner&&f.owner!=='-'?f.owner:p.owner);
+  st.newPreset=preset;
+  modal('Yeni Görev',`<div class="frm" id="hzQuickForm">
+    <div class="full"><label>Görev adı</label><input id="hzn_title" placeholder="Yapılacak işi yazın" onkeydown="if(event.key==='Enter'){event.preventDefault();HZ.createTask()}"></div>
+    <div><label>Son tarih</label><input id="hzn_due" type="date" value="${esc(preset.dueDate||'')}"></div>
+    <div><label>Durum</label><select id="hzn_status">${STATUSES.filter(s=>s[0]!=='done').map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div>
+    <div><label>Sorumlu</label><input id="hzn_owner" list="hzOwners" value="${esc(owner)}" placeholder="Görevi kim yapacak?"></div>
+    <div><label>Proje</label><input id="hzn_proj" list="hzProjs" value="${esc(project)}" placeholder="Örn. Genel Kurul"></div>
+    <div><label>Öncelik</label><select id="hzn_pri">${[['medium','Normal'],['high','Yüksek'],['low','Düşük']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div>
+    <div><label>Tekrar</label><select id="hzn_recur">${RECUR.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div>
+  </div>${relPresetNote(preset)}<datalist id="hzOwners">${ownerList().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist><datalist id="hzProjs">${projectList().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
+  <p class="hz-note" style="margin-top:10px">Alt adım, yorum, hatırlatma ve ilişkiler kaydettikten sonra görevin ayrıntısından eklenir. <kbd>Ctrl</kbd>+<kbd>Enter</kbd> ile kaydedebilirsiniz.</p>`,
+  `<button class="btn" onclick="HZ.createTask(true)">Kaydet ve ayrıntıyı aç</button><button class="btn primary" onclick="HZ.createTask()">Kaydet</button>`);
+  document.getElementById('hzn_title')?.focus();
+}
+function relPresetNote(p){
+  const parts=[];
+  for(const id of p.memberIds||[]) parts.push(`👤 ${esc(member(id)?.ad||'')}`);
+  for(const id of p.kararIds||[]){ const k=(S.kararlar||[]).find(x=>x.id===id); if(k) parts.push(`⚖ Karar ${esc(k.no??'')}`); }
+  return parts.length?`<div class="banner blue" style="margin:12px 0 0">🔗 Bu görev şunlarla ilişkilendirilecek: ${parts.join(', ')}</div>`:'';
+}
+function createTask(openAfter){
+  if(!editable()) return;
+  const title=val('hzn_title').trim();
+  if(!title){ toast('Görev adı gerekli'); document.getElementById('hzn_title')?.focus(); return; }
+  const due=val('hzn_due'), p=st.newPreset||{}, recur=val('hzn_recur');
+  const t=touch({id:uid('task'),title,notes:'',dueDate:due,dueTime:'',reminderAt:due?`${due}T09:00`:'',priority:val('hzn_pri')||'medium',
+    project:val('hzn_proj').trim(),owner:val('hzn_owner').trim(),key:'',status:val('hzn_status')||'todo',waitingFor:'',recur,
+    recurDay:recur==='monthly'&&due?parseDay(due).getDate():undefined,
+    memberIds:p.memberIds||[],kararIds:p.kararIds||[],event:p.event||'',checklist:[],comments:[],
+    history:[{at:nowISO(),by:me().name,text:'Görev oluşturuldu'}],sourceIds:[],transcriptId:'',createdAt:nowISO(),completedAt:null,notifiedAt:null});
+  if(recur&&!due){ t.dueDate=today(); t.reminderAt=`${t.dueDate}T09:00`; }
+  H().tasks.push(t); st.newPreset=null;
+  save(); closeModal(); render();
+  toastAct('✓ Görev eklendi','Geri al',()=>undo([{kind:'tasks',id:t.id,before:null}],'↺ Görev kaldırıldı'));
+  if(openAfter) openTask(t.id);
+}
+
+/* ---------- Görev ayrıntısı (değişiklikler anında kaydedilir) ---------- */
 function openTask(id){
-  const h=H(), t=id?h.tasks.find(x=>x.id===id):null;
-  if(id&&!t){ toast('Görev bulunamadı — silinmiş olabilir'); return; }
-  if(!t&&!editable()) return;
-  st.editId=t?t.id:'';
+  const h=H(), t=h.tasks.find(x=>x.id===id);
+  if(!t){ toast('Görev bulunamadı — silinmiş olabilir'); return; }
+  st.editId=id;
   const ed=editable(), dis=ed?'':'disabled';
-  const srcs=t?sourcesOf(t).map(s=>h.transcripts.find(x=>x.id===s)).filter(Boolean):[];
-  const pri=t?.priority||'medium';
-  modal(t?(ed?'Görevi Düzenle':'Görev'):'Yeni Görev',`
-  <div class="frm">
-    <div class="full"><label>Görev adı</label><input id="hzt_title" value="${esc(t?.title||'')}" placeholder="Yapılacak işi yazın" ${dis} onkeydown="if(event.key==='Enter')HZ.saveTask()"></div>
-    <div><label>Son tarih</label><input id="hzt_due" type="date" value="${esc(t?.dueDate||'')}" data-prev="${esc(t?.dueDate||'')}" ${dis} onchange="HZ.syncRem(this)"></div>
-    <div><label>Saat</label><input id="hzt_time" type="time" value="${esc(t?.dueTime||'')}" ${dis}></div>
-    <div><label>Öncelik</label><select id="hzt_pri" ${dis}>${[['medium','Normal'],['high','Yüksek'],['low','Düşük']].map(([v,l])=>`<option value="${v}" ${pri===v?'selected':''}>${l}</option>`).join('')}</select></div>
-    <div><label>Durum</label><select id="hzt_status" ${dis}><option value="open">Açık</option><option value="done" ${t?.status==='done'?'selected':''}>Tamamlandı</option></select></div>
-    <div><label>Proje</label><input id="hzt_proj" list="hzProjOpts" value="${esc(t?t.project||'':st.project)}" placeholder="Örn. Genel Kurul" ${dis}><datalist id="hzProjOpts">${projectList().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist></div>
-    <div><label>Sorumlu</label><input id="hzt_owner" value="${esc(t?t.owner||'':prefs().owner)}" placeholder="Görevi kim yapacak?" ${dis}></div>
-    <div class="full"><label>Hatırlat</label><input id="hzt_rem" type="datetime-local" value="${esc(t?.reminderAt?t.reminderAt.slice(0,16):'')}" ${dis}><div class="muted" style="margin-top:5px">Hatırlatma, panel bir tarayıcı sekmesinde açıkken bildirim olarak gösterilir.</div></div>
-    <div class="full"><label>Notlar</label><textarea id="hzt_notes" rows="5" placeholder="Bağlam, takip notu veya iletişim bilgisi…" ${dis}>${esc(t?.notes||'')}</textarea></div>
+  const on=(k)=>ed?`onchange="HZ.field('${k}',this)"`:'';
+  const srcs=sourcesOf(t).map(s=>h.transcripts.find(x=>x.id===s)).filter(Boolean);
+  const opt=(list,cur)=>list.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('');
+  modal(`Görev ayrıntısı <span id="hzDetailTitle">${statusTag(t.status)}</span>`,`
+  <div class="hz-detail" id="hzDetail">
+    <div>
+      <div class="frm">
+        <div class="full"><label>Görev adı</label><input id="hzt_title" value="${esc(t.title)}" ${dis} ${on('title')}></div>
+        <div><label>Durum</label><select id="hzt_status" ${dis} ${on('status')}>${opt(STATUSES,t.status)}</select></div>
+        <div id="hzWaitRow" class="${t.status==='waiting'?'':'hidden'}"><label>Kimi / neyi bekliyor?</label><input id="hzt_wait" value="${esc(t.waitingFor||'')}" placeholder="Örn. muhasebe onayı" ${dis} ${on('waitingFor')}></div>
+        <div><label>Son tarih</label><input id="hzt_due" type="date" value="${esc(t.dueDate||'')}" ${dis} ${on('dueDate')}></div>
+        <div><label>Saat</label><input id="hzt_time" type="time" value="${esc(t.dueTime||'')}" ${dis} ${on('dueTime')}></div>
+        <div><label>Öncelik</label><select id="hzt_pri" ${dis} ${on('priority')}>${opt(PRIORITIES,t.priority||'medium')}</select></div>
+        <div><label>Tekrar</label><select id="hzt_recur" ${dis} ${on('recur')}>${opt(RECUR,t.recur||'')}</select></div>
+        <div><label>Sorumlu</label><input id="hzt_owner" list="hzOwners2" value="${esc(t.owner||'')}" placeholder="Görevi kim yapacak?" ${dis} ${on('owner')}></div>
+        <div><label>Proje</label><input id="hzt_proj" list="hzProjs2" value="${esc(t.project||'')}" placeholder="Örn. Genel Kurul" ${dis} ${on('project')}></div>
+        <div class="full"><label>Hatırlat</label><input id="hzt_rem" type="datetime-local" value="${esc(t.reminderAt?t.reminderAt.slice(0,16):'')}" ${dis} ${on('reminderAt')}><div class="hz-note">Hatırlatma, panel bir tarayıcı sekmesinde açıkken bildirim olarak gösterilir.</div></div>
+        <div class="full"><label>Notlar</label><textarea id="hzt_notes" rows="4" placeholder="Bağlam, takip notu veya iletişim bilgisi…" ${dis} ${on('notes')}>${esc(t.notes||'')}</textarea></div>
+      </div>
+      <div class="hz-sublabel">Alt adımlar <span id="hzCkCount"></span></div>
+      <div id="hzCkBox">${checklistHTML(t)}</div>
+      <div class="hz-sublabel">Yorumlar ve notlar</div>
+      <div id="hzCmBox">${commentsHTML(t)}</div>
+    </div>
+    <div class="hz-side">
+      <div class="hz-sublabel">İlişkili kayıtlar</div>
+      <div id="hzLinkBox">${linksHTML(t)}</div>
+      ${srcs.length?`<div class="hz-sublabel">Çıktığı toplantılar</div><div class="hz-linked">${srcs.map(s=>`<button type="button" data-id="${esc(s.id)}" onclick="HZ.openMeeting(this.dataset.id)">≡ <span class="t">${esc(s.title)} · ${esc(absDate(s.date))}</span></button>`).join('')}</div>`:''}
+      <details class="hz-det" ${(t.history||[]).length&&!ed?'open':''}><summary>Değişiklik geçmişi (${(t.history||[]).length})</summary>
+        <div class="hz-hist" id="hzHist">${historyHTML(t)}</div></details>
+      <div class="hz-note" style="margin-top:12px">${ed?'Değişiklikler otomatik kaydedilir.':''} Oluşturulma: ${esc(stamp(t.createdAt))}${t.updatedAt?` · Son değişiklik: ${esc(stamp(t.updatedAt))}${t.updatedBy?` (${esc(t.updatedBy)})`:''}`:''}</div>
+    </div>
   </div>
-  ${srcs.length?`<div style="margin-top:16px"><div class="hz-sublabel">İlgili görüşmeler</div><div class="hz-linked">${srcs.map(s=>`<button type="button" data-id="${esc(s.id)}" onclick="HZ.openViewer(this.dataset.id)">≡ ${esc(s.title)} · ${esc(absDate(s.date))}</button>`).join('')}</div></div>`:''}`,
-  ed?`${t?'<button class="btn danger" style="order:-1;margin-right:auto" onclick="HZ.delTask()">Görevi sil</button>':''}${t&&t.status!=='done'?'<button class="btn" onclick="HZ.remindTomorrow()">Yarın hatırlat</button>':''}<button class="btn primary" onclick="HZ.saveTask()">Kaydet</button>`:' ');
-  if(ed) setTimeout(()=>document.getElementById('hzt_title')?.focus(),50);
+  <datalist id="hzOwners2">${ownerList().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist><datalist id="hzProjs2">${projectList().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>`,
+  `${ed?'<button class="btn danger" style="order:-1;margin-right:auto" onclick="HZ.delTask()">🗑 Sil</button>':''}
+   <button class="btn" onclick="HZ.reminderMsg('gorev_wp')" title="Mesaj Şablonları'nda WhatsApp hatırlatması">💬 WhatsApp metni</button>
+   <button class="btn" onclick="HZ.reminderMsg('gorev_mail')" title="Mesaj Şablonları'nda e-posta hatırlatması">✉ E-posta metni</button>
+   <button class="btn" onclick="HZ.exportICS(HZ._editId())" ${t.dueDate?'':'disabled title="Önce son tarih girin"'}>📅 .ics</button>
+   ${ed&&!isDone(t)?'<button class="btn" onclick="HZ.remindTomorrow()">Yarın hatırlat</button>':''}`,true);
+  // Ayrıntı penceresinde "Vazgeç" yerine "Kapat": değişiklikler zaten kaydedildi.
+  const f=document.querySelector('#modalRoot .modal-f .btn'); if(f&&f.textContent==='Vazgeç') f.textContent='Kapat';
+  updCkCount(t);
 }
-// Son tarih değişince, özel bir hatırlatma yazılmadıysa hatırlatmayı o gün 09.00'a getir.
-function syncRem(input){
-  const rem=document.getElementById('hzt_rem'), prev=input.dataset.prev||'';
-  if(!rem.value||rem.value===`${prev}T09:00`) rem.value=input.value?`${input.value}T09:00`:'';
-  input.dataset.prev=input.value;
+function field(key,el){
+  const t=H().tasks.find(x=>x.id===st.editId); if(!t||!editable()) return;
+  let v=el.value; if(typeof v==='string'&&key!=='notes') v=v.trim();
+  if(key==='title'&&!v){ toast('Görev adı boş olamaz'); el.value=t.title; return; }
+  if(key==='status'){ document.getElementById('hzWaitRow').classList.toggle('hidden',v!=='waiting'); }
+  if(key==='status'){
+    const u=snap('tasks',[t.id]); const n=applyStatus(t,v,v==='waiting'?val('hzt_wait').trim():null);
+    if(n) u.push({kind:'tasks',id:n.id,before:null});
+    save(); refreshDetail(t); render();
+    if(v==='done') toastAct(`✓ Tamamlandı${n?` · sonraki tekrar ${shortDate(n.dueDate)}`:''}`,'Geri al',()=>{ undo(u); closeModal(); });
+    return;
+  }
+  if((t[key]||'')===v) return;
+  const before=clone(t);
+  t[key]=v;
+  if(key==='dueDate'&&(!t.reminderAt||t.reminderAt===`${before.dueDate}T09:00`)){ t.reminderAt=v?`${v}T09:00`:''; const r=document.getElementById('hzt_rem'); if(r) r.value=t.reminderAt; }
+  if(key==='dueDate'||key==='reminderAt'){ if((before.reminderAt||'')!==(t.reminderAt||'')) t.notifiedAt=null; }
+  if(key==='recur'){ if(v==='monthly') t.recurDay=(parseDay(t.dueDate)||new Date()).getDate(); if(v&&!t.dueDate){ t.dueDate=today(); const d=document.getElementById('hzt_due'); if(d) d.value=t.dueDate; } }
+  touch(t); logDiff(before,t); save(); refreshDetail(t); render();
 }
-function saveTask(){
-  if(!editable()) return false;
-  const title=val('hzt_title').trim();
-  if(!title){ toast('Görev adı gerekli'); document.getElementById('hzt_title').focus(); return false; }
-  const h=H(), existing=h.tasks.find(t=>t.id===st.editId);
-  const status=val('hzt_status'), reminderAt=val('hzt_rem')||'';
-  const task={
-    ...(existing||{}), id:existing?existing.id:uid('task'), title,
-    dueDate:val('hzt_due'), dueTime:val('hzt_time'), priority:val('hzt_pri'), project:val('hzt_proj').trim(),
-    owner:val('hzt_owner').trim(), reminderAt, status, notes:val('hzt_notes').trim(),
-    createdAt:existing?.createdAt||nowISO(),
-    completedAt:status==='done'?existing?.completedAt||nowISO():null,
-    notifiedAt:existing&&(existing.reminderAt||'')===reminderAt?existing.notifiedAt||null:null
-  };
-  if(!existing){ task.key||=''; task.sourceIds||=[]; }
-  touch(task);
-  if(existing) Object.assign(existing,task); else h.tasks.push(task);
-  save(); closeModal(); render(); toast(existing?'Görev güncellendi':'Görev eklendi');
-  return true;
+function refreshDetail(t){
+  const hist=document.getElementById('hzHist'); if(hist) hist.innerHTML=historyHTML(t);
+  const s=document.getElementById('hzDetailTitle'); if(s) s.innerHTML=statusTag(t.status);
+  const sum=document.querySelector('details.hz-det summary'); if(sum) sum.textContent=`Değişiklik geçmişi (${(t.history||[]).length})`;
+  updCkCount(t);
 }
+function historyHTML(t){
+  const list=[...(t.history||[])].reverse().slice(0,80);
+  return list.length?list.map(x=>`<div><b>${esc(x.by||'—')}</b> · ${esc(stamp(x.at))}<br>${esc(x.text)}</div>`).join(''):'<div>Henüz değişiklik yok.</div>';
+}
+function updCkCount(t){ const c=document.getElementById('hzCkCount'); const ck=t.checklist||[]; if(c) c.innerHTML=ck.length?`<span class="tag t-green nodot">${ck.filter(x=>x.done).length}/${ck.length}</span>`:''; }
+function checklistHTML(t){
+  const ed=editable(), ck=t.checklist||[];
+  return `${ck.map(c=>`<div class="hz-ck-row ${c.done?'done':''}" data-cid="${esc(c.id)}"><input type="checkbox" ${c.done?'checked':''} ${ed?'':'disabled'} aria-label="Tamamlandı" onchange="HZ.ck(this,'toggle')"><input type="text" value="${esc(c.text)}" ${ed?'':'disabled'} aria-label="Alt adım" onchange="HZ.ck(this,'text')">${ed?'<button title="Alt adımı sil" aria-label="Alt adımı sil" onclick="HZ.ck(this,\'del\')">✕</button>':''}</div>`).join('')}
+    ${ed?`<div class="hz-ck-row"><span style="width:17px;text-align:center;color:var(--faint)">＋</span><input type="text" id="hzCkNew" placeholder="Alt adım ekleyin ve Enter'a basın" onkeydown="if(event.key==='Enter'){event.preventDefault();HZ.ck(this,'add')}"></div>`:(ck.length?'':'<div class="muted">Alt adım yok.</div>')}`;
+}
+function ck(el,action){
+  const t=H().tasks.find(x=>x.id===st.editId); if(!t||!editable()) return;
+  t.checklist=t.checklist||[];
+  const row=el.closest('.hz-ck-row'), item=t.checklist.find(c=>c.id===row?.dataset.cid);
+  if(action==='add'){ const text=el.value.trim(); if(!text) return; t.checklist.push({id:uid('ck'),text,done:false}); log(t,`Alt adım eklendi: ${text}`); }
+  else if(!item) return;
+  else if(action==='toggle'){ item.done=el.checked; log(t,`Alt adım ${item.done?'tamamlandı':'yeniden açıldı'}: ${item.text}`); }
+  else if(action==='text'){ const text=el.value.trim(); if(!text||text===item.text){ el.value=item.text; return; } log(t,`Alt adım değişti: ${item.text} → ${text}`); item.text=text; }
+  else if(action==='del'){ t.checklist=t.checklist.filter(c=>c!==item); log(t,`Alt adım silindi: ${item.text}`); }
+  touch(t); save();
+  document.getElementById('hzCkBox').innerHTML=checklistHTML(t);
+  if(action==='add') document.getElementById('hzCkNew')?.focus();
+  refreshDetail(t); render();
+}
+function commentsHTML(t){
+  const ed=editable(), my=me().id, list=t.comments||[];
+  return `<div class="hz-comments">${list.map(c=>`<div class="hz-cm" data-cid="${esc(c.id)}"><div class="h"><b>${esc(c.by||'—')}</b>${esc(stamp(c.at))}${ed&&c.byId&&c.byId===my?'<button onclick="HZ.comment(this,\'del\')">Sil</button>':''}</div><p>${esc(c.text)}</p></div>`).join('')||'<div class="muted">Henüz yorum yok.</div>'}</div>
+    ${ed?`<textarea id="hzCmNew" rows="2" placeholder="Yorum veya ara not yazın… (Ctrl+Enter ile ekleyin)" onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();event.stopPropagation();HZ.comment(this,'add')}"></textarea><div style="display:flex;justify-content:flex-end;margin-top:6px"><button class="btn sm" onclick="HZ.comment(this,'add')">Yorum ekle</button></div>`:''}`;
+}
+function comment(el,action){
+  const t=H().tasks.find(x=>x.id===st.editId); if(!t||!editable()) return;
+  t.comments=t.comments||[];
+  if(action==='add'){ const text=val('hzCmNew').trim(); if(!text){ toast('Önce yorumu yazın'); return; } t.comments.push({id:uid('cm'),at:nowISO(),by:me().name,byId:me().id,text}); log(t,'Yorum eklendi'); }
+  else if(action==='del'){ const id=el.closest('.hz-cm').dataset.cid; if(!confirm('Yorum silinsin mi?')) return; t.comments=t.comments.filter(c=>c.id!==id); log(t,'Yorum silindi'); }
+  touch(t); save();
+  document.getElementById('hzCmBox').innerHTML=commentsHTML(t);
+  const box=document.querySelector('.hz-comments'); if(box) box.scrollTop=box.scrollHeight;
+  refreshDetail(t); render();
+}
+
+/* ---------- İlişkiler: üye, YK kararı, etkinlik (yalnızca kimlik saklanır) ---------- */
+const memberLabel=m=>`${m.ad}${uyeNo(m)!=null?` (No ${uyeNo(m)})`:''}`;
+const kararLabel=k=>`Karar ${k.no??'—'} · ${k.konu||''}${k.uyeAdi?` · ${k.uyeAdi}`:''}`.slice(0,90);
+function linksHTML(t){
+  const ed=editable();
+  const members=(t.memberIds||[]).map(id=>({id,m:member(id)}));
+  const kararlar=(t.kararIds||[]).map(id=>({id,k:(S.kararlar||[]).find(x=>x.id===id)}));
+  const chip=(cls,label,type,id,onOpen)=>`<span class="tag ${cls} nodot ${onOpen?'link':''}" data-id="${esc(id)}" ${onOpen?`onclick="${onOpen}"`:''}>${esc(label)}${ed?`<button title="İlişkiyi kaldır" aria-label="İlişkiyi kaldır" onclick="event.stopPropagation();HZ.unlink('${type}',this.dataset.id)" data-id="${esc(id)}">✕</button>`:''}</span>`;
+  return `<div class="hz-chips">${members.map(({id,m})=>chip('t-blue',m?`👤 ${m.ad}`:'👤 (silinmiş üye)','member',id,m?'HZ.openMember(this.dataset.id)':'')).join('')}
+      ${kararlar.map(({id,k})=>chip('t-violet',k?`⚖ Karar ${k.no??'—'}${k.konu?` · ${k.konu}`:''}`:'⚖ (silinmiş karar)','karar',id,'')).join('')}
+      ${t.event?chip('t-gold',`🎪 ${t.event}`,'event','',''):''}
+      ${!members.length&&!kararlar.length&&!t.event?'<span class="muted">Bu görev henüz bir üye, karar veya etkinlikle ilişkili değil.</span>':''}</div>
+    ${ed?`<input list="hzMemberOpts" placeholder="Üye bağla… (adını yazın)" aria-label="Üye bağla" onchange="HZ.link('member',this)" style="margin-bottom:6px">
+      <datalist id="hzMemberOpts">${[...S.members].sort(byName).map(m=>`<option value="${esc(memberLabel(m))}"></option>`).join('')}</datalist>
+      <select aria-label="YK kararı bağla" onchange="HZ.link('karar',this)" style="margin-bottom:6px"><option value="">YK kararı bağla…</option>${[...(S.kararlar||[])].sort((a,b)=>(b.no||0)-(a.no||0)).map(k=>`<option value="${esc(k.id)}">${esc(kararLabel(k))}</option>`).join('')}</select>
+      <input list="hzEventOpts" value="${esc(t.event||'')}" placeholder="Etkinlik (örn. Genel Kurul 2026)" aria-label="Etkinlik" onchange="HZ.link('event',this)">
+      <datalist id="hzEventOpts">${eventList().map(e=>`<option value="${esc(e)}"></option>`).join('')}</datalist>`:''}`;
+}
+function link(type,el){
+  const t=H().tasks.find(x=>x.id===st.editId); if(!t||!editable()) return;
+  const before=clone(t), v=el.value.trim();
+  if(type==='member'){
+    if(!v) return;
+    const m=S.members.find(x=>memberLabel(x)===v)||S.members.find(x=>trNorm(x.ad)===trNorm(v));
+    if(!m){ toast('Üye bulunamadı — listeden seçin'); return; }
+    t.memberIds=[...new Set([...(t.memberIds||[]),m.id])];
+  } else if(type==='karar'){ if(!v) return; t.kararIds=[...new Set([...(t.kararIds||[]),v])]; }
+  else if(type==='event'){ if((t.event||'')===v) return; t.event=v; }
+  touch(t); logDiff(before,t); save();
+  document.getElementById('hzLinkBox').innerHTML=linksHTML(t); refreshDetail(t); render();
+}
+function unlink(type,id){
+  const t=H().tasks.find(x=>x.id===st.editId); if(!t||!editable()) return;
+  const before=clone(t);
+  if(type==='member') t.memberIds=(t.memberIds||[]).filter(x=>x!==id);
+  else if(type==='karar') t.kararIds=(t.kararIds||[]).filter(x=>x!==id);
+  else t.event='';
+  touch(t); logDiff(before,t); save();
+  document.getElementById('hzLinkBox').innerHTML=linksHTML(t); refreshDetail(t); render();
+}
+// Üye kartı ve karar penceresinde gösterilen "İlgili görevler" bölümü.
+function relatedHTML(type,id){
+  if(!S||!id) return '';
+  const key=type==='member'?'memberIds':'kararIds';
+  const list=C.sortTasks(H().tasks.filter(t=>(t[key]||[]).includes(id)),'due');
+  const ed=editable();
+  const openSt=list.filter(t=>!isDone(t)).length;
+  return `<div class="hz-rel"><h3>📋 İlgili Görevler <span class="tag t-gray nodot">${openSt} açık · ${list.length} toplam</span>${ed?`<button class="btn sm" style="margin-left:auto" data-k="${key}" data-id="${esc(id)}" onclick="HZ.newTask({[this.dataset.k]:[this.dataset.id]})">+ Görev ekle</button>`:''}</h3>
+    ${list.length?`<div class="hz-linked">${list.slice(0,30).map(t=>`<button type="button" class="${isDone(t)?'done':''}" data-id="${esc(t.id)}" onclick="HZ.openTask(this.dataset.id)"><span>${isDone(t)?'✓':lateOf(t)?'⚠':'○'}</span><span class="t">${esc(t.title)}${t.dueDate?` · ${esc(humanDate(t.dueDate))}`:''}${t.owner?` · ${esc(t.owner)}`:''}</span>${statusTag(t.status)}</button>`).join('')}</div>`:'<div class="muted">Bu kayıtla ilişkili görev yok.</div>'}</div>`;
+}
+function relChip(type,id){
+  if(!S||!S.hafiza||!id) return '';
+  const key=type==='member'?'memberIds':'kararIds';
+  const n=(S.hafiza.tasks||[]).filter(t=>!isDone(t)&&(t[key]||[]).includes(id)).length;
+  return n?`<span class="tag t-blue nodot hz-relchip" title="İlgili açık görevler" data-t="${type}" data-id="${esc(id)}" onclick="event.stopPropagation();HZ.showRelated(this.dataset.t,this.dataset.id)">📋 ${n}</span>`:'';
+}
+function showRelated(type,id){
+  const k=type==='karar'?(S.kararlar||[]).find(x=>x.id===id):null;
+  modal(type==='karar'?`İlgili görevler · Karar ${esc(k?.no??'')}`:'İlgili görevler',relatedHTML(type,id).replace('class="hz-rel"','class="hz-rel" style="margin-top:0"'),'');
+}
+
+/* ---------- Silme, hatırlatma, mesaj ---------- */
 function delTask(){
   const h=H(), t=h.tasks.find(x=>x.id===st.editId); if(!t||!editable()) return;
   if(!confirm(`“${t.title}” görevi silinsin mi?`)) return;
-  h.tasks=h.tasks.filter(x=>x.id!==t.id); save(); closeModal(); render(); toast('Görev silindi');
+  const u=snap('tasks',[t.id]);
+  h.tasks=h.tasks.filter(x=>x.id!==t.id); st.sel.delete(t.id);
+  save(); closeModal(); render();
+  toastAct('🗑 Görev silindi','Geri al',()=>undo(u,'↺ Görev geri getirildi'));
 }
 function remindTomorrow(){
+  const t=H().tasks.find(x=>x.id===st.editId); if(!t) return;
   const d=new Date(); d.setDate(d.getDate()+1);
-  document.getElementById('hzt_rem').value=`${localISO(d)}T09:00`;
-  if(saveTask()) toast('Hatırlatma ertelendi — yarın 09:00’da bildirim gösterilecek');
+  const el=document.getElementById('hzt_rem'); el.value=`${localISO(d)}T09:00`; field('reminderAt',el);
+  toast('🔔 Hatırlatma yarın 09:00’a ayarlandı');
+}
+function reminderMsg(tip){ const id=st.editId; closeModal(); msj.tip=tip; msj.gorev=id; go('mesajlar'); }
+// Mesaj Şablonları sayfasına eklenen görev hatırlatma şablonları.
+function msgTemplates(id){
+  const t=id?H().tasks.find(x=>x.id===id):null;
+  const ad=t?.owner||'[Sorumlu]', is=t?`“${t.title}”`:'[Görev]';
+  const tarih=t?.dueDate?absDate(t.dueDate)+(t.dueTime?` ${t.dueTime}`:''):'[tarih]';
+  const late=t&&lateOf(t)?` (son tarih ${-dayDiff(t.dueDate)} gün önce geçti)`:'';
+  const ck=t?.checklist||[], open=ck.filter(c=>!c.done);
+  const adimlar=open.length?`\n\nKalan adımlar:\n${open.map(c=>`• ${c.text}`).join('\n')}`:'';
+  const durum=t?STATUS_LABEL[t.status]+(t.status==='waiting'&&t.waitingFor?` (beklenen: ${t.waitingFor})`:''):'[durum]';
+  const proje=t?.project?` (${t.project})`:'';
+  const dernek=S.ayarlar?.dernekAdi||'FOYDER Derneği';
+  return {
+    gorev_wp:{t:'Görev Hatırlatma · WhatsApp',m:`Merhaba ${ad},\n\n${is}${proje} görevinin son tarihi ${tarih}${late}. Şu anki durum: ${durum}.${adimlar}\n\nGüncel durumu paylaşabilir misin? Teşekkürler 🙏\n${dernek}`},
+    gorev_mail:{t:'Görev Hatırlatma · E-posta',m:`Konu: Hatırlatma — ${t?t.title:'[Görev]'}\n\nSayın ${ad},\n\n${is}${proje} görevinin son tarihi ${tarih}${late} olarak planlanmıştır. Görevin kayıtlarımızdaki durumu: ${durum}.${adimlar}\n\nGüncel durumu ve varsa ihtiyaç duyduğunuz desteği bu e-postaya yanıt olarak iletmenizi rica ederiz.\n\nSaygılarımızla,\n${dernek}`}
+  };
+}
+function taskOptions(cur){
+  const list=C.sortTasks(H().tasks.filter(t=>!isDone(t)),'due');
+  return list.slice(0,500).map(t=>`<option value="${esc(t.id)}" ${cur===t.id?'selected':''}>${esc(`${t.title.slice(0,70)}${t.owner?` — ${t.owner}`:''}${t.dueDate?` (${shortDate(t.dueDate)})`:''}`)}</option>`).join('');
 }
 
-/* ---------- Deşifre arşivi ---------- */
-function openViewer(id){
+/* ---------- Toplantı kaydı ---------- */
+const splitList=v=>String(v||'').split(/[,;\n]/).map(x=>x.trim()).filter(Boolean);
+function openMeeting(id){
   const h=H(), t=h.transcripts.find(x=>x.id===id); if(!t) return;
   st.viewerId=id;
-  const linked=h.tasks.filter(task=>sourcesOf(task).includes(id)), ed=editable();
-  modal(`${esc(t.title)} <span class="muted" style="font-weight:550">· ${esc(absDate(t.date))}</span>`,`
-  <div class="muted" style="margin-bottom:12px">${(t.wordCount||words(t.text)).toLocaleString('tr-TR')} kelime · ${linked.length} görev (${linked.filter(x=>x.status==='done').length} tamamlandı)</div>
-  <div class="hz-sublabel">Bu görüşmeden çıkan görevler</div>
-  <div class="hz-linked">${linked.length?linked.map(x=>`<button type="button" class="${x.status==='done'?'done':''}" data-id="${esc(x.id)}" onclick="HZ.openTask(this.dataset.id)"><span>${x.status==='done'?'✓':'○'}</span>${esc(x.title)}</button>`).join(''):'<div class="muted">Bu görüşmeye bağlı görev yok.</div>'}</div>
-  <div class="hz-sublabel">Deşifre metni</div>
-  <div class="hz-text">${esc(t.text)}</div>`,
-  `${ed?'<button class="btn danger" style="order:-1;margin-right:auto" onclick="HZ.delTranscript()">Deşifreyi sil</button>':''}<button class="btn" onclick="HZ.copyTranscript()">Metni kopyala</button>${ed?'<button class="btn primary" onclick="HZ.reanalyze()">✦ Yeniden analiz et</button>':''}`,true);
+  const {linked,done}=meetingStats(id,h.tasks), ed=editable(), dis=ed?'':'disabled';
+  const on=k=>ed?`onchange="HZ.meetField('${k}',this)"`:'';
+  modal(`≡ ${esc(t.title)}`,`
+  <div class="hz-row" style="margin:0 0 14px"><div style="flex:1;min-width:200px">${progHTML(done,linked.length,true)}</div><b>${done}/${linked.length} görev tamamlandı${linked.length?` · %${Math.round(done/linked.length*100)}`:''}</b></div>
+  <div class="hz-meet">
+    <div><label class="hz-sublabel" style="margin-top:0">Toplantı adı</label><input value="${esc(t.title)}" ${dis} ${on('title')}></div>
+    <div><label class="hz-sublabel" style="margin-top:0">Tarih</label><input type="date" value="${esc(t.date||'')}" ${dis} ${on('date')}></div>
+    <div><label class="hz-sublabel" style="margin-top:0">Katılımcılar <span class="muted" style="font-weight:500">(virgülle ayırın)</span></label><input value="${esc((t.participants||[]).join(', '))}" placeholder="Örn. Başkan, Genel Sekreter, Sayman" ${dis} ${on('participants')}></div>
+    <div><label class="hz-sublabel" style="margin-top:0">Konu / gündem</label><input value="${esc(t.topic||'')}" placeholder="Toplantının konusu" ${dis} ${on('topic')}></div>
+  </div>
+  <div class="hz-sublabel">Alınan kararlar <span class="muted" style="font-weight:500">(her satıra bir karar)</span></div>
+  <textarea rows="4" placeholder="Toplantıda alınan kararları yazın…" ${dis} ${on('decisions')}>${esc(t.decisions||'')}</textarea>
+  <div class="hz-sublabel">Özet ${ed?'<button class="btn sm" onclick="HZ.aiSummary()" title="Metin Ayarlar\'da seçili yapay zekâ sağlayıcısına gönderilir">✨ AI ile özet üret</button>':''}</div>
+  <div id="hzSumBox"><textarea rows="4" id="hzSummary" placeholder="Toplantının kısa özeti…" ${dis} ${on('summary')}>${esc(t.summary||'')}</textarea></div>
+  <div class="hz-sublabel">Bu toplantıdan çıkan görevler (${linked.length})</div>
+  <div class="hz-linked">${linked.length?C.sortTasks([...linked],'due').map(x=>`<button type="button" class="${isDone(x)?'done':''}" data-id="${esc(x.id)}" onclick="HZ.openTask(this.dataset.id)"><span>${isDone(x)?'✓':lateOf(x)?'⚠':'○'}</span><span class="t">${esc(x.title)}${x.owner?` · ${esc(x.owner)}`:''}${x.dueDate?` · ${esc(humanDate(x.dueDate))}`:''}</span>${statusTag(x.status)}</button>`).join(''):'<div class="muted">Bu toplantıya bağlı görev yok.</div>'}</div>
+  <details class="hz-det"><summary>Deşifre metni · ${(t.wordCount||words(t.text)).toLocaleString('tr-TR')} kelime</summary><div class="hz-text">${esc(t.text)}</div></details>`,
+  `${ed?'<button class="btn danger" style="order:-1;margin-right:auto" onclick="HZ.delMeeting()">🗑 Sil</button>':''}<button class="btn" onclick="HZ.copyMeeting()">Metni kopyala</button><button class="btn" onclick="HZ.printMeeting()">🖨 Tutanak PDF</button>${ed?'<button class="btn primary" onclick="HZ.reanalyze()">✦ Yeniden analiz et</button>':''}`,true);
+  const f=document.querySelector('#modalRoot .modal-f .btn'); if(f&&f.textContent==='Vazgeç') f.textContent='Kapat';
 }
-function delTranscript(){
+function meetField(k,el){
+  const t=H().transcripts.find(x=>x.id===st.viewerId); if(!t||!editable()) return;
+  let v=k==='participants'?splitList(el.value):k==='decisions'||k==='summary'?el.value.trim():el.value.trim();
+  if(k==='title'&&!v){ toast('Toplantı adı boş olamaz'); el.value=t.title; return; }
+  if(JSON.stringify(t[k]??'')===JSON.stringify(v)) return;
+  t[k]=v; touch(t); save(); render();
+  const h3=document.querySelector('#modalRoot .modal-h h3'); if(k==='title'&&h3) h3.textContent=`≡ ${v}`;
+}
+function delMeeting(){
   const h=H(), t=h.transcripts.find(x=>x.id===st.viewerId); if(!t||!editable()) return;
-  const linked=h.tasks.filter(task=>sourcesOf(task).includes(t.id)).length;
-  if(!confirm(`“${t.title}” deşifresi silinsin mi?\n\n${linked?`Bu görüşmeden çıkan ${linked} görev silinmez; yalnızca görüşme bağlantısı kaldırılır.`:'Bu görüşmeye bağlı görev yok.'}`)) return;
+  const linked=h.tasks.filter(task=>sourcesOf(task).includes(t.id));
+  if(!confirm(`“${t.title}” toplantı kaydı silinsin mi?\n\n${linked.length?`Bu toplantıdan çıkan ${linked.length} görev silinmez; yalnızca toplantı bağlantısı kaldırılır.`:'Bu toplantıya bağlı görev yok.'}`)) return;
+  const u=[...snap('transcripts',[t.id]),...snap('tasks',linked.map(x=>x.id))];
   h.transcripts=h.transcripts.filter(x=>x.id!==t.id);
-  for(const task of h.tasks){
-    const before=JSON.stringify([task.sourceIds,task.transcriptId]);
+  for(const task of linked){
     if(task.sourceIds) task.sourceIds=task.sourceIds.filter(id=>id!==t.id);
     if(task.transcriptId===t.id) task.transcriptId=task.sourceIds?.at(-1)||'';
-    if(JSON.stringify([task.sourceIds,task.transcriptId])!==before) touch(task);
+    touch(task);
   }
-  save(); closeModal(); render(); toast('Deşifre silindi');
+  save(); closeModal(); render();
+  toastAct('🗑 Toplantı kaydı silindi','Geri al',()=>undo(u,'↺ Toplantı geri getirildi'));
 }
-async function copyTranscript(){
-  const t=H().transcripts.find(x=>x.id===st.viewerId); if(!t) return;
-  try{ await navigator.clipboard.writeText(t.text); toast('📋 Metin panoya kopyalandı'); }catch(e){ toast('Kopyalanamadı — metni seçip kopyalayabilirsiniz'); }
-}
+function copyMeeting(){ const t=H().transcripts.find(x=>x.id===st.viewerId); if(t) copyText(t.text,'📋 Deşifre metni kopyalandı'); }
 function reanalyze(){
   const t=H().transcripts.find(x=>x.id===st.viewerId); if(!t||!editable()) return;
   closeModal();
-  st.draft={reId:t.id,title:t.title,date:t.date||localISO(),text:t.text,step:'source',cands:[],dup:null};
+  st.draft={reId:t.id,title:t.title,date:t.date||today(),text:t.text,participants:(t.participants||[]).join(', '),topic:t.topic||'',decisions:t.decisions||'',step:'source',cands:[],dup:null,ai:null};
   analyze();
 }
 
-/* ---------- Yeni deşifre ve önizleme ---------- */
+/* ---------- Yazdırma / PDF (panelin "Yazdır / PDF" yapısı) ---------- */
+function printDoc(html,title){
+  let el=document.getElementById('hzPrint');
+  if(!el){ el=document.createElement('div'); el.id='hzPrint'; document.body.appendChild(el); }
+  el.innerHTML=html;
+  const old=document.title; document.title=title;
+  document.body.classList.add('hz-printing');
+  const done=()=>{ document.body.classList.remove('hz-printing'); document.title=old; window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done);
+  setTimeout(()=>{ window.print(); setTimeout(done,1500); },60);
+}
+const printHead=(title,sub)=>`<div class="ph"><div><div class="org">${esc(S.ayarlar?.dernekAdi||'FOYDER Derneği')}</div><h1>${esc(title)}</h1>${sub?`<div class="muted">${esc(sub)}</div>`:''}</div><div class="dt">Düzenleme: ${esc(new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'}))}</div></div>`;
+const printFoot=()=>`<div class="pf"><span>FOYDER OS · Toplantılar ve Görevler</span><span>${esc(new Date().toLocaleString('tr-TR'))}</span></div>`;
+function printMeeting(){
+  const h=H(), t=h.transcripts.find(x=>x.id===st.viewerId); if(!t) return;
+  const {linked,done}=meetingStats(t.id,h.tasks);
+  const decisions=String(t.decisions||'').split('\n').map(x=>x.replace(/^\s*(?:[-•*]|\d+[.)])\s*/,'').trim()).filter(Boolean);
+  const rows=C.sortTasks([...linked],'due').map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.title)}</td><td>${esc(x.owner||'—')}</td><td>${x.dueDate?esc(absDate(x.dueDate)):'—'}</td><td>${esc(STATUS_LABEL[x.status])}</td></tr>`).join('');
+  printDoc(`${printHead('Toplantı Tutanağı',t.title)}
+    <table class="info"><tr><td>Toplantı</td><td>${esc(t.title)}</td></tr><tr><td>Tarih</td><td>${esc(absDate(t.date))}</td></tr>
+    <tr><td>Katılımcılar</td><td>${esc((t.participants||[]).join(', ')||'—')}</td></tr><tr><td>Konu / gündem</td><td>${esc(t.topic||'—')}</td></tr>
+    <tr><td>Görev durumu</td><td>${done}/${linked.length} görev tamamlandı</td></tr></table>
+    ${t.summary?`<h2>Özet</h2><p>${esc(t.summary).replace(/\n/g,'<br>')}</p>`:''}
+    <h2>Alınan Kararlar</h2>${decisions.length?`<ol>${decisions.map(d=>`<li>${esc(d)}</li>`).join('')}</ol>`:'<p class="muted">Kayıtlı karar yok.</p>'}
+    <h2>Görevler</h2>${rows?`<table><thead><tr><th>#</th><th>Görev</th><th>Sorumlu</th><th>Son tarih</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table>`:'<p class="muted">Bu toplantıdan çıkan görev yok.</p>'}
+    <div class="sig"><div>Hazırlayan</div><div>Onaylayan</div></div>${printFoot()}`,`Toplanti_Tutanagi_${t.date||''}`);
+}
+function printWeekly(){
+  const r=weeklyReport();
+  const tbl=list=>list.length?`<table><thead><tr><th>Görev</th><th>Sorumlu</th><th>Proje</th><th>Son tarih</th><th>Durum</th></tr></thead><tbody>${list.map(x=>`<tr><td>${esc(x.title)}${x.status==='waiting'&&x.waitingFor?`<br><span class="muted">Beklenen: ${esc(x.waitingFor)}</span>`:''}</td><td>${esc(x.owner||'—')}</td><td>${esc(x.project||'—')}</td><td>${x.dueDate?esc(absDate(x.dueDate)):'—'}</td><td>${esc(STATUS_LABEL[x.status])}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">Kayıt yok.</p>';
+  printDoc(`${printHead('Haftalık Görev Özeti',weeklyTitle().split(' — ')[1]||'')}
+    <h2>Tamamlananlar · ${esc(absDate(r.from))} – ${esc(absDate(r.today))} (${r.done.length})</h2>${tbl(r.done)}
+    <h2>Devam edenler (${r.active.length})</h2>${tbl(r.active)}
+    <h2>Gecikenler (${r.overdue.length})</h2>${tbl(r.overdue)}
+    <h2>Yapılacaklar · ${esc(absDate(r.today))} – ${esc(absDate(r.to))} (${r.next.length})</h2>${tbl(r.next)}${printFoot()}`,`Haftalik_Ozet_${today()}`);
+}
+function copyWeekly(){ copyText(C.weeklyText(weeklyReport(),{title:weeklyTitle(),fmtDate:shortDate}),'📋 Haftalık özet kopyalandı — WhatsApp veya e-postaya yapıştırabilirsiniz'); }
+
+/* ---------- Takvim dosyası ---------- */
+function exportICS(id){
+  const list=id?H().tasks.filter(t=>t.id===id&&t.dueDate):filtered({ignoreScope:true}).filter(t=>!isDone(t)&&t.dueDate);
+  if(!list.length){ toast(id?'Bu görevin son tarihi yok':'Aktarılacak tarihli açık görev yok — filtreleri kontrol edin'); return; }
+  dl(C.icsText(list,{name:`${S.ayarlar?.dernekAdi||'FOYDER'} Görevler`}),id?`gorev-${list[0].dueDate}.ics`:`foyder-gorevler-${today()}.ics`,'text/calendar;charset=utf-8');
+  toast(`📅 ${list.length} görev .ics dosyasına aktarıldı — dosyayı Google veya Outlook takvimine içe aktarabilirsiniz`);
+}
+
+/* ---------- Yeni toplantı ve önizleme ---------- */
 const stats=text=>{ const t=String(text||'').trim(); return `${words(t).toLocaleString('tr-TR')} kelime · ${t.length.toLocaleString('tr-TR')} karakter`; };
 function newDraft(){
   if(!editable()) return;
-  st.draft={reId:'',title:'',date:localISO(),text:'',step:'source',cands:[],dup:null};
-  go('gorevler'); setTimeout(()=>document.getElementById('hzTitle')?.focus(),50);
+  st.draft={reId:'',title:'',date:today(),text:'',participants:'',topic:'',decisions:'',step:'source',cands:[],dup:null,ai:null};
+  go('gorevler'); document.getElementById('hzTitle')?.focus();
 }
 function cancelDraft(){
   const d=st.draft;
-  if(d&&(d.step==='results'||d.text.trim())&&!confirm('Kaydedilmemiş deşifre çalışması kapatılsın mı?')) return;
+  if(d&&(d.step==='results'||d.text.trim())&&!confirm('Kaydedilmemiş toplantı çalışması kapatılsın mı?')) return;
   st.draft=null; render(); window.scrollTo(0,0);
 }
-function setDraft(k,v){
-  if(!st.draft) return; st.draft[k]=v;
-  if(k==='text'){ const s=document.getElementById('hzStats'); if(s) s.textContent=stats(v); }
-}
+function setDraft(k,v){ if(!st.draft) return; st.draft[k]=v; if(k==='text'){ const s=document.getElementById('hzStats'); if(s) s.textContent=stats(v); } }
 function loadFile(file){
   if(!file||!st.draft) return;
   if(file.size>5*1024*1024){ toast('Dosya çok büyük — en fazla 5 MB düz metin yüklenebilir'); return; }
@@ -2596,8 +3490,20 @@ function loadFile(file){
   rd.readAsText(file,'utf-8');
 }
 function drop(e){ if(e.dataTransfer?.files?.length){ e.preventDefault(); loadFile(e.dataTransfer.files[0]); } }
-
-// Aday için mevcut görev eşleşmesini ve varsayılan işlemi belirler.
+// Konuşmacı etiketlerinden ("Ad Soyad:" / "Ad Bey:") katılımcı önerisi.
+function guessParticipants(text){
+  const re=/^\s*([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s(?:Bey|Hanım|[A-ZÇĞİÖŞÜ][a-zçğıöşü]+))?)\s*:\s+\S/gm, seen=new Map();
+  let m; while((m=re.exec(text))) seen.set(m[1],(seen.get(m[1])||0)+1);
+  return [...seen.keys()].filter(n=>!/^(Not|Konu|Tarih|Gündem|Karar|Kararlar|Katılımcılar|Sonuç|Özet|Madde)$/i.test(n)).slice(0,20);
+}
+// Metindeki karar cümlelerinden öneri ("… karar verildi", "… kararlaştırıldı", "… onaylandı").
+function guessDecisions(text){
+  const out=[];
+  for(const s of String(text).replace(/\s+/g,' ').split(/(?<=[.!?])\s+/)){
+    if(/(karar(ı|i)? (alındı|verildi)|kararlaştırıldı|oy birliğiyle|onaylandı|uygun bulundu|kabul edildi)/i.test(s)&&s.length<300) out.push(s.replace(/^[^:]{0,40}:\s*/,'').trim());
+  }
+  return [...new Set(out)].slice(0,15).join('\n');
+}
 function computeMatch(c){
   const h=H(), reId=st.draft.reId;
   const manual=c.manualMatchId?h.tasks.find(t=>t.id===c.manualMatchId):null;
@@ -2607,14 +3513,14 @@ function computeMatch(c){
   c.decisionMatchId=c.matchId;
   if(manual||c.manualCleared) c.decision='update';
   else if(!match) c.decision='new';
-  // Bitmiş işi yeniden açma; yeniden analizde bu görüşmeden zaten çıkmış işi tekrarlama.
-  else c.decision=match.status==='done'||(reId&&sourcesOf(match).includes(reId))?'skip':'update';
+  // Bitmiş işi yeniden açma; yeniden analizde bu toplantıdan zaten çıkmış işi tekrarlama.
+  else c.decision=isDone(match)||(reId&&sourcesOf(match).includes(reId))?'skip':'update';
 }
 function matchLabel(c){
   const match=H().tasks.find(t=>t.id===c.matchId), reId=st.draft.reId;
   if(!match) return c.decision==='update'?'<div class="hz-new">Bağlanacak görevi yukarıdan seçin.</div>':'<div class="hz-new">Yeni görev</div>';
-  const done=match.status==='done', already=reId&&sourcesOf(match).includes(reId);
-  const heading=already?'Bu görüşmeden zaten çıkarılmış':done?'Tamamlanmış görev bulundu':'Mevcut görev bulundu';
+  const done=isDone(match), already=reId&&sourcesOf(match).includes(reId);
+  const heading=already?'Bu toplantıdan zaten çıkarılmış':done?'Tamamlanmış görev bulundu':'Mevcut görev bulundu';
   const dateNote=match.dueDate&&c.dueDate&&match.dueDate!==c.dueDate?` · <b>Tarih farklı:</b> kayıtlı ${esc(absDate(match.dueDate))} / yeni ${esc(absDate(c.dueDate))} (kayıtlı tarih değişmez)`:'';
   const outcome=c.decision==='skip'?(done?' — tamamlandığı için atlanacak.':' — atlanacak.'):c.decision==='update'?' — yeni not eklenecek.':' — yine de ayrı bir görev oluşturulacak.';
   return `<div class="hz-match ${done?'fin':''}"><b>${heading}:</b> ${esc(match.title)}${outcome}${dateNote}</div>`;
@@ -2622,63 +3528,58 @@ function matchLabel(c){
 function summaryHTML(){
   const d=st.draft, matched=d.cands.filter(c=>c.matchId).length;
   return `✦ <div><b>${d.cands.length} görev bulundu · ${matched} eşleşme</b><br>${d.dup
-    ?`Bu deşifre daha önce kaydedilmiş (“${esc(d.dup.title)}”). Tekrar kaydedilemez; eksik görevler için Deşifreler sekmesinden “Yeniden analiz et” kullanılabilir.`
-    :'Her başlığı ve eşleşmeyi kontrol edin. Tamamlanan görevler varsayılan olarak atlanır.'}</div>`;
+    ?`Bu deşifre daha önce kaydedilmiş (“${esc(d.dup.title)}”). Tekrar kaydedilemez; eksik görevler için Toplantılar sekmesinden “Yeniden analiz et” kullanılabilir.`
+    :'Her başlığı ve eşleşmeyi kontrol edin. Tamamlanan görevler varsayılan olarak atlanır. Hiçbir şey siz “Seçilenleri kaydet”e basmadan kaydedilmez.'}</div>`;
 }
 function updateSummary(){
-  const s=document.getElementById('hzSummary'); if(s) s.innerHTML=summaryHTML();
+  const s=document.getElementById('hzSummaryBox'); if(s) s.innerHTML=summaryHTML();
   const b=document.getElementById('hzSaveC'); if(b) b.disabled=!!st.draft.dup||!st.draft.cands.length;
 }
-// Satırı yeniden oluşturmadan günceller; yazarken odak kaybolmaz.
 function syncRow(row,c){
   row.querySelector('.hz-dec').value=c.decision;
-  const link=row.querySelector('.hz-cand-link');
-  link.classList.toggle('hidden',c.decision!=='update');
-  if(c.decision==='update'){
-    const sel=row.querySelector('.hz-target');
-    if(sel.options.length<=1) sel.insertAdjacentHTML('beforeend',targetOptions());
-    sel.value=c.matchId;
-  }
+  const lk=row.querySelector('.hz-cand-link');
+  lk.classList.toggle('hidden',c.decision!=='update');
+  if(c.decision==='update'){ const sel=row.querySelector('.hz-target'); if(sel.options.length<=1) sel.insertAdjacentHTML('beforeend',targetOptions()); sel.value=c.matchId; }
   row.querySelector('.hz-cand-st').innerHTML=matchLabel(c);
   row.classList.toggle('off',!c.selected);
 }
 function targetOptions(selected){
-  const sorted=[...H().tasks].sort((a,b)=>(a.status==='done')-(b.status==='done')||a.title.localeCompare(b.title,'tr'));
-  return sorted.map(t=>`<option value="${esc(t.id)}" ${t.id===selected?'selected':''}>${esc(t.title)}${t.status==='done'?' · tamamlandı':''}</option>`).join('');
+  const sorted=[...H().tasks].sort((a,b)=>isDone(a)-isDone(b)||a.title.localeCompare(b.title,'tr'));
+  return sorted.map(t=>`<option value="${esc(t.id)}" ${t.id===selected?'selected':''}>${esc(t.title.slice(0,110))}${isDone(t)?' · tamamlandı':''}</option>`).join('');
 }
 function grow(area){ area.style.height='auto'; area.style.height=`${area.scrollHeight+2}px`; }
 function candRow(c){
   const hasTasks=H().tasks.length>0;
-  return `<div class="hz-cand ${c.selected?'':'off'}" data-id="${esc(c.id)}">
+  return `<div class="hz-cand ${c.selected?'':'off'} ${c.fromAI?'ai':''}" data-id="${esc(c.id)}">
     <div class="hz-cand-top"><input type="checkbox" ${c.selected?'checked':''} aria-label="Görevi seç" onchange="HZ.cand(this,'selected',this.checked)">
       <textarea rows="1" aria-label="Görev adı" oninput="HZ.cand(this,'title',this.value)" onchange="HZ.cand(this,'rematch')" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">${esc(c.title)}</textarea>
       <button class="btn ghost sm" title="Önizlemeden kaldır" aria-label="Önizlemeden kaldır" onclick="HZ.cand(this,'remove')">✕</button></div>
     <div class="hz-cand-grid">
       <input list="hzProjects" value="${esc(c.project||'')}" placeholder="Proje" aria-label="Proje" onchange="HZ.cand(this,'project',this.value)">
-      <input value="${esc(c.owner||'')}" placeholder="Sorumlu" aria-label="Sorumlu" onchange="HZ.cand(this,'owner',this.value)">
+      <input list="hzOwnersD" value="${esc(c.owner||'')}" placeholder="Sorumlu" aria-label="Sorumlu" onchange="HZ.cand(this,'owner',this.value)">
       <input type="date" value="${esc(c.dueDate||'')}" aria-label="Son tarih" onchange="HZ.cand(this,'dueDate',this.value)">
-      <select aria-label="Öncelik" onchange="HZ.cand(this,'priority',this.value)">${[['high','Yüksek'],['medium','Normal'],['low','Düşük']].map(([v,l])=>`<option value="${v}" ${c.priority===v?'selected':''}>${l}</option>`).join('')}</select>
+      <select aria-label="Öncelik" onchange="HZ.cand(this,'priority',this.value)">${PRIORITIES.map(([v,l])=>`<option value="${v}" ${c.priority===v?'selected':''}>${l}</option>`).join('')}</select>
       <select class="hz-dec" aria-label="Eşleşme işlemi" onchange="HZ.cand(this,'decision',this.value)">${[['new','Yeni görev'],...(hasTasks?[['update','Mevcut görevi güncelle']]:[]),['skip','Atla']].map(([v,l])=>`<option value="${v}" ${c.decision===v?'selected':''}>${l}</option>`).join('')}</select>
     </div>
     <div class="hz-cand-link ${c.decision==='update'?'':'hidden'}"><span>Bağlanacak görev</span><select class="hz-target" aria-label="Mevcut görevi seç" onchange="HZ.cand(this,'target',this.value)"><option value="">Görev seçin…</option>${c.decision==='update'?targetOptions(c.matchId):''}</select></div>
     <div class="hz-cand-st">${matchLabel(c)}</div>
-    ${c.notes?`<div class="hz-ctx">${esc(c.notes.slice(0,260))}</div>`:''}
+    ${c.notes?`<div class="hz-ctx">${c.fromAI?'✨ Yapay zekâ önerisi · ':''}${esc(c.notes.slice(0,260))}</div>`:''}
   </div>`;
 }
-function cand(el,field,value){
+function cand(el,fieldName,value){
   const row=el.closest('.hz-cand'), d=st.draft; if(!d) return;
   const item=d.cands.find(x=>x.id===row.dataset.id); if(!item) return;
   const rematch=()=>{ computeMatch(item); syncRow(row,item); updateSummary(); };
-  if(field==='selected'){ item.selected=value; row.classList.toggle('off',!value); }
-  else if(field==='title'){ item.title=value.replace(/\s*\n\s*/g,' '); grow(el); }
-  else if(field==='rematch') rematch();
-  else if(field==='project'){ item.project=value.trim(); rematch(); }
-  else if(field==='owner') item.owner=value.trim();
-  else if(field==='dueDate'){ item.dueDate=value; syncRow(row,item); }
-  else if(field==='priority') item.priority=value;
-  else if(field==='decision'){ item.decision=value; syncRow(row,item); }
-  else if(field==='target'){ item.manualMatchId=value; item.manualCleared=!value; rematch(); }
-  else if(field==='remove'){ d.cands=d.cands.filter(x=>x!==item); row.remove(); updateSummary(); }
+  if(fieldName==='selected'){ item.selected=value; row.classList.toggle('off',!value); }
+  else if(fieldName==='title'){ item.title=value.replace(/\s*\n\s*/g,' '); grow(el); }
+  else if(fieldName==='rematch') rematch();
+  else if(fieldName==='project'){ item.project=value.trim(); rematch(); }
+  else if(fieldName==='owner') item.owner=value.trim();
+  else if(fieldName==='dueDate'){ item.dueDate=value; syncRow(row,item); }
+  else if(fieldName==='priority') item.priority=value;
+  else if(fieldName==='decision'){ item.decision=value; syncRow(row,item); }
+  else if(fieldName==='target'){ item.manualMatchId=value; item.manualCleared=!value; rematch(); }
+  else if(fieldName==='remove'){ d.cands=d.cands.filter(x=>x!==item); row.remove(); updateSummary(); }
 }
 function analyze(){
   const d=st.draft; if(!d) return;
@@ -2689,16 +3590,102 @@ function analyze(){
   const owner=prefs().owner.trim();
   d.cands=Engine.extract(text,d.date,{defaultOwner:owner,knownProjects:projectList()}).map(item=>({id:uid('candidate'),selected:true,...item}));
   if(!d.cands.length){
-    d.cands=[{id:uid('candidate'),selected:true,title:'Görüşme notlarını gözden geçir',notes:text.slice(0,520),source:'',dueDate:'',dueTime:'',priority:'medium',project:'Genel',owner,key:''}];
+    d.cands=[{id:uid('candidate'),selected:true,title:'Toplantı notlarını gözden geçir',notes:text.slice(0,520),source:'',dueDate:'',dueTime:'',priority:'medium',project:'Genel',owner,key:''}];
     toast('Açık bir eylem bulunamadı — gözden geçirme görevi önerildi');
   }
+  if(!d.participants.trim()) d.participants=guessParticipants(text).join(', ');
+  if(!d.decisions.trim()) d.decisions=guessDecisions(text);
   d.cands.forEach(computeMatch);
-  d.step='results';
+  d.step='results'; d.ai=null;
   if(route!=='gorevler') go('gorevler'); else { render(); window.scrollTo(0,0); }
   if(d.dup) toast('Bu deşifre zaten kayıtlı: '+d.dup.title);
 }
 function back(){ if(st.draft){ st.draft.step='source'; render(); } }
+
+/* ---------- Yapay zekâ (isteğe bağlı; yalnızca öneri verir) ---------- */
+const AI_FAIL='Yapay zekâya ulaşılamadı. Ayarlar → Yapay Zekâ bölümünden sağlayıcıyı ve anahtarı kontrol edin; sorun sürerse biraz sonra yeniden deneyin.';
+const validISO=v=>/^\d{4}-\d\d-\d\d$/.test(v||'')&&!!parseDay(v);
+async function aiCheck(){
+  const d=st.draft; if(!d||d.ai?.busy) return;
+  d.ai={busy:true}; renderAI();
+  const list=d.cands.map((c,i)=>`${i+1}. ${c.title} — son tarih: ${c.dueDate||'yok'} — sorumlu: ${c.owner||'yok'}`).join('\n');
+  const prompt=`Sen bir dernek sekreteryasında çalışan dikkatli bir toplantı asistanısın. Aşağıda bir toplantı deşifresi ve kural tabanlı bir sistemin bu metinden çıkardığı görev listesi var.
+Görevin:
+1) Listede OLMAYAN ama metinde açıkça geçen yapılacak işleri bul.
+2) Listedeki görevlerin son tarihlerinde metne göre yanlışlık varsa doğru tarihi öner. Toplantı tarihi ${d.date||today()}; "yarın", "haftaya cuma" gibi ifadeleri buna göre takvim tarihine çevir.
+Kurallar: Uydurma; yalnızca metinde dayanağı olanları yaz. Zaten listede olan işi tekrar önerme. Türkçe yaz.
+SADECE şu biçimde geçerli JSON döndür, başka hiçbir şey yazma:
+{"eksik":[{"baslik":"emir kipinde kısa görev adı","son_tarih":"YYYY-MM-DD veya boş","sorumlu":"metinde geçiyorsa ad","oncelik":"high|medium|low","dayanak":"metinden kısa alıntı"}],"tarih":[{"no":<listedeki sıra numarası>,"onerilen":"YYYY-MM-DD","dayanak":"metinden kısa alıntı"}]}
+
+Görev listesi:
+${list||'(boş)'}
+
+Deşifre:
+${d.text.slice(0,24000)}`;
+  try{
+    const res=parseAiJson(await aiCallText(prompt));
+    const missing=(Array.isArray(res.eksik)?res.eksik:[]).filter(x=>x&&typeof x.baslik==='string'&&x.baslik.trim()).slice(0,20)
+      .map(x=>({id:uid('ai'),title:x.baslik.trim().slice(0,200),dueDate:validISO(x.son_tarih)?x.son_tarih:'',owner:String(x.sorumlu||'').trim().slice(0,60),priority:['high','medium','low'].includes(x.oncelik)?x.oncelik:'medium',why:String(x.dayanak||'').slice(0,300)}));
+    const dates=(Array.isArray(res.tarih)?res.tarih:[]).filter(x=>x&&d.cands[Number(x.no)-1]&&validISO(x.onerilen)&&d.cands[Number(x.no)-1].dueDate!==x.onerilen).slice(0,30)
+      .map(x=>({id:uid('ai'),candId:d.cands[Number(x.no)-1].id,date:x.onerilen,why:String(x.dayanak||'').slice(0,300)}));
+    d.ai={missing,dates};
+  }catch(e){ console.error('AI kontrolü',e); d.ai={error:AI_FAIL}; }
+  renderAI();
+}
+function renderAI(){
+  const box=document.getElementById('hzAIBox'), d=st.draft; if(!box||!d) return;
+  const a=d.ai;
+  if(!a){ box.innerHTML=''; return; }
+  if(a.busy){ box.innerHTML='<div class="hz-ai"><h4><span class="hz-sync on saving" style="padding:0;background:none"><i></i></span> Yapay zekâ metni inceliyor…</h4><div class="muted">Bu işlem birkaç saniye sürebilir. Önerileri kabul etmeden hiçbir şey değişmez.</div></div>'; return; }
+  if(a.error){ box.innerHTML=`<div class="banner amber">⚠ ${esc(a.error)}</div>`; return; }
+  const items=[
+    ...a.missing.map(x=>`<div class="hz-ai-item ${x.applied?'applied':''}"><div><b>➕ ${esc(x.title)}</b>${x.dueDate?` · ${esc(absDate(x.dueDate))}`:''}${x.owner?` · ${esc(x.owner)}`:''}${x.why?`<small>“${esc(x.why)}”</small>`:''}</div>${x.applied?'<span class="tag t-green nodot">Eklendi</span>':`<button class="btn sm" onclick="HZ.aiApply('${x.id}')">Önizlemeye ekle</button>`}</div>`),
+    ...a.dates.map(x=>{ const c=d.cands.find(k=>k.id===x.candId); return c?`<div class="hz-ai-item ${x.applied?'applied':''}"><div><b>📅 ${esc(c.title)}</b><br>Tarih: ${esc(c.dueDate?absDate(c.dueDate):'yok')} → <b>${esc(absDate(x.date))}</b>${x.why?`<small>“${esc(x.why)}”</small>`:''}</div>${x.applied?'<span class="tag t-green nodot">Uygulandı</span>':`<button class="btn sm" onclick="HZ.aiApply('${x.id}')">Tarihi uygula</button>`}</div>`:''; })
+  ].join('');
+  box.innerHTML=`<div class="hz-ai"><h4>✨ Yapay zekâ önerileri <button class="btn sm ghost" style="margin-left:auto" onclick="HZ.aiClose()">✕ Kapat</button></h4>${items||'<div class="muted">Kaçırılmış görev veya yanlış tarih bulunmadı.</div>'}<div class="hz-note" style="margin-top:8px">Öneriler yalnızca önizlemeye eklenir; kaydetmek için yine “Seçilenleri kaydet”e basmanız gerekir.</div></div>`;
+}
+function aiApply(id){
+  const d=st.draft; if(!d||!d.ai) return;
+  const m=(d.ai.missing||[]).find(x=>x.id===id);
+  if(m&&!m.applied){
+    const c={id:uid('candidate'),selected:true,title:m.title,dueDate:m.dueDate,dueTime:'',owner:m.owner||prefs().owner,priority:m.priority,project:'Genel',notes:m.why?`Dayanak: ${m.why}`:'',source:m.why||'',key:'',fromAI:true};
+    computeMatch(c); d.cands.push(c); m.applied=true;
+    const host=document.getElementById('hzCands'); host.insertAdjacentHTML('beforeend',candRow(c)); grow(host.lastElementChild.querySelector('textarea'));
+  }
+  const dt=(d.ai.dates||[]).find(x=>x.id===id);
+  if(dt&&!dt.applied){
+    const c=d.cands.find(k=>k.id===dt.candId);
+    if(c){ c.dueDate=dt.date; dt.applied=true; const row=document.querySelector(`.hz-cand[data-id="${CSS.escape(c.id)}"]`); if(row){ row.querySelector('input[type=date]').value=c.dueDate; syncRow(row,c); } }
+  }
+  updateSummary(); renderAI();
+}
+function aiClose(){ if(st.draft){ st.draft.ai=null; renderAI(); } }
+async function aiSummary(){
+  const t=H().transcripts.find(x=>x.id===st.viewerId); if(!t||!editable()) return;
+  const box=document.getElementById('hzSumBox');
+  const prev=box.innerHTML;
+  box.innerHTML='<div class="hz-ai"><h4><span class="hz-sync on saving" style="padding:0;background:none"><i></i></span> Özet hazırlanıyor…</h4></div>';
+  const prompt=`Aşağıdaki toplantı deşifresini 5-6 cümlelik, kurumsal ve tarafsız bir Türkçe paragrafla özetle. Kim ne söyledi yerine ne konuşulduğuna, alınan kararlara ve sonraki adımlara odaklan. Metinde olmayan bilgi ekleme. Yalnızca özet metnini düz yazı olarak döndür.
+Toplantı: ${t.title} · Tarih: ${t.date||''}${t.topic?` · Konu: ${t.topic}`:''}
+
+Deşifre:
+${String(t.text).slice(0,24000)}`;
+  try{
+    const txt=String(await aiCallText(prompt)).trim();
+    if(!txt) throw new Error('boş yanıt');
+    box.innerHTML=`<div class="hz-ai"><h4>✨ Önerilen özet</h4><textarea id="hzSumNew" rows="6">${esc(txt)}</textarea>
+      <div class="actions" style="margin-top:8px;justify-content:flex-end"><button class="btn sm" onclick="HZ.openMeeting(HZ._viewerId())">Vazgeç</button><button class="btn sm primary" onclick="HZ.saveSummary()">Özeti kaydet</button></div>
+      <div class="hz-note">Özeti düzenleyebilirsiniz; “Özeti kaydet”e basmadan kaydedilmez.</div></div>`;
+  }catch(e){ console.error('AI özet',e); box.innerHTML=prev; toast('⚠ '+AI_FAIL); }
+}
+function saveSummary(){
+  const t=H().transcripts.find(x=>x.id===st.viewerId); if(!t) return;
+  t.summary=val('hzSumNew').trim(); touch(t); save(); toast('✓ Özet kaydedildi'); openMeeting(t.id); render();
+}
+
+/* ---------- Önizlemeyi kaydetme ---------- */
 function applyUpdate(existing,c,transcript){
+  const before=clone(existing);
   const header=`[${absDate(transcript.date)} · ${transcript.title}]`;
   const additions=[];
   if(!existing.dueDate&&c.dueDate){
@@ -2706,15 +3693,13 @@ function applyUpdate(existing,c,transcript){
     if(!existing.dueTime&&c.dueTime) existing.dueTime=c.dueTime;
     if(!existing.reminderAt){ existing.reminderAt=`${c.dueDate}T09:00`; existing.notifiedAt=null; }
   } else if(existing.dueDate&&c.dueDate&&existing.dueDate!==c.dueDate){
-    // Kayıtlı tarihi sessizce değiştirme; yeni tarihi nota yaz, karar kullanıcıda kalsın.
-    additions.push(`Bu görüşmede geçen tarih: ${absDate(c.dueDate)} (kayıtlı son tarih: ${absDate(existing.dueDate)}).`);
+    additions.push(`Bu toplantıda geçen tarih: ${absDate(c.dueDate)} (kayıtlı son tarih: ${absDate(existing.dueDate)}).`);
   }
   const isLegacyTitle=/^(TMA Ödemesi Takibi|E-posta CC Kuralı|Halkbank & Sponsor Stant Masaları|Katılımcı Sayısı ve E-mailing Kampanyası|İlk Tur Davetiyeler.*|İkinci Tur Davetiyeler|LinkedIn Reklam Bütçesi ve Dağıtımı|Raporlama)$/i.test(existing.title);
   if(isLegacyTitle) existing.title=c.title.trim();
   const known=Engine.fold(existing.notes), note=(c.notes||'').trim(), sentence=Engine.fold(c.source||note);
   if(note&&!(sentence&&known.includes(sentence))) additions.unshift(note);
   if(additions.length) existing.notes=[existing.notes,`${header} ${additions.join(' ')}`].filter(Boolean).join('\n\n');
-  // Öncelik yalnızca yükselir; sonraki bir not mevcut önceliği düşürmez.
   if(c.priority==='high') existing.priority='high';
   existing.priority||=c.priority||'medium';
   existing.project||=c.project;
@@ -2722,60 +3707,68 @@ function applyUpdate(existing,c,transcript){
   existing.key||=c.key||'';
   existing.sourceIds=[...new Set([...sourcesOf(existing),transcript.id])];
   existing.lastSeenAt=nowISO();
-  if(existing.status!=='done') existing.transcriptId=transcript.id;
-  touch(existing);
+  if(!isDone(existing)) existing.transcriptId=transcript.id;
+  touch(existing); logDiff(before,existing); log(existing,`“${transcript.title}” toplantısından güncellendi`);
 }
 function saveCands(){
   const d=st.draft; if(!d||!editable()) return;
-  if(d.dup){ toast('Deşifre zaten kayıtlı: '+d.dup.title); return; }
+  if(d.dup){ toast('Bu deşifre zaten kayıtlı: '+d.dup.title); return; }
   const h=H();
   const chosen=d.cands.filter(c=>c.selected);
   const active=chosen.filter(c=>c.title.trim()&&c.decision!=='skip');
   const skipped=chosen.length-active.length;
   if(!chosen.length){ toast('En az bir görev seçmelisiniz'); return; }
   if(active.some(c=>c.decision==='update'&&!h.tasks.some(t=>t.id===c.matchId))){ toast('Güncellenecek her aday için mevcut bir görev seçmelisiniz'); return; }
-  const text=d.text.trim(), date=d.date||localISO();
+  const text=d.text.trim(), date=d.date||today();
+  const meta={participants:splitList(d.participants),topic:d.topic.trim(),decisions:d.decisions.trim()};
   let transcript=d.reId?h.transcripts.find(t=>t.id===d.reId):null;
-  if(!transcript){
-    transcript=touch({id:uid('transcript'),title:d.title.trim()||`Görüşme — ${absDate(date)}`,date,text,wordCount:words(text),createdAt:nowISO()});
-    h.transcripts.push(transcript);
+  const u=[];
+  if(transcript){ u.push(...snap('transcripts',[transcript.id])); Object.assign(transcript,meta); touch(transcript); }
+  else {
+    transcript=touch({id:uid('transcript'),title:d.title.trim()||`Toplantı — ${absDate(date)}`,date,text,wordCount:words(text),createdAt:nowISO(),...meta,summary:''});
+    h.transcripts.push(transcript); u.push({kind:'transcripts',id:transcript.id,before:null});
   }
   let added=0, updated=0;
   for(const c of active){
     const existing=c.decision==='update'?h.tasks.find(t=>t.id===c.matchId):null;
-    if(existing){ applyUpdate(existing,c,transcript); updated++; continue; }
-    h.tasks.push(touch({id:uid('task'),title:c.title.trim(),notes:c.notes||'',dueDate:c.dueDate||'',dueTime:c.dueDate?c.dueTime||'':'',reminderAt:c.dueDate?`${c.dueDate}T09:00`:'',priority:c.priority||'medium',project:c.project||'Genel',owner:c.owner||'',key:c.key||'',status:'open',transcriptId:transcript.id,sourceIds:[transcript.id],createdAt:nowISO(),completedAt:null,notifiedAt:null}));
+    if(existing){ u.push(...snap('tasks',[existing.id])); applyUpdate(existing,c,transcript); updated++; continue; }
+    const t=touch({id:uid('task'),title:c.title.trim(),notes:c.notes||'',dueDate:c.dueDate||'',dueTime:c.dueDate?c.dueTime||'':'',reminderAt:c.dueDate?`${c.dueDate}T09:00`:'',priority:c.priority||'medium',project:c.project||'Genel',owner:c.owner||'',key:c.key||'',status:'todo',waitingFor:'',transcriptId:transcript.id,sourceIds:[transcript.id],createdAt:nowISO(),completedAt:null,notifiedAt:null,checklist:[],comments:[],
+      history:[{at:nowISO(),by:me().name,text:`“${transcript.title}” toplantısından oluşturuldu${c.fromAI?' (yapay zekâ önerisi)':''}`}]});
+    h.tasks.push(t); u.push({kind:'tasks',id:t.id,before:null});
     added++;
   }
   save();
-  st.draft=null; st.view='inbox'; st.filter='open'; st.project=''; render(); window.scrollTo(0,0);
-  toast(`✓ Deşifre işlendi: ${added} yeni görev, ${updated} güncelleme, ${skipped} aday atlandı`);
+  st.draft=null; st.tab='list'; st.f.scope='open'; st.sel.clear(); render(); window.scrollTo(0,0);
+  toastAct(`✓ Toplantı kaydedildi: ${added} yeni görev, ${updated} güncelleme, ${skipped} aday atlandı`,'Geri al',()=>undo(u,'↺ Toplantı kaydı geri alındı'));
 }
 function draftPage(){
   const d=st.draft, re=!!d.reId;
-  const head=`<div class="pagehead"><div><h2>${re?'Deşifreyi yeniden analiz et':'Yeni deşifre'}</h2><div class="sub">${re
-    ?'Bu görüşmeden daha önce çıkarılmış görevler atlanır; yalnızca eksik kalanları ekleyebilirsiniz.'
-    :'Konuşma metnini olduğu gibi yapıştırın ya da .txt dosyası yükleyin. Görevleri kaydetmeden önce gözden geçirebilirsiniz.'}</div></div>
+  const head=`<div class="pagehead"><div><h2>${re?'Toplantıyı yeniden analiz et':'Yeni toplantı kaydı'}</h2><div class="sub">${re
+    ?'Bu toplantıdan daha önce çıkarılmış görevler atlanır; yalnızca eksik kalanları ekleyebilirsiniz.'
+    :'Deşifreyi yapıştırın ya da .txt dosyası yükleyin. Görevleri kaydetmeden önce gözden geçirebilirsiniz.'}</div></div>
     <div class="actions"><button class="btn" onclick="HZ.cancelDraft()">← Listeye dön</button></div></div>`;
-  if(d.step==='source') return head+`<div class="card"><div class="card-b">
-    <div class="frm">
-      <div><label>Görüşme başlığı</label><input id="hzTitle" value="${esc(d.title)}" placeholder="Örn. Haftalık koordinasyon toplantısı" oninput="HZ.d('title',this.value)"></div>
-      <div><label>Görüşme tarihi</label><input id="hzDate" type="date" value="${esc(d.date)}" onchange="HZ.d('date',this.value)"></div>
+  const meta=`<div class="frm">
+      <div><label>Toplantı adı</label><input id="hzTitle" value="${esc(d.title)}" placeholder="Örn. Haftalık koordinasyon toplantısı" ${re?'disabled':''} oninput="HZ.d('title',this.value)"></div>
+      <div><label>Tarih</label><input id="hzDate" type="date" value="${esc(d.date)}" ${re?'disabled':''} onchange="HZ.d('date',this.value)"></div>
+      <div><label>Katılımcılar <span class="muted" style="font-weight:500">(virgülle ayırın)</span></label><input value="${esc(d.participants)}" placeholder="Örn. Başkan, Genel Sekreter" oninput="HZ.d('participants',this.value)"></div>
+      <div><label>Konu / gündem</label><input value="${esc(d.topic)}" placeholder="Toplantının konusu" oninput="HZ.d('topic',this.value)"></div>`;
+  if(d.step==='source') return head+`<div class="card"><div class="card-b">${meta}
       <div class="full"><label>Deşifre metni</label><textarea id="hzText" class="hz-textarea" placeholder="Ses kaydının yazıya çevrilmiş hâlini buraya yapıştırın…" oninput="HZ.d('text',this.value)" ondragover="if(event.dataTransfer&&[...event.dataTransfer.types].includes('Files'))event.preventDefault()" ondrop="HZ.drop(event)">${esc(d.text)}</textarea></div>
     </div>
     <div class="hz-row"><div><button class="btn sm" onclick="document.getElementById('hzFile').click()">📄 Dosyadan yükle (.txt)</button><input type="file" id="hzFile" accept=".txt,.md,.text,text/plain" hidden onchange="HZ.loadFile(this.files[0]);this.value=''"></div><span class="muted" id="hzStats">${stats(d.text)}</span></div>
-  </div><div class="hz-foot"><button class="btn" onclick="HZ.cancelDraft()">Vazgeç</button><button class="btn primary" onclick="HZ.analyze()">✦ Görevleri çıkar</button></div></div>`;
-  setTimeout(afterResults,0);
+  </div><div class="hz-foot"><button class="btn" onclick="HZ.cancelDraft()">Vazgeç</button><button class="btn primary" onclick="HZ.analyze()" title="Ctrl+Enter">✦ Görevleri çıkar</button></div></div>`;
+  setTimeout(()=>{ document.querySelectorAll('#hzCands .hz-cand textarea').forEach(grow); renderAI(); },0);
   return head+`<div class="card"><div class="card-b">
-    <div class="banner ${d.dup?'amber':'blue'}" id="hzSummary">${summaryHTML()}</div>
+    <div class="hz-sublabel" style="margin-top:0">Toplantı bilgileri</div>${meta}
+      <div class="full"><label>Alınan kararlar <span class="muted" style="font-weight:500">(her satıra bir karar${d.decisions?' · metinden önerildi, düzenleyebilirsiniz':''})</span></label><textarea rows="3" placeholder="Toplantıda alınan kararlar…" oninput="HZ.d('decisions',this.value)">${esc(d.decisions)}</textarea></div>
+    </div>
+    <div class="hz-row" style="margin:18px 0 10px"><div class="banner ${d.dup?'amber':'blue'}" id="hzSummaryBox" style="margin:0;flex:1;min-width:240px">${summaryHTML()}</div>
+      <button class="btn" onclick="HZ.aiCheck()" title="Metin Ayarlar'da seçili yapay zekâ sağlayıcısına gönderilir">✨ AI ile kontrol et</button></div>
+    <div id="hzAIBox"></div>
     <div id="hzCands">${d.cands.map(candRow).join('')}</div>
     <datalist id="hzProjects">${projectList().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
-  </div><div class="hz-foot">${re?'':'<button class="btn left" onclick="HZ.back()">← Metne dön</button>'}<button class="btn" onclick="HZ.cancelDraft()">Vazgeç</button><button class="btn primary" id="hzSaveC" ${d.dup||!d.cands.length?'disabled':''} onclick="HZ.saveCands()">Seçilenleri kaydet</button></div></div>`;
-}
-// Başlık kutularını içeriğe göre uzat (yükseklik ancak sayfaya eklendikten sonra ölçülebilir).
-function afterResults(){
-  if(!st.draft||st.draft.step!=='results') return;
-  document.querySelectorAll('#hzCands .hz-cand textarea').forEach(grow);
+    <datalist id="hzOwnersD">${ownerList().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
+  </div><div class="hz-foot">${re?'':'<button class="btn left" onclick="HZ.back()">← Metne dön</button>'}<button class="btn" onclick="HZ.cancelDraft()">Vazgeç</button><button class="btn primary" id="hzSaveC" ${d.dup||!d.cands.length?'disabled':''} onclick="HZ.saveCands()" title="Ctrl+Enter">Seçilenleri kaydet</button></div></div>`;
 }
 
 /* ---------- Hafıza yedeğini içe aktarma ---------- */
@@ -2783,7 +3776,7 @@ function importFile(file){
   if(!file||!editable()) return;
   const rd=new FileReader();
   rd.onload=()=>{
-    let d; try{ d=JSON.parse(String(rd.result||'').replace(/^﻿/,'')); }catch(e){ toast('⚠ Dosya okunamadı — geçerli bir JSON değil'); return; }
+    let d; try{ d=JSON.parse(String(rd.result||'').replace(/^﻿/,'')); }catch(e){ toast('⚠ Dosya okunamadı — geçerli bir yedek dosyası değil'); return; }
     const ok=x=>x&&Array.isArray(x.tasks)&&Array.isArray(x.transcripts);
     const src=ok(d)?d:(d&&ok(d.hafiza)?d.hafiza:null);
     if(!src){ toast('⚠ Bu dosya bir Hafıza yedeği değil (görev ve deşifre listesi bulunamadı)'); return; }
@@ -2792,18 +3785,20 @@ function importFile(file){
     const tIds=new Set(h.transcripts.map(x=>x.id)), kIds=new Set(h.tasks.map(x=>x.id));
     const newTr=[], newTasks=[]; let dup=0, bad=0;
     for(const x of src.transcripts){ if(!hasId(x)||typeof x.text!=='string'){ bad++; continue; } if(tIds.has(x.id)){ dup++; continue; } tIds.add(x.id); newTr.push(x); }
-    for(const x of src.tasks){ if(!hasId(x)||typeof x.title!=='string'||!x.title.trim()){ bad++; continue; } if(kIds.has(x.id)){ dup++; continue; } kIds.add(x.id); newTasks.push(x); }
+    for(const x of src.tasks){ if(!hasId(x)||typeof x.title!=='string'||!x.title.trim()){ bad++; continue; } if(kIds.has(x.id)){ dup++; continue; } kIds.add(x.id); newTasks.push(C.migrateTask(x)); }
     if(!newTr.length&&!newTasks.length){ toast(`Eklenecek yeni kayıt yok — ${dup} kayıt zaten panelde`); return; }
-    if(!confirm(`Hafıza yedeği içe aktarılsın mı?\n\n• ${newTasks.length} yeni görev ve ${newTr.length} yeni deşifre eklenecek.\n• Panelde zaten olan ${dup} kayıt atlanacak${bad?`, ${bad} okunamayan kayıt yok sayılacak`:''}.\n\nMevcut görevler, üye ve aidat kayıtları değiştirilmez.`)) return;
+    if(!confirm(`Hafıza yedeği içe aktarılsın mı?\n\n• ${newTasks.length} yeni görev ve ${newTr.length} yeni toplantı eklenecek.\n• Panelde zaten olan ${dup} kayıt atlanacak${bad?`, ${bad} okunamayan kayıt yok sayılacak`:''}.\n\nMevcut görevler, üye ve aidat kayıtları değiştirilmez.`)) return;
     h.transcripts.push(...newTr); h.tasks.push(...newTasks);
+    const u=[...newTr.map(x=>({kind:'transcripts',id:x.id,before:null})),...newTasks.map(x=>({kind:'tasks',id:x.id,before:null}))];
     save(); closeModal(); st.draft=null; render();
-    toast(`✓ İçe aktarıldı: ${newTasks.length} görev, ${newTr.length} deşifre${dup?` · ${dup} kayıt zaten vardı`:''}`);
+    toastAct(`✓ İçe aktarıldı: ${newTasks.length} görev, ${newTr.length} toplantı${dup?` · ${dup} kayıt zaten vardı`:''}`,'Geri al',()=>undo(u,'↺ İçe aktarma geri alındı'));
   };
   rd.onerror=()=>toast('Dosya okunamadı: '+file.name);
   rd.readAsText(file,'utf-8');
 }
 
-/* ---------- Ayarlar ve bildirimler ---------- */
+/* ---------- Ayarlar, bildirimler, kısayollar ---------- */
+const notifState=()=>!('Notification' in window)?'unsupported':Notification.permission;
 function settings(){
   const p=prefs(), n=notifState(), ed=editable();
   const nText={granted:'Açık — hatırlatmalar bu tarayıcıda bildirim olarak gösterilir.',denied:'Engellendi — tarayıcının site ayarlarından izin verebilirsiniz. Hatırlatmalar panel içinde gösterilir.',default:'Henüz izin verilmedi. Hatırlatmalar şimdilik panel içinde gösterilir.',unsupported:'Bu tarayıcı bildirimleri desteklemiyor. Hatırlatmalar panel içinde gösterilir.'}[n];
@@ -2833,32 +3828,89 @@ function show(msg){
 // Hangi görev için en son ne zaman bildirim gösterildiği bu tarayıcıda tutulur; ortak veriye yazılmaz.
 function checkReminders(){
   if(!S||!document.getElementById('nav').innerHTML) return;
-  if(st.day&&st.day!==localISO()) refresh();
+  ensureBase();
+  if(st.day&&st.day!==today()) refresh();
   const map=notified(), tasks=(S.hafiza&&Array.isArray(S.hafiza.tasks))?S.hafiza.tasks:[];
   const view=tasks.map(t=>{ const m=map[t.id]; return m&&m.r===(t.reminderAt||'')?{...t,notifiedAt:m.at}:t; });
   const due=Rem.due(view,new Date(),prefs().repeat);
   if(!due.length) return;
-  const stamp=nowISO();
+  const at=nowISO();
   for(const msg of Rem.messages(due)) show(msg);
   const ids=new Set(tasks.map(t=>t.id)), next={};
   for(const [id,v] of Object.entries(map)) if(ids.has(id)) next[id]=v;
-  for(const t of due) next[t.id]={at:stamp,r:t.reminderAt||''};
+  for(const t of due) next[t.id]={at,r:t.reminderAt||''};
   try{ localStorage.setItem(NOTIFIED_KEY,JSON.stringify(next)); }catch(e){}
 }
-setTimeout(checkReminders,4000);
+setTimeout(checkReminders,2500);
 setInterval(checkReminders,30000);
 
+const SHORTCUTS=[['N','Yeni görev'],['Shift + N','Yeni toplantı kaydı'],['/','Görevlerde ara'],['1 – 5','Liste, Pano, Takvim, Toplantılar, Haftalık Özet'],['Ctrl + Enter','Kaydet (yeni görev, toplantı önizlemesi, yorum)'],['Esc','Pencereyi kapat'],['?','Bu yardım penceresi']];
+function help(){ modal('⌨ Klavye kısayolları',`<div class="hz-kbd">${SHORTCUTS.map(([k,l])=>`<div>${k.split(' + ').map(x=>`<kbd>${esc(x)}</kbd>`).join(' + ')}</div><div>${esc(l)}</div>`).join('')}</div><p class="hz-note" style="margin-top:14px">Kısayollar Toplantılar ve Görevler sayfasında, bir metin kutusuna yazmıyorken çalışır.</p>`,''); }
+function focusSearch(){ const s=document.getElementById('hzSearch'); if(s){ s.focus(); s.select(); } }
+document.addEventListener('keydown',e=>{
+  if(typeof route==='undefined'||route!=='gorevler'||!S) return;
+  const tag=(e.target.tagName||'').toLowerCase(), typing=['input','textarea','select'].includes(tag)||e.target.isContentEditable;
+  const ctrl=e.ctrlKey||e.metaKey, mOpen=modalOpen();
+  if(ctrl&&(e.key==='Enter'||e.key.toLowerCase()==='s')){
+    if(mOpen&&document.getElementById('hzQuickForm')){ e.preventDefault(); createTask(); }
+    else if(mOpen&&document.getElementById('hzDetail')){ e.preventDefault(); if(document.activeElement&&document.activeElement.blur) document.activeElement.blur(); toast('✓ Değişiklikler kaydedildi'); }
+    else if(!mOpen&&st.draft){ e.preventDefault(); if(document.activeElement&&document.activeElement.blur) document.activeElement.blur(); st.draft.step==='source'?analyze():saveCands(); }
+    return;
+  }
+  if(e.key==='Escape'&&!mOpen&&st.draft&&!typing){ cancelDraft(); return; }
+  if(typing||ctrl||e.altKey||mOpen) return;
+  if(e.key==='?'){ e.preventDefault(); help(); return; }
+  if(st.draft) return;
+  if(e.key==='/'){ e.preventDefault(); focusSearch(); return; }
+  if(e.key==='n'||e.key==='N'){ e.preventDefault(); e.shiftKey?newDraft():newTask(); return; }
+  const i=Number(e.key); if(i>=1&&i<=TABS.length){ e.preventDefault(); setTab(TABS[i-1][0]); }
+});
+
+/* ---------- Dashboard kartı ---------- */
+function dashCard(){
+  if(!S) return '';
+  const tasks=(S.hafiza&&Array.isArray(S.hafiza.tasks))?S.hafiza.tasks:[], td=today();
+  const open=tasks.filter(t=>t.status!=='done');
+  const weekAgo=new Date(Date.now()-7*864e5).toISOString();
+  const n={today:open.filter(t=>t.dueDate===td).length,overdue:open.filter(t=>t.dueDate&&t.dueDate<td).length,done:tasks.filter(t=>t.status==='done'&&(t.completedAt||'')>=weekAgo).length};
+  return `<div class="card"><div class="card-h"><h3>📋 Görevler</h3><button class="btn ghost sm" onclick="go('gorevler')">Toplantılar ve Görevler →</button></div><div class="card-b"><div class="hz-dash">
+    <button onclick="HZ.quick('today')"><small>◷ Bugün</small><strong style="color:var(--amber)">${n.today}</strong></button>
+    <button onclick="HZ.quick('overdue')"><small>⚠ Geciken</small><strong style="color:${n.overdue?'var(--red)':'var(--text)'}">${n.overdue}</strong></button>
+    <button onclick="HZ.quick('done')"><small>✓ Bu hafta biten</small><strong style="color:var(--green)">${n.done}</strong></button>
+  </div>${!tasks.length?'<p class="muted" style="margin-top:10px">Henüz görev yok. Toplantı deşifresinden görev çıkarmak için bölüme gidin.</p>':''}</div></div>`;
+}
+
+/* ---------- Görünüm denetimleri ---------- */
+function setTab(v){ st.tab=v; st.draft=null; st.limit=PAGE; saveView(); if(route!=='gorevler') go('gorevler'); else render(); }
+function quick(kind){
+  st.draft=null; st.tab='list'; st.limit=PAGE; st.f={...defaultFilters()};
+  if(kind==='doing'){ st.f.scope='open'; st.f.status='doing'; } else st.f.scope=kind;
+  saveView(); if(route!=='gorevler') go('gorevler'); else { render(); window.scrollTo(0,0); }
+}
+let searchTimer=null;
 return {
   page,prepareOut,synced:(sent,merged)=>{ if(merged) synced(sent,merged); },
-  badge:()=>{ const today=localISO(); return ((S&&S.hafiza&&S.hafiza.tasks)||[]).filter(t=>t.status!=='done'&&t.dueDate&&t.dueDate<=today).length; },
-  view:(v,f)=>{ st.view=v; if(f) st.filter=f; if(st.draft) st.draft=null; if(route!=='gorevler') go('gorevler'); else render(); },
-  set:(k,v)=>{ st[k]=v; render(); },
-  search:v=>{ st.search=v; updateBody(); },
+  badge:()=>{ const td=today(); return ((S&&S.hafiza&&S.hafiza.tasks)||[]).filter(t=>t.status!=='done'&&t.dueDate&&t.dueDate<=td).length; },
+  dashCard,relatedHTML,relChip,showRelated,msgTemplates,taskOptions,
+  tab:setTab,quick,
+  setF:(k,v)=>{ st.f[k]=v; st.limit=PAGE; saveView(); render(); },
+  setSort:v=>{ st.sort=v; saveView(); render(); },
+  clearFilters:()=>{ st.f={...defaultFilters(),scope:st.f.scope}; st.limit=PAGE; saveView(); render(); },
+  search:v=>{ st.f.q=v; st.limit=PAGE; clearTimeout(searchTimer); searchTimer=setTimeout(updateBody,120); },
+  meetSearch:v=>{ st.meetQ=v; clearTimeout(searchTimer); searchTimer=setTimeout(updateBody,120); },
+  more:()=>{ st.limit+=PAGE; updateBody(); },
+  boardMore:s=>{ st.boardMore[s]=(st.boardMore[s]||0)+50; updateBody(); },
+  calMove:n=>{ if(!n){ const d=new Date(); st.cal={y:d.getFullYear(),m:d.getMonth()}; st.calDay=today(); } else { const d=new Date(st.cal.y,st.cal.m+n,1); st.cal={y:d.getFullYear(),m:d.getMonth()}; } updateBody(); },
+  calPick:d=>{ st.calDay=st.calDay===d?'':d; updateBody(); },
   d:setDraft,pref:setPref,
-  toggle,openTask,saveTask,delTask,remindTomorrow,syncRem,
-  openViewer,delTranscript,copyTranscript,reanalyze,
-  newDraft,cancelDraft,loadFile,drop,analyze,back,cand,saveCands,
-  importFile,settings,askNotify,checkReminders
+  select,selectAll,selectNone,bulk,complete,setStatus,confirmWaiting,
+  dragStart,dragOver,dropStatus,dropDay,
+  newTask,createTask,openTask,field,ck,comment,link,unlink,delTask,remindTomorrow,reminderMsg,
+  openMember:id=>openMember(id),
+  openMeeting,meetField,delMeeting,copyMeeting,reanalyze,printMeeting,printWeekly,copyWeekly,exportICS,
+  newDraft,cancelDraft,loadFile,drop,analyze,back,cand,saveCands,aiCheck,aiApply,aiClose,aiSummary,saveSummary,
+  importFile,settings,askNotify,checkReminders,help,
+  _editId:()=>st.editId,_viewerId:()=>st.viewerId
 };
 })();
 function pageGorevler(){ return HZ.page(); }
@@ -3019,11 +4071,11 @@ function pageAyarlar(){
     setTimeout(loadProfiles,60);
   }
   if(ayarTab==='rol'){
-    const R=[['admin','Yönetici','Tüm modüller + ayarlar'],['operasyon','Operasyon','Üye, başvuru, YK kararı; aidat salt-okunur'],['muhasebe','Muhasebe','Aidat & ödemeler; üye kayıtları salt-okunur'],['okuyucu','Okuyucu','Yalnızca görüntüleme ve raporlar']];
+    const R=[['admin','Yönetici','Tüm modüller + ayarlar'],['operasyon','Operasyon','Üye, başvuru, YK kararı, görevler; aidat salt-okunur'],['muhasebe','Muhasebe','Aidat & ödemeler, görevler; üye kayıtları salt-okunur'],['okuyucu','Okuyucu','Yalnızca görüntüleme ve raporlar']];
     body=`
     <p class="muted" style="margin-bottom:12px">Her kullanıcının rolü <b>🔐 Kullanıcı Onayları</b> sekmesinden, yalnızca yönetici tarafından atanır ve o kişinin görebileceği/düzenleyebileceği bölümleri belirler. Aşağıda rollerin yetki haritası yer alır.</p>
-    <div class="tbl-wrap"><table><thead><tr><th>Rol</th><th>Açıklama</th><th>Üye</th><th>Aidat</th><th>Başvuru</th><th>YK</th><th>Ayar</th></tr></thead><tbody>
-    ${R.map(([k,t,d])=>`<tr><td><b>${t}</b></td><td class="muted">${d}</td>${['uye','aidat','basvuru','karar','ayar'].map(p=>`<td>${PERM[k][p]?'✓':'—'}</td>`).join('')}</tr>`).join('')}
+    <div class="tbl-wrap"><table><thead><tr><th>Rol</th><th>Açıklama</th><th>Üye</th><th>Aidat</th><th>Başvuru</th><th>YK</th><th>Görev</th><th>Ayar</th></tr></thead><tbody>
+    ${R.map(([k,t,d])=>`<tr><td><b>${t}</b></td><td class="muted">${d}</td>${['uye','aidat','basvuru','karar','gorev','ayar'].map(p=>`<td>${PERM[k][p]?'✓':'—'}</td>`).join('')}</tr>`).join('')}
     </tbody></table></div>`;
   }
   return `
