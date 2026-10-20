@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+  <title>Hafıza</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">H</div>
+        <div><div class="brand-name">Hafıza</div><div class="brand-tag">Konuşmadan eyleme</div></div>
+      </div>
+
+      <button class="primary-button new-transcript" id="openTranscriptBtn">
+        <span class="plus">＋</span> Yeni deşifre
+      </button>
+
+      <nav class="nav" aria-label="Ana menü">
+        <button class="nav-item active" data-view="inbox"><span class="nav-icon">⌂</span><span>Görevler</span><b id="navInboxCount">0</b></button>
+        <button class="nav-item" data-view="today"><span class="nav-icon">◷</span><span>Bugün</span><b id="navTodayCount">0</b></button>
+        <button class="nav-item" data-view="upcoming"><span class="nav-icon">▦</span><span>Yaklaşan</span><b id="navUpcomingCount">0</b></button>
+        <button class="nav-item" data-view="completed"><span class="nav-icon">✓</span><span>Tamamlanan</span><b id="navCompletedCount">0</b></button>
+        <button class="nav-item" data-view="transcripts"><span class="nav-icon">≡</span><span>Deşifreler</span><b id="navTranscriptCount">0</b></button>
+      </nav>
+
+      <div class="sidebar-section">
+        <div class="section-label">PROJELER</div>
+        <div id="projectNav" class="project-nav"></div>
+      </div>
+
+      <div class="memory-card">
+        <div class="memory-status"><span class="pulse" id="savePulse"></span> <span id="saveStatus">Otomatik kaydediliyor</span></div>
+        <p id="saveDetail">Görevlerin bu bilgisayarda korunur.</p>
+        <button class="text-button" id="openSettingsBtn">Veri ve ayarlar →</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow" id="viewEyebrow">ÇALIŞMA ALANI</div>
+          <h1 id="viewTitle">Görevler</h1>
+        </div>
+        <div class="top-actions">
+          <label class="search-box"><span>⌕</span><input id="searchInput" type="search" placeholder="Görevlerde ara (Ctrl+F)" /></label>
+          <button class="icon-button" id="quickTaskBtn" title="Hızlı görev ekle (Ctrl+N)" aria-label="Hızlı görev ekle">＋</button>
+        </div>
+      </header>
+
+      <section id="dashboardView">
+        <div class="summary-strip">
+          <div class="summary-main">
+            <div class="summary-ring" id="progressRing"><span id="progressPercent">0%</span></div>
+            <div><div class="summary-label">BUGÜNÜN İLERLEMESİ</div><strong id="progressText">Henüz görev yok</strong><small id="progressSub">Yeni bir deşifre ekleyerek başlayın.</small></div>
+          </div>
+          <div class="metric"><span class="metric-dot amber"></span><div><small>Bugün</small><strong id="metricToday">0</strong></div></div>
+          <div class="metric"><span class="metric-dot red"></span><div><small>Geciken</small><strong id="metricOverdue">0</strong></div></div>
+          <div class="metric"><span class="metric-dot green"></span><div><small>Bu hafta bitti</small><strong id="metricDone">0</strong></div></div>
+        </div>
+
+        <div class="toolbar">
+          <div class="segmented" id="statusTabs">
+            <button class="active" data-filter="open">Açık</button>
+            <button data-filter="all">Tümü</button>
+            <button data-filter="high">Öncelikli</button>
+          </div>
+          <div class="toolbar-right">
+            <select id="projectFilter" aria-label="Proje filtresi"><option value="">Tüm projeler</option></select>
+            <select id="sortSelect" aria-label="Sıralama"><option value="due">Tarihe göre</option><option value="priority">Önceliğe göre</option><option value="created">Yeni eklenen</option></select>
+          </div>
+        </div>
+
+        <div class="task-list" id="taskList"></div>
+        <div class="empty-state hidden" id="emptyState">
+          <div class="empty-art"><span>✓</span></div>
+          <h2 id="emptyTitle">Her şey yolunda</h2>
+          <p id="emptyText">Bu görünümde görev bulunmuyor.</p>
+          <button class="secondary-button" id="emptyAction">Yeni deşifre ekle</button>
+        </div>
+      </section>
+
+      <section id="transcriptView" class="hidden">
+        <div class="transcript-grid" id="transcriptGrid"></div>
+        <div class="empty-state hidden" id="transcriptEmpty">
+          <div class="empty-art transcript-art"><span>≡</span></div>
+          <h2>İlk konuşmanı ekle</h2>
+          <p>Deşifreyi yapıştır; Hafıza eylemleri ayıklayıp görev listene eklesin.</p>
+          <button class="secondary-button" id="transcriptEmptyAction">Deşifre ekle</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop hidden" id="transcriptModal">
+    <section class="modal transcript-modal" role="dialog" aria-modal="true" aria-labelledby="transcriptModalTitle">
+      <header class="modal-header">
+        <div><div class="eyebrow" id="transcriptEyebrow">YENİ KAYIT</div><h2 id="transcriptModalTitle">Deşifreyi görevlere dönüştür</h2><p id="transcriptIntro">Konuşma metnini olduğu gibi yapıştır. Görevleri kaydetmeden önce gözden geçirebilirsin.</p></div>
+        <button class="close-button" data-close="transcriptModal" aria-label="Kapat">×</button>
+      </header>
+      <div class="modal-body transcript-body">
+        <div class="step source-step">
+          <div class="field-row">
+            <label>Görüşme başlığı<input id="transcriptTitle" placeholder="Örn. Önder Bey ile haftalık toplantı" /></label>
+            <label>Görüşme tarihi<input id="transcriptDate" type="date" /></label>
+          </div>
+          <label class="full-field">Deşifre metni<textarea id="transcriptText" placeholder="Ses kaydının yazıya çevrilmiş halini buraya yapıştır…"></textarea></label>
+          <div class="source-footer">
+            <div class="source-actions"><button class="text-button" id="loadFileBtn">Dosyadan yükle (.txt)</button><button class="text-button" id="loadSampleBtn">Örnek deşifreyi yükle</button><input type="file" id="transcriptFile" accept=".txt,.md,.text,text/plain" hidden /></div>
+            <span id="transcriptStats">0 kelime</span>
+          </div>
+        </div>
+        <div class="step results-step hidden" id="analysisResults">
+          <div class="analysis-summary"><div class="spark">✦</div><div><strong id="analysisCount">0 görev bulundu</strong><p id="analysisHelp">Başlıkları ve mevcut görev eşleşmelerini gözden geçir. Eşleşenler için nasıl ilerleyeceğini seçebilirsin.</p></div></div>
+          <div class="candidate-list" id="candidateList"></div>
+          <datalist id="candidateProjects"></datalist>
+        </div>
+      </div>
+      <footer class="modal-footer">
+        <button class="secondary-button" data-close="transcriptModal">Vazgeç</button>
+        <div class="footer-actions"><button class="secondary-button hidden" id="backToTextBtn">← Metne dön</button><button class="primary-button" id="analyzeBtn"><span>✦</span> Görevleri çıkar</button><button class="primary-button hidden" id="saveCandidatesBtn">Seçilenleri kaydet</button></div>
+      </footer>
+    </section>
+  </div>
+
+  <div class="modal-backdrop hidden" id="taskModal">
+    <section class="modal task-modal" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
+      <header class="modal-header compact"><div><div class="eyebrow">GÖREV</div><h2 id="taskModalTitle">Görev ekle</h2></div><button class="close-button" data-close="taskModal" aria-label="Kapat">×</button></header>
+      <div class="modal-body task-form">
+        <input type="hidden" id="taskId" />
+        <label class="full-field">Görev adı<input id="taskTitle" placeholder="Yapılacak işi yazın" /></label>
+        <div class="field-row three">
+          <label>Son tarih<input id="taskDueDate" type="date" /></label>
+          <label>Saat<input id="taskDueTime" type="time" /></label>
+          <label>Öncelik<select id="taskPriority"><option value="medium">Normal</option><option value="high">Yüksek</option><option value="low">Düşük</option></select></label>
+        </div>
+        <div class="field-row">
+          <label>Proje<input id="taskProject" list="projectOptions" placeholder="Örn. Büyük Zirve" /><datalist id="projectOptions"></datalist></label>
+          <label>Sorumlu<input id="taskOwner" placeholder="Örn. Atakan" /></label>
+        </div>
+        <div class="field-row">
+          <label>Hatırlat<input id="taskReminder" type="datetime-local" title="Hatırlatmalar uygulama açıkken veya sistem tepsisinde çalışırken gösterilir." /></label>
+          <label>Durum<select id="taskStatus"><option value="open">Açık</option><option value="done">Tamamlandı</option></select></label>
+        </div>
+        <label class="full-field">Notlar<textarea id="taskNotes" class="small-textarea" placeholder="Bağlam, takip notu veya iletişim bilgisi…"></textarea></label>
+        <div class="task-history hidden" id="taskHistory"></div>
+      </div>
+      <footer class="modal-footer"><button class="danger-text hidden" id="deleteTaskBtn">Görevi sil</button><div class="footer-actions"><button class="secondary-button hidden" id="remindTomorrowBtn">Yarın hatırlat</button><button class="secondary-button" data-close="taskModal">Vazgeç</button><button class="primary-button" id="saveTaskBtn">Kaydet</button></div></footer>
+    </section>
+  </div>
+
+  <div class="modal-backdrop hidden" id="settingsModal">
+    <section class="modal settings-modal" role="dialog" aria-modal="true">
+      <header class="modal-header compact"><div><div class="eyebrow">AYARLAR</div><h2>Veri ve hatırlatmalar</h2></div><button class="close-button" data-close="settingsModal" aria-label="Kapat">×</button></header>
+      <div class="modal-body settings-body">
+        <div class="setting-row"><div><strong>Kapatınca arka planda çalış</strong><p>Sağ üstteki çarpı uygulamayı küçültür; hatırlatmalar sürer.</p></div><label class="switch"><input id="settingTray" type="checkbox" /><span></span></label></div>
+        <div class="setting-row"><div><strong>Hatırlatma sesi</strong><p>Windows bildirimi gösterilirken ses çal.</p></div><label class="switch"><input id="settingSound" type="checkbox" /><span></span></label></div>
+        <div class="setting-row"><div><strong>Günlük hatırlatma</strong><p>Açık bir görev tamamlanana kadar her gün seçilen saatte hatırlat.</p></div><label class="switch"><input id="settingRepeat" type="checkbox" /><span></span></label></div>
+        <div class="setting-row" id="autostartRow"><div><strong>Windows açılışında başlat</strong><p id="autostartHelp">Bilgisayar açılınca Hafıza sistem tepsisinde başlar; hatırlatmalar kaçmaz.</p></div><label class="switch"><input id="settingAutostart" type="checkbox" /><span></span></label></div>
+        <div class="setting-row"><div><strong>Varsayılan sorumlu</strong><p>Deşifreden çıkarılan görevlere sorumlu olarak yazılır.</p></div><input id="settingOwner" class="setting-input" placeholder="Örn. Atakan" /></div>
+        <div class="data-location"><span>VERİ DOSYASI</span><code id="dataPath">Yükleniyor…</code><div class="backup-actions"><button class="secondary-button" id="openDataFolderBtn">Klasörde göster</button><button class="secondary-button" id="exportDataBtn">Yedek indir (JSON)</button><button class="secondary-button" id="importDataBtn">Yedekten geri yükle…</button></div><small>Her kayıtta önceki sürüm .bak dosyasında, her günün ilk hâli ise “yedekler” klasöründe (son 14 gün) tutulur.</small></div>
+      </div>
+      <footer class="modal-footer"><button class="danger-text" id="quitAppBtn">Uygulamayı tamamen kapat</button><span class="app-version" id="appVersion"></span><button class="primary-button" data-close="settingsModal">Bitti</button></footer>
+    </section>
+  </div>
+
+  <div class="modal-backdrop hidden" id="viewerModal">
+    <section class="modal viewer-modal" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
+      <header class="modal-header">
+        <div><div class="eyebrow" id="viewerDate">GÖRÜŞME</div><h2 id="viewerTitle">Deşifre</h2><p id="viewerStats"></p></div>
+        <button class="close-button" data-close="viewerModal" aria-label="Kapat">×</button>
+      </header>
+      <div class="modal-body viewer-body">
+        <div class="viewer-tasks"><strong>Bu görüşmeden çıkan görevler</strong><div id="viewerTasks"></div></div>
+        <div class="viewer-text" id="viewerText"></div>
+      </div>
+      <footer class="modal-footer">
+        <button class="danger-text" id="deleteTranscriptBtn">Deşifreyi sil</button>
+        <div class="footer-actions"><button class="secondary-button" id="copyTranscriptBtn">Metni kopyala</button><button class="secondary-button" id="reanalyzeBtn">Yeniden analiz et</button><button class="primary-button" data-close="viewerModal">Kapat</button></div>
+      </footer>
+    </section>
+  </div>
+
+  <div class="toast-stack" id="toastStack"></div>
+  <script src="task-engine.js"></script>
+  <script src="reminders.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+{
+  "name": "hafiza-desktop",
+  "version": "1.2.0",
+  "description": "Toplantı deşifrelerini kalıcı ve zamanlanabilir görevlere dönüştüren masaüstü uygulaması",
+  "main": "main.js",
+  "author": "Hafıza",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/engine.test.js test/store.test.js",
+    "test:e2e": "electron test/e2e.js",
+    "icons": "node tools/make-icons.js",
+    "build": "electron-builder --win portable --x64"
+  },
+  "devDependencies": {
+    "electron": "38.8.6",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.hafiza.desktop",
+    "productName": "Hafıza",
+    "artifactName": "Hafiza-Masaustu-${version}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "store.js",
+      "reminders.js",
+      "index.html",
+      "styles.css",
+      "renderer.js",
+      "task-engine.js",
+      "sample-transcript.txt",
+      "assets/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "Hafiza-Masaustu-${version}.${ext}"
+    }
+  }
+}
