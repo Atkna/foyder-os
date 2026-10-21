@@ -683,7 +683,7 @@ function bindEvents() {
   $('#backToTextBtn').addEventListener('click', () => showStep(false));
   $('#loadSampleBtn').addEventListener('click', async () => {
     $('#transcriptText').value = await window.hafiza.loadSample();
-    if (!$('#transcriptTitle').value.trim()) $('#transcriptTitle').value = 'Önder Bey ile haftalık toplantı';
+    if (!$('#transcriptTitle').value.trim()) $('#transcriptTitle').value = 'Örnek Derneği haftalık koordinasyon toplantısı';
     dirty.transcriptModal = true;
     updateWordCount(); toast('Örnek deşifre yüklendi');
   });
