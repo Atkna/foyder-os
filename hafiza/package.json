@@ -8,7 +8,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/engine.test.js test/store.test.js",
+    "test": "node --test test/engine.test.js test/store.test.js test/package.test.js",
     "test:e2e": "electron test/e2e.js",
     "icons": "node tools/make-icons.js",
     "build": "electron-builder --win portable --x64"

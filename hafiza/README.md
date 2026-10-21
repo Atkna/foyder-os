@@ -7,7 +7,7 @@ Toplantı deşifrelerini görevlere dönüştüren, çevrimdışı çalışan Wi
 ```bash
 npm install        # ilk seferde: Electron ve electron-builder iner
 npm start          # geliştirme modunda aç
-npm test           # motor, veri saklama ve hatırlatma birim testleri
+npm test           # motor, veri saklama ve hatırlatma birim testleri (yalnızca Node; Electron gerekmez)
 npm run test:e2e   # uygulamayı geçici veri klasörüyle açıp arayüzü uçtan uca dener
 npm run build      # dist/Hafiza-Masaustu-<sürüm>.exe (taşınabilir)
 ```
@@ -25,7 +25,7 @@ npm run build      # dist/Hafiza-Masaustu-<sürüm>.exe (taşınabilir)
 | `task-engine.js` | Metinden görev çıkarma, tarih/öncelik/proje tahmini, mevcut görevle eşleştirme |
 | `reminders.js` | Hangi görev için ne zaman bildirim gösterileceği |
 | `renderer.js`, `index.html`, `styles.css` | Arayüz |
-| `sample-transcript.txt` | Uygulamayla gelen örnek deşifre |
+| `sample-transcript.txt` | Uygulamayla gelen uydurma örnek deşifre (“Örnek deşifreyi yükle” düğmesi; birim ve uçtan uca testler de kullanır) |
 | `tools/make-icons.js` | Uygulama simgesini üretir (`npm run icons`) |
 | `test/` | Birim testleri, uçtan uca deneme, klavye kısayolu denemesi |
 
@@ -40,4 +40,7 @@ npm run build      # dist/Hafiza-Masaustu-<sürüm>.exe (taşınabilir)
 5. Aday, mevcut görevlerle karşılaştırılır: kayıtlı konu anahtarı, aynı cümlenin notlarda geçmesi
    veya yüksek sözcük benzerliği. Farklı özel ad ya da farklı sayı içeren başlıklar birleştirilmez.
 
-Örnek deşifre için `task-engine.js` içindeki `sampleRules` hazır başlıkları kullanılır.
+`sample-transcript.txt` uydurma bir dernek yönetim kurulu toplantısıdır (kişi ve kurum adları gerçek değildir);
+genel kurallarla işlenir ve 18 görev üretir. `test/engine.test.js` bu sayıyı, sorumluları ve tarihleri denetler;
+örnek metin değişirse test de güncellenmelidir. `task-engine.js` içindeki `sampleRules` yalnızca eski bir
+toplantı notunun birebir tekrar girilmesi hâlinde devreye giren hazır başlıklardır; yeni örnek bunlara dayanmaz.

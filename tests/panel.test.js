@@ -11,7 +11,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const block = html.match(/<script id="foyder-core">\n([\s\S]*?)<\/script>/);
 assert.ok(block, 'index.html içinde foyder-core bloğu bulunamadı');
 const ctx = {};
-vm.runInNewContext(block[1] + '\n;Object.assign(this,{trNorm,toISOdate,odenenTutari,isAidatTip,tipKey,normDurum,normUyeDurum,parseTutar,parseTarih,mergeValue,mergeById,mergeState});', ctx);
+vm.runInNewContext(block[1] + '\n;Object.assign(this,{trNorm,toISOdate,odenenTutari,isAidatTip,tipKey,normDurum,normUyeDurum,parseTutar,parseTarih,mergeValue,mergeById,mergeState,tutarYaziyla,uyeEslestir,adBenzer,gecmisEkle,gecmisBirlestir,alanFarki,GECMIS_SINIRI});', ctx);
 const C = ctx;
 const plain = v => JSON.parse(JSON.stringify(v));
 
@@ -127,4 +127,70 @@ test('panel güvenlik ayarları kaynakta yerinde', () => {
   assert.doesNotMatch(html, /supabase-js@2"/, 'sabitlenmemiş Supabase sürümü kalmamalı');
   assert.match(html, /function exportJson\(silent\)\{\n\s+dlBlob\(new Blob\(\[JSON\.stringify\(stripForCloud\(S\)/, 'JSON yedeği yapay zekâ anahtarı olmadan yazılmalı');
   assert.match(html, /if\(loaded==='error'\)\{ showLoadError\(\); return; \}/, 'okuma hatasında boş veri yazılmamalı');
+});
+
+test('tutar yazıyla (makbuz)', () => {
+  const cases = [[0, 'sıfır Türk Lirası'], [1, 'bir Türk Lirası'], [15, 'on beş Türk Lirası'], [100, 'yüz Türk Lirası'], [1000, 'bin Türk Lirası'],
+    [1500, 'bin beş yüz Türk Lirası'], [6500, 'altı bin beş yüz Türk Lirası'], [21000, 'yirmi bir bin Türk Lirası'], [101101, 'yüz bir bin yüz bir Türk Lirası'],
+    [1250000, 'bir milyon iki yüz elli bin Türk Lirası'], [3000.5, 'üç bin Türk Lirası elli Kuruş'], ['7000', 'yedi bin Türk Lirası']];
+  for (const [n, y] of cases) assert.equal(C.tutarYaziyla(n), y, String(n));
+});
+
+test('içe aktarmada eşleştirme: önce numara, sonra ad; belirsizlikte karar verilmez', () => {
+  const uyeler = [{ id: 'A', ad: 'Deneme Kişi', defterNo: 10 }, { id: 'B', ad: 'Aynı Ad', defterNo: 11 }, { id: 'C', ad: 'Aynı Ad', defterNo: 12 }, { id: 'D', ad: 'Numarasız Üye', defterNo: null }];
+  let r = C.uyeEslestir(uyeler, 'Aynı Ad', '12');
+  assert.equal(r.tip, 'no'); assert.equal(r.uye.id, 'C');
+  r = C.uyeEslestir(uyeler, 'Deneme  KİŞİ (yazım farkı)', '10.0');
+  assert.equal(r.tip, 'no', 'numara eşleşir, ad benzerse kabul'); assert.equal(r.uye.id, 'A');
+  r = C.uyeEslestir(uyeler, 'Bambaşka Biri', '10');
+  assert.equal(r.tip, 'belirsiz', 'numara başka bir ada aitse sorulur'); assert.deepEqual(plain(r.adaylar.map(x => x.id)), ['A']);
+  r = C.uyeEslestir(uyeler, 'Aynı Ad', '');
+  assert.equal(r.tip, 'belirsiz', 'aynı adla iki kayıt → sorulur'); assert.deepEqual(plain(r.adaylar.map(x => x.id).sort()), ['B', 'C']);
+  r = C.uyeEslestir(uyeler, 'numarasiz uye', '');
+  assert.equal(r.tip, 'ad'); assert.equal(r.uye.id, 'D');
+  r = C.uyeEslestir(uyeler, 'Numarasız Üye', '99');
+  assert.equal(r.tip, 'ad', 'numara bulunamazsa ada göre (üyenin numarası yoksa)');
+  r = C.uyeEslestir(uyeler, 'Deneme Kişi', '77');
+  assert.equal(r.tip, 'belirsiz', 'ad eşleşir ama numara farklıysa sorulur');
+  assert.equal(C.uyeEslestir(uyeler, 'Hiç Olmayan', '').tip, 'yok');
+  assert.equal(C.uyeEslestir(uyeler, 'Hiç Olmayan', '500').tip, 'yok');
+});
+
+test('kayıt geçmişi: sınır, alan farkı ve eşzamanlı birleştirme', () => {
+  const rec = {};
+  for (let i = 0; i < 50; i++) C.gecmisEkle(rec, { at: '2026-01-01T00:00:' + String(i).padStart(2, '0') + 'Z', by: 'K', text: 'g' + i }, 20);
+  assert.equal(rec.gecmis.length, 20); assert.equal(rec.gecmis[0].text, 'g30'); assert.equal(rec.gecmis.at(-1).text, 'g49');
+  const fark = C.alanFarki({ telefon: '', durum: 'AKTİF', notlar: 'gizli eski not' }, { telefon: '0500', durum: 'PASİF', notlar: 'gizli yeni not' }, { telefon: 'Telefon', durum: 'Durum', notlar: 'Notlar' }, (k, v) => v || '—');
+  assert.deepEqual(plain(fark), ['Telefon: — → 0500', 'Durum: AKTİF → PASİF', 'Notlar güncellendi'], 'not içeriği geçmişe yazılmaz');
+  // İki kullanıcı aynı üyeye farklı geçmiş girişi ekledi → ikisi de kalır
+  const g0 = [{ at: '2026-01-01T10:00:00Z', by: 'X', text: 'ilk' }];
+  const b = { members: [{ id: 'M1', ad: 'Deneme', gecmis: g0 }], payments: [] };
+  const l = plain(b), r = plain(b);
+  l.members[0].telefon = '1'; l.members[0].gecmis.push({ at: '2026-01-02T10:00:00Z', by: 'A', text: 'A değiştirdi' });
+  r.members[0].email = 'e'; r.members[0].gecmis.push({ at: '2026-01-02T09:00:00Z', by: 'B', text: 'B değiştirdi' });
+  const m = plain(C.mergeState(b, l, r)).members[0];
+  assert.deepEqual(plain(m.gecmis.map(x => x.text)), ['ilk', 'B değiştirdi', 'A değiştirdi']);
+  assert.equal(m.telefon, '1'); assert.equal(m.email, 'e');
+  // Yalnızca bir taraf geçmişi değiştirdiyse (ör. KVKK ile temizlendiyse) o hâli geçer
+  const l2 = plain(b); l2.members[0].gecmis = [{ at: '2026-02-01T00:00:00Z', by: 'A', text: 'temizlendi' }];
+  assert.deepEqual(plain(C.mergeState(b, l2, plain(b))).members[0].gecmis.map(x => x.text), ['temizlendi']);
+});
+
+test('KVKK ile anonimleştirilen kayıt eşzamanlı eski bilgilerle geri dolmaz', () => {
+  const b = { members: [{ id: 'M1', ad: 'Deneme Kişi', telefon: '0500', email: 'a@ornek.org', gorev: 'Mühendis', gecmis: [{ at: '1', text: 'Telefon: — → 0500' }] }], payments: [] };
+  const l = plain(b), r = plain(b);
+  l.members[0] = { id: 'M1', ad: 'Anonim Üye #1', telefon: '', email: '', gorev: '', anonim: true, durum: 'PASİF', gecmis: [{ at: '2', text: 'silindi' }] };
+  r.members[0].gorev = 'Yönetici'; r.members[0].gecmis.push({ at: '3', text: 'Meslek değişti' });
+  for (const m of [C.mergeState(b, l, r).members[0], C.mergeState(b, r, l).members[0]]) {
+    assert.equal(m.ad, 'Anonim Üye #1'); assert.equal(m.gorev, ''); assert.equal(m.anonim, true);
+    assert.ok(!JSON.stringify(m).includes('0500') && !JSON.stringify(m).includes('Yönetici'));
+  }
+});
+
+test('bu turdaki sadeleştirme ve sürüm sabitleme kaynakta yerinde', () => {
+  assert.match(html, /@e965\/xlsx@0\.20\.3\/dist\/xlsx\.full\.min\.js" integrity="sha384-EnyY0\/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP\+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"/, 'SheetJS 0.20.3 sabit ve bütünlük karmalı olmalı');
+  assert.doesNotMatch(html, /xlsx@0\.18|xlsx\/0\.18/, 'eski SheetJS sürümü kalmamalı');
+  assert.doesNotMatch(html, /HAS_STORE|window\.storage/, 'Vercel\'de çalışmayan depolama yolu kaldırılmalı');
+  assert.doesNotMatch(html, /Kaydolun|authMode|signUp\(/, 'girişte kayıt bağlantısı olmamalı');
+  assert.doesNotMatch(html, /rol:'admin'/, 'kullanılmayan ayarlar.rol alanı kaldırılmalı');
 });

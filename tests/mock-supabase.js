@@ -41,7 +41,7 @@
   }
   window.supabase={ createClient(){ return {
     from:q,
-    auth:{ async getSession(){ return {data:{session:{user:{id:'u-test',email:'deneme@ornek.org',user_metadata:{name:'Deneme Kullanıcı'}}}}}; }, async signOut(){} },
+    auth:{ async getSession(){ return {data:{session:{user:{id:window.__uid||'u-test',email:'deneme@ornek.org',user_metadata:{name:window.__uname||'Deneme Kullanıcı'}}}}}; }, async signOut(){} },
     channel(){ const c={on(){return c;},subscribe(){return c;}}; return c; }
   }; } };
 })();

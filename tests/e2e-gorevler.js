@@ -10,6 +10,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const OUT = process.env.E2E_OUT || path.join(require('os').tmpdir(), 'foyder-e2e');
 fs.mkdirSync(OUT, { recursive: true });
+const xlsxJs = require('./xlsx-yerel')();
 const mock = fs.readFileSync(path.join(__dirname, 'mock-supabase.js'), 'utf8');
 const sample = fs.readFileSync(path.join(__dirname, 'ornek-toplanti.txt'), 'utf8');
 const pad = n => String(n).padStart(2, '0');
@@ -45,7 +46,7 @@ function serve() {
       if (!file.startsWith(ROOT) || !fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
       res.writeHead(200, { 'content-type': file.endsWith('.html') ? 'text/html; charset=utf-8' : 'text/plain' });
       // Testte Supabase sahte dosyayla değiştirildiği için bütünlük karması kaldırılır (gerçek karma ayrı testte denetlenir).
-      if (file.endsWith('index.html')) res.end(fs.readFileSync(file, 'utf8').replace(/ integrity="sha384-[^"]+" crossorigin="anonymous"/, ''));
+      if (file.endsWith('index.html')) res.end(fs.readFileSync(file, 'utf8').replace(/(supabase\.js") integrity="sha384-[^"]+" crossorigin="anonymous"/, '$1'));
       else fs.createReadStream(file).pipe(res);
     });
     srv.listen(0, '127.0.0.1', () => resolve(srv));
@@ -56,6 +57,7 @@ async function newContext(browser, url, { seedRow = seed, role = 'admin', viewpo
   const ctx = await browser.newContext({ viewport, locale: 'tr-TR', isMobile: mobile, hasTouch: mobile, deviceScaleFactor: mobile ? 2 : 1, acceptDownloads: true });
   await ctx.grantPermissions(['notifications'], { origin: url });
   await ctx.route(/cdn\.jsdelivr\.net\/npm\/@supabase/, r => r.fulfill({ contentType: 'application/javascript', body: mock }));
+  await ctx.route(/cdn\.jsdelivr\.net\/npm\/@e965\/xlsx@0\.20\.3\//, r => r.fulfill({ contentType: 'application/javascript', headers: { 'access-control-allow-origin': '*' }, body: xlsxJs }));
   await ctx.route(/cdnjs\.cloudflare\.com/, r => r.fulfill({ contentType: r.request().url().endsWith('.css') ? 'text/css' : 'application/javascript', body: '' }));
   await ctx.route('https://api.anthropic.com/**', route => {
     const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };

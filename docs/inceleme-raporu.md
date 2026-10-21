@@ -1,7 +1,8 @@
 # FOYDER OS — İnceleme Raporu
 
 **Tarih:** 21 Ekim 2026  
-**Kapsam:** `index.html` (panelin tamamı) ve `hafiza/` (masaüstü uygulaması, yalnızca okundu)  
+**Kapsam:** `index.html` (panelin tamamı) ve `hafiza/` (masaüstü uygulaması)  
+**Güncelleme (ikinci tur):** Önemli geliştirmelerin tamamı (Ö10–Ö17) ve "İleride yapılabilir" listesinden seçilen 4, 9, 11 ve 12. maddeler yönetim kararlarına göre uygulandı.  
 **Yöntem:** Kod satır satır okundu. Panel tarayıcıda uydurma verilerle açıldı (300 üye, üç yıllık aidat, başvurular, kararlar), her sayfa ve ana düğmeler tek tek denendi. Bulunan her hata önce testle tekrarlandı, sonra düzeltildi.
 
 **İşaretler**
@@ -17,8 +18,8 @@
 | Grup | Madde | Uygulanan |
 |---|---|---|
 | Hemen düzeltilmeli | 19 | 18 ✅ + 1 ⚠️ (Supabase güvenlik kuralları sizin tarafınızda) |
-| Önemli geliştirme | 17 | 9 ✅ |
-| İleride yapılabilir | 12 | — |
+| Önemli geliştirme | 17 | 17 ✅ |
+| İleride yapılabilir | 12 | 4 ✅ (4'ün makbuz kısmı, 9, 11, 12) · diğerleri sunucu kurulumu gerektirdiği için bekliyor |
 
 En kritik iki bulgu:
 
@@ -188,14 +189,14 @@ Yeni kayıt istemiyorsanız ayrıca Supabase → Authentication → Sign In / Pr
 | Ö7 | Aidat tarifesinde "Sil" için onay | Tek tıkla tarife siliniyordu | Düşük | Küçük | ✅ |
 | Ö8 | Kod düzeni: ortak yardımcılar ayrı ve test edilebilir bir blokta (`foyder-core`); tek yapay zekâ işlevi; tek tahsilat hesabı; üç ayrı "aidat mı?" kontrolü teke indi | Aynı hata bir yerde düzeltilip başka yerde kalmasın | Düşük | Orta | ✅ |
 | Ö9 | Test altyapısı: `tests/panel.test.js` (birim) ve `tests/e2e-panel.js` (tarayıcı, 61 denetim) | Sonraki değişikliklerde bozulmayı hemen yakalar | — | Orta | ✅ |
-| Ö10 | Excel kütüphanesi (SheetJS 0.18.5) bilinen güvenlik açıkları içeriyor; özel hazırlanmış bir dosya okunduğunda sorun çıkarabilir. 0.20.x'e geçilmeli (cdn.sheetjs.com) | Yalnızca yönetici dosya yüklediği için olasılık düşük | Orta | Küçük | ⏳ Yeni adres canlıda denenmeden değiştirmedim |
-| Ö11 | Asistan sohbeti bütün kullanıcılar arasında ortak; herkes başkasının sorularını görüyor | Gizlilik ve karışıklık | Orta | Küçük | ⏳ Veri yapısı değişikliği gerektirir |
-| Ö12 | Varsayılan sağlayıcı "Claude (anahtarsız)" Vercel'de çalışmıyor; asistan sessizce yerel moda düşüyor | Kullanıcı yapay zekânın neden "basit" yanıt verdiğini anlamıyor | Düşük | Küçük | ⏳ Ayarlar'da bir anahtar girilmesi ya da ekranda açık bir not önerilir |
-| Ö13 | Üye "ücretsiz" yapılınca o yılın açık aidatı MUAF'a dönmüyor | Borç listesinde yanlış kişiler kalır | Orta | Küçük | ⏳ Aidat kaydını kendiliğinden değiştirmek istemedim; onaylı bir adım önerilir |
-| Ö14 | Dashboard'da "Bekleyen Aidat" pasif üyelerin borcunu sayıyor, "Ödemeyen Üye" saymıyor; "X ödeme alındı" kısmi ödemeleri saymıyor | Tanım farkı kafa karıştırır | Düşük | Küçük | ⏳ Hangi tanımın istendiğine sizin karar vermeniz gerekir |
-| Ö15 | Üye ve aidat tabloları telefonda yana kayıyor | Telefonda kullanım zor | Düşük | Orta | ⏳ Kart görünümü önerilir |
-| Ö16 | Üye ve aidatta "kim, ne zaman değiştirdi" geçmişi yok (görevlerde var) | Hatalı değişikliğin kaynağı bulunamıyor | Orta | Orta | ⏳ |
-| Ö17 | Sheets ve Excel eşleştirmesi yalnızca ada göre; aynı adlı iki üye ya da yazım farkı mükerrer kayıt üretir | Mükerrer üye ve aidat | Orta | Orta | ⏳ Üye/defter numarasıyla eşleştirme önerilir |
+| Ö10 | Excel kütüphanesi (SheetJS 0.18.5) bilinen güvenlik açıkları içeriyor; özel hazırlanmış bir dosya okunduğunda sorun çıkarabilir | Yalnızca yönetici dosya yüklediği için olasılık düşük | Orta | Küçük | ✅ 0.20.3'e geçildi, sürüm sabit ve bütünlük karmalı. Not: SheetJS'in kendi sunucusu (cdn.sheetjs.com) bu çalışma ortamından erişilemediği için dosya, aynı sürümün npm'deki birebir yansısından (`@e965/xlsx@0.20.3`, jsDelivr üzerinden) yükleniyor; dosya başlığı, sürüm numarası ve lisans denetlendi. İçe ve dışa aktarma tarayıcıda gerçek dosyayla ve karma doğrulamasıyla denendi |
+| Ö11 | Asistan sohbeti bütün kullanıcılar arasında ortak; herkes başkasının sorularını görüyor | Gizlilik ve karışıklık | Orta | Küçük | ✅ Sohbet artık kişiye özel. Eski ortak sohbet kaybolmadan taşındı; yöneticide "Eski ortak sohbet" olarak görünüyor. Yalnızca okuma yetkili kullanıcının sohbeti kendi tarayıcısında tutuluyor. Not: Sohbetler diğer verilerle aynı bulut satırında durduğu için ayrım ekran düzeyindedir; JSON yedeğinde herkesin sohbeti bulunur. Tam ayrım için verilerin ayrı tablolara taşınması gerekir (İleride 1) |
+| Ö12 | Varsayılan sağlayıcı "Claude (anahtarsız)" Vercel'de çalışmıyor; asistan sessizce yerel moda düşüyor | Kullanıcı yapay zekânın neden "basit" yanıt verdiğini anlamıyor | Düşük | Küçük | ✅ Asistanın üstünde "Yapay zekâ bağlı değil, basit modda yanıtlanıyor" notu; Ayarlar'da ve asistanda hangi sağlayıcının denendiğini ve çalışmama nedenini gösteren "Bağlantıyı test et" düğmesi; basit modda verilen yanıtlar işaretli |
+| Ö13 | Üye "ücretsiz" yapılınca o yılın açık aidatı MUAF'a dönmüyor | Borç listesinde yanlış kişiler kalır | Orta | Küçük | ✅ Kayıtta "Bu yılın açık aidatı Muaf yapılsın mı?" diye soruluyor; "Hayır" denirse hiçbir şey değişmiyor, "Evet" denirse değişiklik geçmişe yazılıyor |
+| Ö14 | Dashboard'da "Bekleyen Aidat" pasif üyelerin borcunu sayıyor, "Ödemeyen Üye" saymıyor; "X ödeme alındı" kısmi ödemeleri saymıyor | Tanım farkı kafa karıştırır | Düşük | Küçük | ✅ "Bekleyen Aidat" ve "Ödemeyen Üye" yalnızca aktif üyeleri sayıyor; "ödeme alındı" kısmileri de sayıyor. Her kartın (ve Aidat sayfasındaki kartların) üzerine gelince ya da telefonda ⓘ'ye dokununca ne saydığı yazıyor |
+| Ö15 | Üye ve aidat tabloları telefonda yana kayıyor | Telefonda kullanım zor | Düşük | Orta | ✅ Telefonda üye listesi, aidat listesi ve üye kartındaki ödeme geçmişi kart görünümüne dönüyor |
+| Ö16 | Üye ve aidatta "kim, ne zaman değiştirdi" geçmişi yok (görevlerde var) | Hatalı değişikliğin kaynağı bulunamıyor | Orta | Orta | ✅ Elle düzenleme, hızlı "Ödendi", asistan, yıl borcu, başvuru onayı, Sheets/Excel aktarımı ve mükerrer birleştirme geçmişe yazıyor. Üye ve ödeme pencerelerinde görünüyor. Sınır: üye başına 30, ödeme başına 20 kayıt (en eskiler düşer). Not içerikleri geçmişe yazılmıyor, yalnızca "güncellendi" deniyor. Eşzamanlı kayıtta iki kişinin geçmiş girişleri birleşiyor. Geçmiş tarayıcıda tutulur; sunucu tarafı denetim kaydının yerini tutmaz |
+| Ö17 | Sheets ve Excel eşleştirmesi yalnızca ada göre; aynı adlı iki üye ya da yazım farkı mükerrer kayıt üretir | Mükerrer üye ve aidat | Orta | Orta | ✅ Önce "Defter No / Üye No" sütunu, yoksa ad. Aynı adlı birden çok kayıt, numara–ad uyuşmazlığı ya da dosyada numarasız aynı adlı iki satır varsa otomatik birleştirme yapılmıyor; kullanıcı listeden üyeyi, "Yeni üye olarak ekle"yi ya da "Atla"yı seçiyor. Seçim istenirse aynı sayfa için hatırlanıyor (Ayarlar → Entegrasyonlar'dan unutulabilir). Panelin Excel ve Sheets çıktılarına "Defter No" sütunu eklendi. "Mükerrer Üyeleri Birleştir" farklı defter numaralı aynı adlı kayıtları artık birleştirmiyor |
 
 ---
 
@@ -205,21 +206,28 @@ Yeni kayıt istemiyorsanız ayrıca Supabase → Authentication → Sign In / Pr
 2. **Sunucu tarafında denetim kaydı:** Kim neyi değiştirdi, Supabase'te tutulsun. *Emek: Orta.*
 3. **Otomatik günlük bulut yedeği** (Supabase zamanlanmış görevi ya da Storage). *Emek: Küçük–Orta.*
 4. **Banka ekstresi içe aktarma** ve ödemeleri otomatik eşleştirme; ödeme makbuzu (PDF). *Emek: Orta–Büyük.*
+   - ✅ **Ödeme makbuzu uygulandı:** Ödenmiş ya da kısmen ödenmiş aidatın yanında "🧾 Makbuz" düğmesi (Aidat sayfası, üye kartı, ödeme penceresi). Dernek adı, makbuz no (her ödeme için sabit), üye, defter no, dönem, tutar ve yazıyla tutar, ödeme tarihi, imza alanları ve "resmî Alındı Belgesi'nin yerine geçmez" notu bulunan A4 sayfa; tarayıcının "PDF olarak kaydet" seçeneğiyle iniyor.
+   - ⏳ Banka ekstresi içe aktarma: Karar gereği şimdilik yapılmadı.
 5. **Toplu WhatsApp/e-posta gönderimi:** Bugün mesaj metni üretiliyor ama gönderilmiyor. *Emek: Orta.*
 6. **Genel kurul modülü** (hazirun listesi, vekâlet, yeter sayı) ve **etkinlik modülü** (görevlerdeki "etkinlik" alanı buna bağlanabilir). *Emek: Büyük.*
 7. **Üye portalı:** Üyenin kendi aidat durumunu görmesi. *Emek: Büyük.*
 8. **Evrak ekleri** (başvuru belgeleri) için Supabase Storage. Bugün yalnızca onay kutusu var. *Emek: Orta.*
-9. **KVKK:** Aydınlatma metni, saklama süresi, silme talebi akışı. Panelde üye silme işlemi yok (yalnızca pasife alma). *Emek: Orta.*
+9. **KVKK:** Aydınlatma metni, saklama süresi, silme talebi akışı. *Emek: Orta.*
+   - ✅ **"Kişisel verileri sil (KVKK)" uygulandı:** Üye kartında, iki aşamalı onayla (açıklamalı onay, ardından "SİL" yazma). İşlemden önce bütün verilerin yedeği kendiliğinden iner. Ad, e-posta, telefon, meslek, doğum yılı, notlar ve değişiklik geçmişi silinir; kayıt "Anonim Üye #defter no" adıyla pasife alınır. Aidat kayıtları istatistik için kalır. Aynı kişinin onaylanmış başvurusundaki kişisel bilgiler de silinir. YK kararları yasal kayıt olduğu için değiştirilmez (onay penceresinde kaç kararda adının geçtiği yazar). Başka bir kullanıcının aynı anda yaptığı kayıt, silinen bilgileri geri getiremez.
+   - ⚠️ İşlem öncesi inen yedek dosyası silinen kişinin bilgilerini içerir; kontrol ettikten sonra bu dosyayı silin. Görev ve sohbet metinlerinde adı geçiyorsa elle temizlenmelidir.
+   - ⏳ Aydınlatma metni ve saklama süresi kuralları: Hukuki metin gerektirdiği için yapılmadı.
 10. **Panel kapalıyken de görev bildirimi** (service worker ya da e-posta). *Emek: Orta.*
-11. **Kaldırılabilecek ya da sadeleştirilebilecek kod** (hiçbiri kaldırılmadı):
+11. ✅ **Kaldırılabilecek ya da sadeleştirilebilecek kod** (üçü de kaldırıldı):
     - `window.storage` ile yerel kayıt yolu (`HAS_STORE`): Claude içinde çalışan eski sürümden kalma, Vercel'de hiç çalışmıyor.
     - `ayarlar.rol` alanı: Kullanılmıyor; rol `profiles` tablosundan geliyor.
-    - Giriş ekranındaki "Kaydolun" bağlantısı: Kayıt kapalıysa kafa karıştırıyor (bkz. H3).
-12. **Hafıza masaüstü uygulaması** (`hafiza/`, değiştirilmedi):
+    - Giriş ekranındaki "Kaydolun" bağlantısı: Kayıt kapalıysa kafa karıştırıyor (bkz. H3). Artık yeni kullanıcıyı yalnızca yönetici ekliyor (Supabase → Authentication → Users → Add user); giriş ekranında "Hesabınız yok mu? Panel yöneticisinden isteyin" yazıyor.
+    - Eski verideki `ayarlar.rol` alanı açılışta kayıpsız temizleniyor; bulutta ilk kurulumda doğrudan başlangıç verisi yazılıyor.
+12. ✅ **Hafıza masaüstü uygulaması** (`hafiza/`, izninizle düzenlendi):
     - `sample-transcript.txt` depodan çıkarıldığı için "Örnek deşifreyi yükle" düğmesi hata veriyor.
     - `npm test` motor test dosyası açılmadan duruyor.
     - Paketleme listesinde eksik dosya var.
     - Örnek dosyaya bağlı iki test ve düğme uydurma bir örnekle çalışır hâle getirilebilir.
+    - **Yapılanlar:** Uydurma bir yönetim kurulu toplantısı deşifresi (`sample-transcript.txt`, gerçek kişi ya da üye adı yok) eklendi; "Örnek deşifreyi yükle" düğmesi bu dosyadan 18 görev çıkarıyor. Örnek başlığı ve kutu içi örnek metindeki gerçek ad uydurma adla değiştirildi. Paketleme listesindeki eksik yalnızca bu dosyanın kendisiydi; listede olup diskte olmayan ya da uygulamanın yükleyip listede olmayan bir dosya kalırsa artık `npm test` hata veriyor (`test/package.test.js`). Görev çıkarma motoru değişmedi, panele gömülü kopyasıyla birebir aynı.
     - Kodun güvenlik ayarları (pencere yalıtımı, içerik güvenlik politikası) iyi durumda.
 
 ---
@@ -228,10 +236,12 @@ Yeni kayıt istemiyorsanız ayrıca Supabase → Authentication → Sign In / Pr
 
 | Test | Ne denetliyor | Sonuç |
 |---|---|---|
-| `node --test tests/panel.test.js` | Değer okuyucular, tahsilat hesabı, eşzamanlı kayıt birleştirmesi, güvenlik ayarları | 8/8 |
+| `node --test tests/panel.test.js` | Değer okuyucular, tahsilat hesabı, eşzamanlı kayıt birleştirmesi, güvenlik ayarları, yazıyla tutar, numara öncelikli eşleştirme, kayıt geçmişi, KVKK birleştirmesi, sürüm sabitleme | 13/13 |
 | `node --test tests/gorevler.test.js` | Toplantılar ve Görevler çekirdeği | 10/10 |
-| `NODE_PATH=$(npm root -g) node tests/e2e-panel.js` | Bu rapordaki düzeltmeler (tarayıcıda) | 61/61 |
+| `NODE_PATH=$(npm root -g) node tests/e2e-panel.js` | Bu rapordaki düzeltmeler ve ikinci turdaki bütün yeni özellikler (tarayıcıda, telefon boyutu dahil; gerçek SheetJS 0.20.3 dosyasıyla) | 102/102 |
 | `NODE_PATH=$(npm root -g) node tests/e2e-gorevler.js` | Toplantılar ve Görevler (tarayıcıda) | 88/88 |
-| `hafiza/test` motor testleri | Görev çıkarma motoru | 22 testten 21'i geçiyor (uydurma örnekle); kalan tek test depodan çıkarılmış gerçek toplantı metnini bekliyor |
+| `cd hafiza && npm test` | Görev çıkarma motoru, kayıt deposu, paketleme listesi | 24/24 (yalnızca Node gerekir; Electron gerektiren `test/e2e.js` bu ortamda çalıştırılamadı, beklenen sayıları yeni örneğe göre güncellendi) |
 
 Tarayıcı testleri gerçek Supabase'e, Google Sheets'e ya da yapay zekâ sağlayıcısına bağlanmaz; bütün test verileri uydurmadır.
+
+Tarayıcı testleri Excel kitaplığını ilk çalıştırmada npm'den bir kez indirip `tests/.cache` klasörüne koyar (bu klasör depoya girmez).

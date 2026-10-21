@@ -43,11 +43,12 @@ async function run() {
     await click('#openTranscriptBtn');
     await click('#loadSampleBtn');
     await sleep(300);
-    await setValue('#transcriptDate', '2026-09-29', 'change');
-    check('kelime sayacı canlı', /3\.5\d\d kelime/.test(await text('#transcriptStats')), await text('#transcriptStats'));
+    await setValue('#transcriptDate', '2026-10-06', 'change');
+    check('örnek başlığı doldurulur', (await js(`return document.querySelector('#transcriptTitle').value;`)) === 'Örnek Derneği haftalık koordinasyon toplantısı');
+    check('kelime sayacı canlı', /^689 kelime/.test(await text('#transcriptStats')), await text('#transcriptStats'));
     await click('#analyzeBtn');
     await sleep(300);
-    check('örnekten 24 aday', (await text('#analysisCount')) === '24 görev bulundu · 0 eşleşme', await text('#analysisCount'));
+    check('örnekten 18 aday', (await text('#analysisCount')) === '18 görev bulundu · 0 eşleşme', await text('#analysisCount'));
     await shot('02-onizleme');
     // Başlık düzenlenirken satır yeniden oluşturulmamalı (odak ve sonraki tıklama kaybolmamalı).
     const rowKept = await js(`
@@ -59,17 +60,18 @@ async function run() {
     await js(`const title = document.querySelector('.candidate-title'); title.value = title.value.replace(' (düzenlendi)', ''); title.dispatchEvent(new Event('input', { bubbles: true })); title.dispatchEvent(new Event('change', { bubbles: true }));`);
     await click('#saveCandidatesBtn');
     await sleep(500);
-    check('24 görev kaydedildi', readData().tasks.length === 24 && readData().transcripts.length === 1, `${readData().tasks.length} görev`);
-    check('tarihli göreve 09.00 hatırlatması', readData().tasks.find(t => t.key === 'summit-invites-second').reminderAt === '2026-11-15T09:00');
-    check('sonuç bildirimi', /24 yeni görev eklendi, 0 görev güncellendi, 0 aday atlandı/.test(await text('.toast:last-child span')), await text('.toast:last-child span'));
+    check('18 görev kaydedildi', readData().tasks.length === 18 && readData().transcripts.length === 1, `${readData().tasks.length} görev`);
+    check('tarihli göreve 09.00 hatırlatması', readData().tasks.find(t => t.title.startsWith('Kasım bülteninin taslağı')).reminderAt === '2026-11-15T09:00');
+    check('sorumlu alt başlıktan alınır', readData().tasks.find(t => t.title.startsWith('Hazirun cetveli')).owner === 'Sekreter');
+    check('sonuç bildirimi', /18 yeni görev eklendi, 0 görev güncellendi, 0 aday atlandı/.test(await text('.toast:last-child span')), await text('.toast:last-child span'));
     await shot('03-gorevler');
 
     // --- Bir görevi tamamla ---
-    const doneId = await js(`const card = [...document.querySelectorAll('.task-card')].find(c => c.textContent.includes('Kara Tillman')); card.querySelector('.task-check').click(); return card.dataset.id;`);
+    const doneId = await js(`const card = [...document.querySelectorAll('.task-card')].find(c => c.textContent.includes('Hazirun cetveli')); card.querySelector('.task-check').click(); return card.dataset.id;`);
     await sleep(400);
     const doneTask = readData().tasks.find(t => t.id === doneId);
     check('tamamlanınca durum ve zaman kaydedilir', doneTask.status === 'done' && Boolean(doneTask.completedAt));
-    check('sayaçlar güncellenir', (await text('#navInboxCount')) === '23' && (await text('#navCompletedCount')) === '1');
+    check('sayaçlar güncellenir', (await text('#navInboxCount')) === '17' && (await text('#navCompletedCount')) === '1');
 
     // --- Aynı deşifre tekrar girilirse engellenir ---
     await click('#openTranscriptBtn');
@@ -79,8 +81,8 @@ async function run() {
     await sleep(300);
     check('aynı deşifre: kaydet düğmesi kapalı', await js(`return document.querySelector('#saveCandidatesBtn').disabled;`));
     check('aynı deşifre: açıklama', /daha önce kaydedilmiş/.test(await text('#analysisHelp')));
-    check('aynı deşifre: 24 eşleşme', /24 görev bulundu · 24 eşleşme/.test(await text('#analysisCount')), await text('#analysisCount'));
-    const doneRow = await js(`const row = [...document.querySelectorAll('.candidate')].find(r => r.querySelector('.candidate-title').value.includes('Kara Tillman')); return { decision: row.querySelector('.candidate-decision').value, label: row.querySelector('.candidate-status').textContent };`);
+    check('aynı deşifre: 18 eşleşme', /18 görev bulundu · 18 eşleşme/.test(await text('#analysisCount')), await text('#analysisCount'));
+    const doneRow = await js(`const row = [...document.querySelectorAll('.candidate')].find(r => r.querySelector('.candidate-title').value.includes('Hazirun cetveli')); return { decision: row.querySelector('.candidate-decision').value, label: row.querySelector('.candidate-status').textContent };`);
     check('tamamlanmış eşleşme varsayılan olarak atlanır', doneRow.decision === 'skip' && /Tamamlanmış görev bulundu/.test(doneRow.label) && /atlanacak/.test(doneRow.label), doneRow.label);
     await shot('04-tekrar');
     await js(`closeModal('transcriptModal', true);`);
@@ -89,20 +91,22 @@ async function run() {
     const sample = fs.readFileSync(path.join(__dirname, '..', 'sample-transcript.txt'), 'utf8');
     await click('#openTranscriptBtn');
     await setValue('#transcriptTitle', 'Takip görüşmesi');
-    await setValue('#transcriptDate', '2026-10-01', 'change');
-    await setValue('#transcriptText', `${sample} Ek not: Sunum dosyası Önder Bey'e 20 Ekim tarihinde gönderilecek.`);
+    await setValue('#transcriptDate', '2026-10-08', 'change');
+    await setValue('#transcriptText', `${sample} Ek not: Sunum dosyası Mehmet Bey'e 20 Ekim tarihinde gönderilecek.`);
     await click('#analyzeBtn');
     await sleep(300);
     await click('#saveCandidatesBtn');
     await sleep(500);
     let data = readData();
-    check('takip notu görevleri çoğaltmaz', data.tasks.length === 24 && data.transcripts.length === 2, `${data.tasks.length} görev, ${data.transcripts.length} deşifre`);
-    check('takip notu sonucu', /0 yeni görev eklendi, 23 görev güncellendi, 1 aday atlandı/.test(await text('.toast:last-child span')), await text('.toast:last-child span'));
+    check('takip notu görevleri çoğaltmaz, yalnızca ek notu ekler', data.tasks.length === 19 && data.transcripts.length === 2, `${data.tasks.length} görev, ${data.transcripts.length} deşifre`);
+    check('takip notu sonucu', /1 yeni görev eklendi, 17 görev güncellendi, 1 aday atlandı/.test(await text('.toast:last-child span')), await text('.toast:last-child span'));
     const stillDone = data.tasks.find(t => t.id === doneId);
     check('tamamlanmış görev yeniden açılmaz', stillDone.status === 'done' && stillDone.sourceIds.length === 1);
-    const updated = data.tasks.find(t => t.key === 'email-onder-cc');
+    const updated = data.tasks.find(t => t.title.startsWith('Web sitesindeki yönetim kurulu sayfası'));
     check('güncellenen görev iki görüşmeye bağlı', updated.sourceIds.length === 2 && updated.status === 'open');
-    check('aynı not ikinci kez eklenmez', (updated.notes.match(/İlgili bölüm/g) || []).length === 1, updated.notes);
+    check('aynı not ikinci kez eklenmez', (updated.notes.match(/Web sitesindeki/g) || []).length === 1, updated.notes);
+    const added = data.tasks.find(t => t.title.startsWith('Sunum dosyası'));
+    check('ek nottaki yeni görev tarihiyle eklenir', added && added.dueDate === '2026-10-20' && added.sourceIds.length === 1, added?.title);
 
     // --- Elle görev: tarih girilince varsayılan hatırlatma ---
     await click('#quickTaskBtn');
@@ -133,9 +137,9 @@ async function run() {
     // --- Arama: Türkçe/İngilizce büyük-küçük harf ---
     await setValue('#searchInput', 'linkedin');
     const found = await js(`return document.querySelectorAll('.task-card').length;`);
-    check('arama "linkedin" → "LinkedIn" görevlerini bulur', found >= 3, `${found} sonuç`);
-    await setValue('#searchInput', 'ONDER');
-    check('arama aksan ve büyük harf duyarsız', (await js(`return document.querySelectorAll('.task-card').length;`)) >= 5);
+    check('arama "linkedin" → "LinkedIn" görevlerini bulur', found >= 2, `${found} sonuç`);
+    await setValue('#searchInput', 'ARSIV');
+    check('arama aksan ve büyük harf duyarsız', (await js(`return document.querySelectorAll('.task-card').length;`)) >= 3);
     await setValue('#searchInput', '');
 
     // --- Sıralama: grup başlıkları yinelenmez ---
@@ -155,17 +159,17 @@ async function run() {
     await shot('06-arsiv');
     await js(`[...document.querySelectorAll('.transcript-card')].find(c => c.textContent.includes('Takip')).click();`);
     check('deşifre görüntüleyici metni gösterir', (await text('#viewerText')).includes('Ek not: Sunum dosyası'));
-    check('görüntüleyici bağlı görevleri listeler', (await js(`return document.querySelectorAll('.viewer-task').length;`)) === 23);
+    check('görüntüleyici bağlı görevleri listeler', (await js(`return document.querySelectorAll('.viewer-task').length;`)) === 18);
     await shot('07-desifre');
     // Yeniden analiz: yeni deşifre kaydı oluşmadan, zaten çıkarılmış görevler atlanır.
     await click('#reanalyzeBtn');
     await sleep(300);
     const decisions = await js(`return candidates.map(c => c.decision);`);
-    check('yeniden analizde çıkarılmış görevler atlanır', decisions.length === 24 && decisions.every(d => d === 'skip'), decisions.join(','));
+    check('yeniden analizde çıkarılmış görevler atlanır', decisions.length === 19 && decisions.every(d => d === 'skip'), decisions.join(','));
     await click('#saveCandidatesBtn');
     await sleep(400);
     data = readData();
-    check('yeniden analiz kopya oluşturmaz', data.tasks.length === 25 && data.transcripts.length === 2);
+    check('yeniden analiz kopya oluşturmaz', data.tasks.length === 20 && data.transcripts.length === 2);
 
     // --- Görev düzenleme, yeniden açma, silme ---
     await click('[data-view="completed"]');
@@ -183,7 +187,7 @@ async function run() {
     const tomorrow = await js(`const d = new Date(); d.setDate(d.getDate() + 1); return localISO(d);`);
     const snoozed = readData().tasks.find(t => t.title === 'LinkedIn duyurusunu gözden geçir');
     check('"Yarın hatırlat" ertesi gün 09.00', snoozed.reminderAt === `${tomorrow}T09:00` && snoozed.notifiedAt === null);
-    await js(`[...document.querySelectorAll('.task-card')].find(c => c.textContent.includes('Kara Tillman')).querySelector('.task-check').click();`);
+    await js(`[...document.querySelectorAll('.task-card')].find(c => c.textContent.includes('Hazirun cetveli')).querySelector('.task-check').click();`);
     await sleep(400);
 
     // --- Ayarlar ---
@@ -205,7 +209,7 @@ async function run() {
   } else {
     // İkinci açılış: her şey yerinde mi?
     const data = readData();
-    check('yeniden açılışta görevler yerinde', (await text('#navInboxCount')) === String(data.tasks.filter(t => t.status !== 'done').length) && data.tasks.length === 25, `${data.tasks.length} görev`);
+    check('yeniden açılışta görevler yerinde', (await text('#navInboxCount')) === String(data.tasks.filter(t => t.status !== 'done').length) && data.tasks.length === 20, `${data.tasks.length} görev`);
     check('yeniden açılışta tamamlanan görev yerinde', (await text('#navCompletedCount')) === '1' && data.tasks.filter(t => t.status === 'done').length === 1);
     check('yeniden açılışta deşifreler yerinde', (await text('#navTranscriptCount')) === '2');
     const kept = data.tasks.find(t => t.title === 'LinkedIn duyurusunu gözden geçir');

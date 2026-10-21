@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230E1A33%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 text-anchor=%22middle%22 fill=%22%23C2992E%22 font-family=%22Georgia%22 font-weight=%22bold%22>F</text></svg>">
 <title>FOYDER OS · Üye ve Aidat Yönetim Sistemi</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- SheetJS 0.20.3 (0.18.5'teki bilinen güvenlik açıkları giderildi). Resmî dağıtım npm'de olmadığı için npm kopyası @e965/xlsx kullanılır;
+     sürüm sabit ve bütünlük karmalı: dosya değişirse tarayıcı yüklemez. -->
+<script src="https://cdn.jsdelivr.net/npm/@e965/xlsx@0.20.3/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
 <!-- Sürüm sabit ve bütünlük karması ile: CDN'deki dosya değişirse tarayıcı yüklemez. Güncellerken karmayı da yenileyin. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/inter-ui/3.19.3/inter.min.css">
@@ -92,6 +94,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
 .kpi:hover{transform:translateY(-2px);box-shadow:var(--sh2)}
 .kpi .ico{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;font-size:15px}
 .kpi .l{font-size:11.5px;color:var(--muted);font-weight:600}
+.kpi .ipucu{display:inline-block;margin-left:2px;color:var(--muted);opacity:.65;font-weight:400;cursor:help;padding:0 3px}
+.kpi .ipucu:hover{opacity:1}
 .kpi .v{font-size:23px;font-weight:760;margin-top:4px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 .kpi .d{font-size:11px;margin-top:4px;color:var(--faint);font-weight:500}
 .t-green{background:var(--green-soft);color:var(--green)} .t-amber{background:var(--amber-soft);color:var(--amber)}
@@ -176,6 +180,9 @@ tr.clickable{cursor:pointer}
 .msg{max-width:80%;padding:11px 14px;border-radius:14px;font-size:13px;line-height:1.55;white-space:pre-wrap}
 .msg.u{align-self:flex-end;background:var(--ink);color:#fff;border-bottom-right-radius:4px}
 .msg.a{align-self:flex-start;background:#F2F4F9;border:1px solid var(--line);border-bottom-left-radius:4px}
+.gecmis{margin-top:14px}.gecmis summary{cursor:pointer;font-size:12px;font-weight:650;color:var(--muted)}
+.gecmis-l{font-size:11.5px;color:var(--muted);line-height:1.5;max-height:220px;overflow:auto;margin-top:6px}.gecmis-l div{padding:5px 0;border-bottom:1px solid #F0F2F6}.gecmis-l b{color:var(--text)}
+.msg .mod{margin-top:6px;font-size:10.5px;color:var(--faint);font-weight:600;letter-spacing:.3px}
 .msg .act{margin-top:8px;font-size:11.5px;background:var(--green-soft);color:var(--green);border-radius:8px;padding:6px 10px;font-weight:600}
 .suggest{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
 .suggest button{font-size:11.5px;border:1px solid var(--line2);background:#fff;border-radius:99px;padding:5px 12px;color:var(--muted);font-weight:550}
@@ -230,6 +237,51 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)!important;box-s
   .cmdbar .hint{display:none}.crumb{display:none}
   .topnav{padding:0 12px;gap:8px}.top-actions .btn .t{display:none}
 }
+/* Ödeme makbuzu yazdırma görünümü */
+#mkPrint{display:none}
+@media print{
+  body.mk-printing>*:not(#mkPrint){display:none!important}
+  body.mk-printing #mkPrint{display:block!important}
+  body.mk-printing{background:#fff}
+  @page{size:A4;margin:16mm}
+}
+#mkPrint{font-family:"Inter","Segoe UI",sans-serif;color:#161D2E;font-size:11pt;line-height:1.5}
+.mk{max-width:720px;margin:0 auto;border:1.5px solid #0E1A33;border-radius:6px;padding:26px 30px}
+.mk-h{display:flex;align-items:center;gap:14px;border-bottom:2.5px solid #C2992E;padding-bottom:14px;margin-bottom:18px}
+.mk-logo{width:46px;height:46px;border-radius:10px;background:#0E1A33;color:#E9D49A;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15pt;flex:none}
+.mk-org{flex:1}.mk-ad{font-size:14pt;font-weight:760;color:#0E1A33}.mk-alt{font-size:9pt;color:#69768C}
+.mk-no{text-align:right;font-size:9.5pt;color:#4A5568}.mk-t{font-size:13pt;font-weight:800;letter-spacing:1.5px;color:#0E1A33}
+.mk-tb{width:100%;border-collapse:collapse;font-size:10.5pt}
+.mk-tb th{width:34%;text-align:left;background:#F6F4EE;color:#4A5568;font-weight:650;padding:7px 10px;border:1px solid #E2DDD0;position:static;text-transform:none;letter-spacing:0;font-size:10pt}
+.mk-tb td{padding:7px 10px;border:1px solid #E2DDD0}
+.mk-tut{font-size:12.5pt;color:#0E1A33}.mk-k{color:#69768C;font-size:9pt}
+.mk-a{margin:16px 0 0;font-size:10pt}
+.mk-imza{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:46px 0 10px}
+.mk-imza div{border-top:1px solid #4A5568;padding-top:6px;font-size:9.5pt;display:flex;flex-direction:column}
+.mk-imza span{color:#69768C}
+.mk-not{margin:18px 0 0;font-size:8.5pt;color:#69768C;border-top:1px dashed #CBD2DC;padding-top:8px}
+.mk-f{display:flex;justify-content:space-between;font-size:8pt;color:#9AA4B5;margin-top:6px}
+/* İçe aktarma eşleştirme seçimi */
+.esles-l{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto;padding-right:4px}
+.esles-s{display:grid;grid-template-columns:1fr minmax(220px,46%);gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.esles-n{font-size:12px;margin-top:2px}
+.esles-h{display:flex!important;gap:8px;align-items:center;justify-content:flex-start;margin-top:12px;font-size:12.5px;color:var(--muted);text-align:left}
+.esles-h input{width:auto!important;flex:none;margin:0}
+@media(max-width:640px){.esles-s{grid-template-columns:1fr}}
+/* Telefonda üye ve aidat tabloları kart görünümüne döner: her satır bir kart, her hücre "etiket: değer" satırı. */
+@media(max-width:640px){
+  table.kart-tablo thead{display:none}
+  table.kart-tablo,table.kart-tablo tbody,table.kart-tablo tr,table.kart-tablo td{display:block;width:100%}
+  table.kart-tablo tbody{padding:4px 10px 10px}
+  table.kart-tablo tr{border:1px solid var(--line);border-radius:12px;margin:8px 0;padding:8px 12px;background:var(--panel);box-shadow:0 1px 2px rgba(14,26,51,.04)}
+  table.kart-tablo td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:5px 0;border:0;text-align:right;min-height:28px}
+  table.kart-tablo td::before{content:attr(data-label);color:var(--muted);font-size:11.5px;font-weight:600;text-align:left;flex:none}
+  table.kart-tablo td.kt-bas{justify-content:flex-start;text-align:left;border-bottom:1px solid #F0F2F6;padding-bottom:8px;margin-bottom:2px}
+  table.kart-tablo td.kt-bas::before,table.kart-tablo td.kt-islem::before{display:none}
+  table.kart-tablo td.kt-islem{justify-content:flex-end;flex-wrap:wrap;padding-top:8px}
+  table.kart-tablo td.kt-islem:empty{display:none}
+  table.kart-tablo td.num{text-align:right}
+}
 </style>
 </head>
 <body>
@@ -282,12 +334,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)!important;box-s
     <div class="logo">F</div>
     <h1 id="authTitle">FOYDER OS — Giriş</h1>
     <div class="sub">Üye ve aidat yönetim paneline erişim için oturum açın.</div>
-    <div id="authNameRow" class="auth-hide"><label>Ad Soyad</label><input id="authName" placeholder="Adınız Soyadınız"></div>
     <label>E-posta</label><input id="authEmail" type="email" placeholder="ornek@foyder.org" onkeydown="if(event.key==='Enter')authSubmit()">
     <label>Parola</label><input id="authPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')authSubmit()">
     <div class="err" id="authErr"></div>
     <button class="auth-btn" id="authBtn" onclick="authSubmit()">Giriş Yap</button>
-    <div class="auth-sw" id="authSw">Hesabınız yok mu? <a href="#" onclick="authMode('up');return false">Kaydolun</a></div>
+    <div class="auth-sw">Hesabınız yok mu? Panel yöneticisinden hesap açmasını isteyin.</div>
   </div>
 </div>
 <div class="auth-wrap auth-hide" id="pendWrap">
@@ -347,8 +398,71 @@ const _isObj=v=>v&&typeof v==='object'&&!Array.isArray(v);
 function mergeValue(b,l,r){
   if(_same(l,b)) return r;
   if(_same(r,b)||_same(l,r)) return l;
-  if(_isObj(l)&&_isObj(r)){ const out={}; for(const k of new Set([...Object.keys(l),...Object.keys(r)])){ const v=mergeValue(_isObj(b)?b[k]:undefined,l[k],r[k]); if(v!==undefined) out[k]=v; } return out; }
+  if(_isObj(l)&&_isObj(r)){ const out={}; for(const k of new Set([...Object.keys(l),...Object.keys(r)])){
+    // Değişiklik geçmişi iki tarafta da büyüdüyse girişler birleştirilir (hiçbiri kaybolmaz).
+    const bk=_isObj(b)?b[k]:undefined;
+    const v=k==='gecmis'&&Array.isArray(l[k])&&Array.isArray(r[k])&&!_same(l[k],bk)&&!_same(r[k],bk)?gecmisBirlestir(l[k],r[k]):mergeValue(bk,l[k],r[k]);
+    if(v!==undefined) out[k]=v; } return out; }
   return l;
+}
+/* ---------- Kayıt değişiklik geçmişi (üye ve ödeme) ----------
+   rec.gecmis = [{at, by, text}], en yeni sonda; kayıt başına sınır aşılınca en eskiler düşer. */
+const GECMIS_SINIRI={uye:30,odeme:20};
+function gecmisEkle(rec,giris,sinir){
+  const g=Array.isArray(rec.gecmis)?rec.gecmis:[];
+  g.push(giris); if(g.length>sinir) g.splice(0,g.length-sinir);
+  rec.gecmis=g; return rec;
+}
+function gecmisBirlestir(l,r){
+  const seen=new Set(), out=[];
+  for(const x of [...r,...l]){ const k=JSON.stringify(x); if(!seen.has(k)){ seen.add(k); out.push(x); } }
+  out.sort((a,b)=>String(a&&a.at||'').localeCompare(String(b&&b.at||'')));
+  return out.slice(-GECMIS_SINIRI.uye);
+}
+// Önceki ve sonraki hâl arasındaki farkı okunur metne çevirir ("Telefon: — → 0500 …"). Notların içeriği yazılmaz.
+function alanFarki(once,sonra,etiketler,bicim){
+  const out=[];
+  for(const [k,etiket] of Object.entries(etiketler)){
+    const a=once?once[k]:undefined, b=sonra[k];
+    if(JSON.stringify(a??'')===JSON.stringify(b??'')) continue;
+    if(k==='notlar'||k==='not'){ out.push(etiket+' güncellendi'); continue; }
+    out.push(`${etiket}: ${bicim(k,a)} → ${bicim(k,b)}`);
+  }
+  return out;
+}
+// Tutarı Türkçe yazıyla yazar (makbuz için): 6500 → "altı bin beş yüz Türk Lirası".
+function tutarYaziyla(n){
+  n=Math.round((+n||0)*100)/100; if(n<0) n=-n;
+  const B=['','bir','iki','üç','dört','beş','altı','yedi','sekiz','dokuz'], O=['','on','yirmi','otuz','kırk','elli','altmış','yetmiş','seksen','doksan'];
+  const uc=x=>{ const y=Math.floor(x/100), o=Math.floor(x%100/10), b=x%10; return [y?(y>1?B[y]+' ':'')+'yüz':'',O[o],B[b]].filter(Boolean).join(' '); };
+  const tam=Math.floor(n), kurus=Math.round((n-tam)*100);
+  const yaz=t=>{ if(!t) return 'sıfır'; const out=[]; [[1e9,'milyar'],[1e6,'milyon'],[1e3,'bin'],[1,'']].forEach(([d,ad])=>{ const g=Math.floor(t/d)%1000; if(!g) return; out.push(d===1e3&&g===1?'bin':(uc(g)+(ad?' '+ad:''))); }); return out.join(' '); };
+  return yaz(tam)+' Türk Lirası'+(kurus?' '+yaz(kurus)+' Kuruş':'');
+}
+/* ---------- İçe aktarmada üye eşleştirme ----------
+   Önce üye/defter numarasıyla, numara yoksa adla eşleştirir. Sonuç kesin değilse (aynı adla birden çok kayıt,
+   numara başka bir ada kayıtlı vb.) "belirsiz" döner; bu satırlar kendiliğinden birleştirilmez, kullanıcıya sorulur. */
+const _noNorm=v=>{ const t=String(v??'').trim(); return /^\d+(\.0+)?$/.test(t)?String(parseInt(t,10)):t; };
+function adBenzer(a,b){ const A=new Set(trNorm(a).split(' ').filter(t=>t.length>=2)); return trNorm(b).split(' ').some(t=>t.length>=2&&A.has(t)); }
+function uyeEslestir(members,ad,no){
+  const k=trNorm(ad), n=_noNorm(no);
+  const adla=k?members.filter(m=>trNorm(m.ad)===k):[];
+  const birlesik=l=>[...new Set([...l,...adla])];
+  if(n){
+    const nola=members.filter(m=>_noNorm(m.defterNo)===n);
+    if(nola.length===1){
+      if(!k||adBenzer(nola[0].ad,ad)) return {tip:'no',uye:nola[0]};
+      return {tip:'belirsiz',neden:`Defter no ${n} başka bir ada (${nola[0].ad}) kayıtlı`,adaylar:birlesik(nola)};
+    }
+    if(nola.length>1) return {tip:'belirsiz',neden:`Defter no ${n} birden çok üyede kayıtlı`,adaylar:birlesik(nola)};
+  }
+  if(adla.length===1){
+    const m=adla[0];
+    if(n&&_noNorm(m.defterNo)&&_noNorm(m.defterNo)!==n) return {tip:'belirsiz',neden:`Ad eşleşti ama defter no farklı (dosyada ${n}, panelde ${m.defterNo})`,adaylar:adla};
+    return {tip:'ad',uye:m};
+  }
+  if(adla.length>1) return {tip:'belirsiz',neden:`Aynı adla ${adla.length} üye kaydı var`,adaylar:adla};
+  return {tip:'yok'};
 }
 // Aynı kaydı iki taraf da değiştirdiyse alanları ayrı ayrı birleştirir; aynı alan ikisinde de değiştiyse bu tarayıcıdaki kazanır.
 function mergeById(b,l,r){
@@ -357,7 +471,9 @@ function mergeById(b,l,r){
   for(const id of [...R.keys(),...L.keys()]){
     if(seen.has(id)) continue; seen.add(id);
     const bi=B.get(id), li=L.get(id), ri=R.get(id);
-    if(li&&ri) out.push(_same(li,ri)?li:bi?mergeValue(bi,li,ri):li);
+    // Kişisel verisi silinen (KVKK) kayıtta anonim hâl öbür taraftaki eski bilgilerle birleştirilmez.
+    const yeniAnonim=x=>x&&x.anonim&&!(bi&&bi.anonim);
+    if(li&&ri) out.push(_same(li,ri)?li:yeniAnonim(li)?li:yeniAnonim(ri)?ri:bi?mergeValue(bi,li,ri):li);
     else if(li){ if(!bi||!_same(li,bi)) out.push(li); }        // başka yerde silinmiş; burada değişmediyse silinmiş kalsın
     else if(!bi||!_same(ri,bi)) out.push(ri);                   // burada silinmiş; başka yerde değişmediyse silinmiş kalsın
   }
@@ -382,16 +498,15 @@ const SEED = JSON.parse(document.getElementById('seedData').textContent);
 const THIS_YEAR = new Date().getFullYear();
 const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)(new Date()); // yerel tarih
 let S=null, route='dashboard', saveTimer=null;
-const HAS_STORE = !!(window.storage && window.storage.get);
 
 function defaultState(){
   return {
     members: SEED.members.map(m=>({email:'',telefon:'',...m})),
     payments: SEED.payments.map(p=>({odenenTutar:p.durum==='ÖDENDİ'?p.tutar:0,not:'',...p})),
-    basvurular: [], chat: [],
+    basvurular: [], chat: [], sohbetler: {},
     kararlar: SEED.kararlar.map((k,i)=>({id:'K'+String(i+1).padStart(3,'0'),...k})),
     ayarlar: {
-      rol:'admin', dernekAdi:'FOYDER Derneği', iban:'',
+      dernekAdi:'FOYDER Derneği', iban:'',
       aidat:{2023:2200,2024:3500,2025:5000,2026:6500}, girisOdentisi:1000,
       ai:{provider:'claude', model:'', apiKey:'', endpoint:'', onayla:true},
       sheets:{csvUyeler:'', csvOdemeler:'', csvBasvurular:'', yilCsv:'', webhook:'', autoPull:false, autoPush:false}
@@ -399,22 +514,14 @@ function defaultState(){
     seq:{ m:SEED.members.length, p:SEED.payments.length, b:0, k:SEED.kararlar.length }
   };
 }
-async function loadState(){
-  if(HAS_STORE){ try{ const r=await window.storage.get('foyder:v2'); if(r&&r.value){ S=JSON.parse(r.value);
-    // eski sürümden eksik alanları tamamla
-    const d=defaultState(); S.ayarlar={...d.ayarlar,...S.ayarlar}; S.ayarlar.ai={...d.ayarlar.ai,...(S.ayarlar.ai||{})}; S.ayarlar.sheets={...d.ayarlar.sheets,...(S.ayarlar.sheets||{})}; S.chat=S.chat||[];
-    restoreAiKey();
-    return; } }catch(e){} }
-  S=defaultState(); persist();
-  if(!HAS_STORE) setTimeout(()=>toast('ℹ Bu ortamda kalıcı kayıt yok — Ayarlar → Yedekleme bölümünden JSON yedek alın'),900);
-}
+// Bulutta henüz satır yoksa (ilk kurulum) başlangıç verisiyle başlar; boot() ardından buluta yazar.
+function loadState(){ S=defaultState(); restoreAiKey(); }
 function persist(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>cloudQueue(async()=>{
     // AI anahtari yalnizca bu tarayicida saklanir; buluta ve ortak depoya asla yazilmaz
     try{ localStorage.setItem('foyder:aikey', (S.ayarlar&&S.ayarlar.ai&&S.ayarlar.ai.apiKey)||''); }catch(e){}
     const out=stripForCloud(S);
-    try{ if(HAS_STORE) await window.storage.set('foyder:v2',JSON.stringify(out)); }catch(e){}
     // Okuyucu rolü hiçbir şeyi değiştiremez; buluta yazmaz (ör. asistan sohbeti yalnızca bu tarayıcıda kalır).
     if(!(window._sb&&window._sbUser)||!canWriteAny()) return;
     try{
@@ -492,6 +599,49 @@ async function cloudCommit(build){
   }
   throw new Error('Kayıt çakışması çözülemedi');
 }
+/* ---------- Üye ve ödeme geçmişi ---------- */
+const benimAdim=()=>window._sbUser?.user_metadata?.name||window._sbUser?.email||'Kullanıcı';
+const UYE_ALAN={ad:'Ad Soyad',uyelikTuru:'Üyelik türü',gorev:'Meslek',durum:'Durum',defterNo:'Defter no',ykKararTarihi:'YK karar tarihi',kayitTarihi:'Kayıt tarihi',dogumYili:'Doğum yılı',ucretsiz:'Ücretsiz',email:'E-posta',telefon:'Telefon',notlar:'Notlar'};
+const ODEME_ALAN={yil:'Yıl',tip:'Tip',tutar:'Tutar',durum:'Durum',odenenTutar:'Ödenen',odemeTarihi:'Ödeme tarihi',not:'Not'};
+function alanBicim(k,v){
+  if(v==null||v==='') return '—';
+  if(typeof v==='boolean') return v?'Evet':'Hayır';
+  if(k==='tutar'||k==='odenenTutar') return fmt(v);
+  return String(v);
+}
+function gecmisYaz(rec,metin,tur){ if(rec&&metin) gecmisEkle(rec,{at:new Date().toISOString(),by:benimAdim(),text:metin},GECMIS_SINIRI[tur]||20); }
+function farkYaz(rec,once,tur,onEk){ const t=alanFarki(once,rec,tur==='odeme'?ODEME_ALAN:UYE_ALAN,alanBicim); if(t.length) gecmisYaz(rec,(onEk?onEk+': ':'')+t.join(' · '),tur); }
+const kopya=o=>JSON.parse(JSON.stringify(o||{}));
+const gecmisEkleYeni=(rec,metin,tur)=>{ gecmisYaz(rec,metin,tur); return rec; };
+function gecmisHTML(rec){
+  const g=Array.isArray(rec&&rec.gecmis)?[...rec.gecmis].reverse():[];
+  return `<details class="gecmis"><summary>🕘 Değişiklik geçmişi (${g.length})</summary>${g.length?`<div class="gecmis-l">${g.map(x=>`<div><b>${esc(x.by||'—')}</b> · ${esc(x.at?new Date(x.at).toLocaleString('tr-TR',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'')}<br>${esc(x.text)}</div>`).join('')}</div>`:'<div class="muted" style="padding:6px 0">Henüz kayıtlı değişiklik yok.</div>'}</details>`;
+}
+
+/* ---------- Kişiye özel asistan sohbeti ----------
+   Yazma yetkisi olan kullanıcının sohbeti bulutta kendi kimliğine ait listede (S.sohbetler[uid]) tutulur;
+   okuyucu buluta yazamadığı için sohbeti bu tarayıcıda kalır. Eski ortak sohbet S.eskiOrtakSohbet'te saklanır. */
+const myUid=()=>window._sbUser?.id||'yerel';
+function chatList(){
+  if(canWriteAny()){ S.sohbetler=S.sohbetler||{}; return S.sohbetler[myUid()]||(S.sohbetler[myUid()]=[]); }
+  if(!window._localChat){ try{ window._localChat=JSON.parse(localStorage.getItem('foyder:sohbet:'+myUid())||'[]')||[]; }catch(e){ window._localChat=[]; } }
+  return window._localChat;
+}
+function chatSave(){ if(canWriteAny()) persist(); else { try{ localStorage.setItem('foyder:sohbet:'+myUid(),JSON.stringify(chatList())); }catch(e){} } }
+function chatPush(m){ const l=chatList(); l.push({...m,at:new Date().toISOString()}); if(l.length>60) l.splice(0,l.length-60); chatSave(); }
+function chatClear(){ if(!confirm('Sohbet geçmişiniz silinsin mi? (Yalnızca sizin sohbetiniz silinir.)')) return; chatList().splice(0); chatSave(); render(); }
+/* Eski verileri yeni yapıya taşır (deterministik ve kayıpsız; birden çok kez çalışması sorun değildir):
+   - Eski ortak sohbet (S.chat) → S.eskiOrtakSohbet (yöneticide okunur), S.chat boş kalır (eski sürümler bozulmasın)
+   - Kullanılmayan ayarlar.rol alanı kaldırılır (rol profiles tablosundan gelir) */
+function migrateState(st){
+  if(!st) return st;
+  ['members','payments','basvurular','kararlar'].forEach(k=>{ if(!Array.isArray(st[k])) st[k]=[]; });
+  if(Array.isArray(st.chat)&&st.chat.length){ st.eskiOrtakSohbet=[...(Array.isArray(st.eskiOrtakSohbet)?st.eskiOrtakSohbet:[]),...st.chat]; }
+  st.chat=[];
+  if(!st.sohbetler||typeof st.sohbetler!=='object'||Array.isArray(st.sohbetler)) st.sohbetler={};
+  if(st.ayarlar&&'rol' in st.ayarlar) delete st.ayarlar.rol;
+  return st;
+}
 function canWriteAny(){ return Object.values(PERM[window._myRole]||PERM.okuyucu).some(Boolean); }
 let _pushTimer=null;
 function schedulePushDurum(){
@@ -521,6 +671,8 @@ const byName=(a,b)=>a.ad.localeCompare(b.ad,'tr');
 const uyeNo=m=>{ const sheetMode=S.members.some(x=>x.sira!=null); return sheetMode?(m.sira??null):(m.defterNo??null); };
 const byDefter=(a,b)=>((uyeNo(a)??1e9)-(uyeNo(b)??1e9))||byName(a,b);
 const initials=ad=>ad.split(' ').map(w=>w[0]).slice(0,2).join('').toLocaleUpperCase('tr');
+// Kart açıklaması: masaüstünde üzerine gelince, telefonda ⓘ'ye dokununca görünür.
+const ipucuHTML=()=>`<span class="ipucu" role="button" tabindex="0" aria-label="Açıklama" onclick="event.stopPropagation();toast(this.closest('[title]').title)">ⓘ</span>`;
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
 // Düğmeli bildirim (ör. silme sonrası "Geri al").
 function toastAction(m,label,fn){
@@ -579,7 +731,11 @@ SORU/SORGU ise (kim, kaç, ne kadar, listele, hangi, var mı, toplam, oran, duru
 
 // Tüm yapay zekâ istekleri buradan geçer (komutlar, analiz yorumu, toplantı kontrolü ve özeti).
 // system: OpenAI uyumlu sağlayıcılarda ayrı sistem mesajı olarak, diğerlerinde metnin başına eklenir.
-async function aiRequest(prompt,{system='',maxTokens=1200}={}){
+async function aiRequest(prompt,opts={}){
+  try{ const r=await aiRequestRaw(prompt,opts); aiDurumYaz(true); return r; }
+  catch(e){ aiDurumYaz(false); throw e; }
+}
+async function aiRequestRaw(prompt,{system='',maxTokens=1200}={}){
   const a=S.ayarlar.ai;
   const full=system?system+'\n\n'+prompt:prompt;
   const read=async r=>{ let d=null; try{ d=await r.json(); }catch(_){} if(!r.ok||!d||d.error) throw new Error((d&&d.error&&(d.error.message||d.error))||('HTTP '+r.status)); return d; };
@@ -607,6 +763,32 @@ async function aiRequest(prompt,{system='',maxTokens=1200}={}){
   throw new Error('AI sağlayıcı yapılandırılmamış');
 }
 const aiCall=userText=>aiRequest('Komut: '+userText,{system:AI_SYS,maxTokens:1000});
+const AI_ADLAR={'claude':'Claude (anahtarsız)','anthropic-key':'Anthropic API (kendi anahtarım)','openai':'OpenAI','gemini':'Google Gemini','custom':'Özel / OpenAI uyumlu sunucu'};
+/* Yapay zekâ bağlantı durumu (bu tarayıcı için): 'bagli' | 'yok' | 'bilinmiyor'.
+   Son denemenin sonucu sağlayıcı/model/adres ile birlikte saklanır; ayar değişince yeniden "bilinmiyor" olur. */
+const aiImza=()=>{ const a=S.ayarlar.ai; return [a.provider,a.model||'',a.endpoint||'',a.apiKey?'k':''].join('|'); };
+function aiDurum(){
+  const a=S.ayarlar.ai;
+  if((a.provider==='anthropic-key'||a.provider==='openai'||a.provider==='gemini')&&!a.apiKey) return 'yok';
+  if(a.provider==='custom'&&!a.endpoint) return 'yok';
+  // Anahtarsız Claude yalnızca panel Claude'un içinde (claude.ai / claudeusercontent.com) açıldığında çalışır.
+  if(a.provider==='claude'&&!/(^|\.)(claude\.ai|claudeusercontent\.com)$/.test(location.hostname)) return 'yok';
+  try{ const t=JSON.parse(localStorage.getItem('foyder:aiDurum')||'null'); if(t&&t.imza===aiImza()) return t.ok?'bagli':'yok'; }catch(e){}
+  return 'bilinmiyor';
+}
+function aiDurumYaz(ok){ try{ localStorage.setItem('foyder:aiDurum',JSON.stringify({imza:aiImza(),ok,at:new Date().toISOString()})); }catch(e){} }
+// Teknik hatayı kullanıcının anlayacağı bir nedene çevirir.
+function aiHataNedeni(e){
+  const a=S.ayarlar.ai, m=String(e&&e.message||e||'');
+  if(a.provider==='claude') return 'Anahtarsız Claude yalnızca panel Claude içinde açıldığında çalışır. Bu sitede bir API anahtarlı sağlayıcı seçin.';
+  if((a.provider==='anthropic-key'||a.provider==='openai'||a.provider==='gemini')&&!a.apiKey) return 'API anahtarı girilmemiş.';
+  if(a.provider==='custom'&&!a.endpoint) return 'Sunucu adresi girilmemiş.';
+  if(/401|403|invalid.*key|api key|authentication|permission/i.test(m)) return 'Anahtar geçersiz ya da yetkisiz.';
+  if(/404|model/i.test(m)) return 'Model adı bulunamadı; Model alanını boş bırakmayı deneyin.';
+  if(/429|rate|quota|credit/i.test(m)) return 'Sağlayıcı kullanım sınırına ulaşıldı.';
+  if(/Failed to fetch|NetworkError|TypeError|Load failed/i.test(m)) return 'Sağlayıcıya ulaşılamadı (internet bağlantısı ya da tarayıcı izni).';
+  return 'Sağlayıcı beklenmeyen bir yanıt verdi.';
+}
 function parseAiJson(text){
   const m=text.match(/\{[\s\S]*\}/); if(!m) throw new Error('JSON bulunamadı');
   return JSON.parse(m[0]);
@@ -645,30 +827,31 @@ async function runCommand(text, fromChat){
   text=(text||'').trim(); if(!text) return;
   const bar=document.getElementById('cmdbar'); bar.classList.add('busy');
   const inp=document.getElementById('cmdInput'); if(!fromChat) inp.value='';
-  S.chat.push({r:'u',t:text}); if(S.chat.length>60) S.chat=S.chat.slice(-60);
+  chatPush({r:'u',t:text});
   if(route==='asistan') render();
   let plan;
   try{ plan=parseAiJson(await aiCall(text)); plan._src='ai'; }
   catch(e){ plan=localParse(text); plan._src='local'; }
+  const mod=plan._src==='local'?'basit':'ai';
   bar.classList.remove('busy');
   // Bilgi/sorgu niyeti varsa: onay isteme, doğrudan veriden cevapla
   const infoActs=(plan.actions||[]).filter(a=>a.type==='bilgi');
   const islemActs=(plan.actions||[]).filter(a=>a.type!=='bilgi');
   if(infoActs.length && !islemActs.length){
     const cevap=infoActs.map(a=>answerQuery(a.soru||text)).join('\n\n');
-    S.chat.push({r:'a',t:cevap}); persist(); route==='asistan'?render():toast('🤖 '+cevap.slice(0,90));
+    chatPush({r:'a',t:cevap,mod}); route==='asistan'?render():toast('🤖 '+cevap.slice(0,90));
     if(route!=='asistan') go('asistan');
     return;
   }
   if(!plan.actions||!plan.actions.length){
     // Hiç eylem yoksa, soruyu yine de veriden yanıtlamayı dene
     const ans=answerQuery(text) || plan.cevap || 'Bu komuttan bir işlem çıkaramadım.';
-    S.chat.push({r:'a',t:ans}); persist(); route==='asistan'?render():toast('🤖 '+ans);
+    chatPush({r:'a',t:ans,mod}); route==='asistan'?render():toast('🤖 '+ans);
     if(route!=='asistan') go('asistan');
     return;
   }
   if(S.ayarlar.ai.onayla) confirmActions(plan);
-  else { const sum=applyActions(plan.actions); S.chat.push({r:'a',t:plan.cevap||'',acts:sum}); persist(); render(); toast('✓ '+sum.join(' · ')); }
+  else { const sum=applyActions(plan.actions); chatPush({r:'a',t:plan.cevap||'',acts:sum,mod}); persist(); render(); toast('✓ '+sum.join(' · ')); }
 }
 
 function confirmActions(plan){
@@ -695,7 +878,7 @@ function execPending(){
   const plan=window._pendingPlan; if(!plan) return;
   plan.actions.forEach((a,i)=>{ const el=document.getElementById('act_uye_'+i); if(el) a._uyeId=el.value; });
   const sum=applyActions(plan.actions);
-  S.chat.push({r:'a',t:plan.cevap||'',acts:sum});
+  chatPush({r:'a',t:plan.cevap||'',acts:sum,mod:plan._src==='local'?'basit':'ai'});
   persist(); closeModal(); render();
   toast(sum.length?('✓ '+sum.join(' · ')):'Uygulanacak işlem yoktu');
 }
@@ -708,25 +891,29 @@ function applyActions(actions){
       const mid=a._uyeId??(resolveMembers(a.uye)[0]?.id); if(!mid){ sum.push('⚠ üye bulunamadı'); continue; }
       const yil=+a.yil||THIS_YEAR;
       let p=S.payments.find(p=>p.uyeId===mid&&Number(p.yil)===yil&&isAidatTip(p));
+      const yeniKayit=!p;
       if(!p){ p={id:nid('p'),uyeId:mid,yil,tip:'AIDAT',tutar:a.tutar||S.ayarlar.aidat[yil]||null,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Asistan'}; S.payments.push(p); }
+      const once=kopya(p);
       if(a.tutar) p.tutar=a.tutar;
       p.durum=a.durum==='KISMİ'?'KISMİ':'ÖDENDİ';
       p.odenenTutar=p.durum==='ÖDENDİ'?(p.tutar||0):(a.tutar||p.odenenTutar||0);
       p.odemeTarihi=a.tarih||TODAY;
+      if(yeniKayit) gecmisYaz(p,'Asistan ile oluşturuldu','odeme');
+      farkYaz(p,once,'odeme','Asistan');
       sum.push(`${member(mid).ad} → ${yil} aidatı ${p.durum}`);
     }
     else if(a.type==='uye_durum'){
       const mid=a._uyeId??(resolveMembers(a.uye)[0]?.id); if(!mid){ sum.push('⚠ üye bulunamadı'); continue; }
-      member(mid).durum=a.durum; sum.push(`${member(mid).ad} → ${a.durum}`);
+      const um=member(mid), once=kopya(um); um.durum=a.durum; farkYaz(um,once,'uye','Asistan'); sum.push(`${um.ad} → ${a.durum}`);
     }
     else if(a.type==='not_ekle'){
       const mid=a._uyeId??(resolveMembers(a.uye)[0]?.id); if(!mid){ sum.push('⚠ üye bulunamadı'); continue; }
-      const m=member(mid); m.notlar=(m.notlar?m.notlar+' | ':'')+a.not; sum.push(`${m.ad} → not eklendi`);
+      const m=member(mid); m.notlar=(m.notlar?m.notlar+' | ':'')+a.not; gecmisYaz(m,'Asistan: not eklendi','uye'); sum.push(`${m.ad} → not eklendi`);
     }
     else if(a.type==='uye_ekle'&&a.ad){
       const mid=nid('m');
-      S.members.push({id:mid,ad:a.ad,defterNo:Math.max(0,...S.members.map(m=>m.defterNo||0))+1,kayitTarihi:TODAY,uyelikTuru:a.uyelikTuru||'Gerçek Üye',gorev:a.gorev||'',durum:'AKTİF',ykKararTarihi:null,dogumYili:null,notlar:'Asistan ile eklendi',ucretsiz:false,email:'',telefon:''});
-      S.payments.push({id:nid('p'),uyeId:mid,yil:THIS_YEAR,tip:'AIDAT',tutar:S.ayarlar.aidat[THIS_YEAR]||0,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:''});
+      S.members.push(gecmisEkleYeni({id:mid,ad:a.ad,defterNo:Math.max(0,...S.members.map(m=>m.defterNo||0))+1,kayitTarihi:TODAY,uyelikTuru:a.uyelikTuru||'Gerçek Üye',gorev:a.gorev||'',durum:'AKTİF',ykKararTarihi:null,dogumYili:null,notlar:'Asistan ile eklendi',ucretsiz:false,email:'',telefon:''},'Asistan ile oluşturuldu','uye'));
+      S.payments.push(gecmisEkleYeni({id:nid('p'),uyeId:mid,yil:THIS_YEAR,tip:'AIDAT',tutar:S.ayarlar.aidat[THIS_YEAR]||0,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:''},'Asistan ile oluşturuldu','odeme'));
       sum.push(`${a.ad} üye olarak eklendi`);
     }
     else if(a.type==='basvuru_ekle'&&a.ad){
@@ -842,31 +1029,93 @@ async function fetchCsv(url){
 const cval=(r,keys)=>{ for(const k of keys){ if(r[k]!=null&&String(r[k]).trim()!=='') return String(r[k]).trim(); } return ''; };
 function mergeDuplicates(){
   if(!need('uye')) return;
-  if(!confirm('Aynı isme sahip üye kayıtları birleştirilecek: ödemeler tek kayda taşınır, boş alanlar dolu olandan tamamlanır, fazla kayıt silinir. Devam edilsin mi?')) return;
+  if(!confirm('Aynı isme sahip üye kayıtları birleştirilecek: ödemeler tek kayda taşınır, boş alanlar dolu olandan tamamlanır, fazla kayıt silinir. Farklı defter numarası taşıyan aynı adlı kayıtlar farklı kişi sayılır ve birleştirilmez. Devam edilsin mi?')) return;
   const groups={};
   S.members.forEach(m=>{ const k=trNorm(m.ad); (groups[k]=groups[k]||[]).push(m); });
-  let merged=0;
+  let merged=0, ayri=0;
   Object.values(groups).forEach(g=>{
     if(g.length<2) return;
+    if(new Set(g.map(m=>_noNorm(m.defterNo)).filter(Boolean)).size>1){ ayri++; return; } // farklı defter no → farklı kişiler
+    const birlesen=[];
     g.sort((a,b)=>((a.defterNo?0:1)-(b.defterNo?0:1)));
     const hedef=g[0];
     g.slice(1).forEach(dup=>{
       S.payments.filter(p=>String(p.uyeId)===String(dup.id)).forEach(p=>{
         const ex=S.payments.find(x=>String(x.uyeId)===String(hedef.id)&&Number(x.yil)===Number(p.yil)&&isAidatTip(x)&&isAidatTip(p));
-        if(ex){
+        if(ex){ const exOnce=kopya(ex);
           if(ex.durum!=='ÖDENDİ'&&p.durum==='ÖDENDİ'){ ex.durum='ÖDENDİ'; ex.tutar=p.tutar||ex.tutar; ex.odemeTarihi=p.odemeTarihi||ex.odemeTarihi; ex.odenenTutar=ex.tutar||0; }
           else { if(!ex.odemeTarihi&&p.odemeTarihi) ex.odemeTarihi=p.odemeTarihi; if(!ex.tutar&&p.tutar) ex.tutar=p.tutar; }
+          farkYaz(ex,exOnce,'odeme','Mükerrer üye birleştirmesi');
           S.payments=S.payments.filter(x=>x.id!==p.id);
-        } else { p.uyeId=hedef.id; }
+        } else { p.uyeId=hedef.id; gecmisYaz(p,'Mükerrer üye birleştirmesiyle bu üyeye taşındı','odeme'); }
       });
       ['defterNo','sira','kayitTarihi','ykKararTarihi','dogumYili','email','telefon','gorev','uyelikTuru'].forEach(f=>{ if(!hedef[f]&&dup[f]) hedef[f]=dup[f]; });
       if(dup.durum==='AKTİF') hedef.durum='AKTİF';
       S.members=S.members.filter(x=>x.id!==dup.id);
+      birlesen.push(dup.defterNo?`defter no ${dup.defterNo}`:'numarasız kayıt');
       merged++;
     });
+    gecmisYaz(hedef,'Mükerrer kayıt bu kayıtla birleştirildi ('+birlesen.join(', ')+')','uye');
   });
-  if(merged){ persist(); render(); toast('✓ '+merged+' mükerrer üye kaydı birleştirildi'); }
-  else toast('Mükerrer üye bulunamadı — kayıtlar temiz ✓');
+  const ayriNot=ayri?` · ${ayri} grup farklı defter no taşıdığı için birleştirilmedi`:'';
+  if(merged){ persist(); render(); toast('✓ '+merged+' mükerrer üye kaydı birleştirildi'+ayriNot); }
+  else toast((ayri?'Birleştirilecek kayıt yok':'Mükerrer üye bulunamadı — kayıtlar temiz ✓')+ayriNot);
+}
+/* İçe aktarma satırları önce toplanır, sonra sırayla eşleştirilir. Kesin eşleşmeyen satırlar
+   (aynı adla birden çok üye, numara/ad uyuşmazlığı, dosyada aynı adla birden çok satır) kullanıcıya sorulur. */
+const NO_KOLON=['Defter No','DEFTER NO','Defter Numarası','Defter no','Üye No','ÜYE NO','Üye Numarası','Üye no'];
+function eslesmeIsle(satirlar){
+  const say={}; satirlar.forEach(x=>{ x.key=trNorm(x.ad)+'#'+_noNorm(x.no); const g=x.grup+'|'+x.key; say[g]=(say[g]||0)+1; });
+  const bekleyen=[]; let hatir=0;
+  const kararlar=S.ayarlar.eslesmeKararlari||{};
+  for(const x of satirlar){
+    x.tekil=say[x.grup+'|'+x.key]===1;
+    const r=uyeEslestir(S.members,x.ad,x.no);
+    // Aynı dosyada numarasız aynı adlı birden çok satır: farklı kişiler olabilir, sorulur.
+    if(!x.tekil&&!_noNorm(x.no)&&(r.tip==='ad'||r.tip==='yok')){ r.tip='belirsiz'; r.neden=`Dosyada aynı adla birden çok satır var`; r.adaylar=r.uye?[r.uye]:[]; }
+    if(r.tip==='no'||r.tip==='ad'){ x.uygula(r.uye,false); continue; }
+    if(r.tip==='yok'){ if(x.yeni) x.uygula(x.yeni(),true); continue; }
+    x.neden=r.neden; x.adaylar=r.adaylar.map(a=>a.id);
+    const hk=x.tekil?kararlar[x.grup+'|'+x.key]:null; // seçim aynı kaynak sayfası için hatırlanır
+    if(hk==='atla'){ hatir++; continue; }
+    if(hk&&x.adaylar.includes(hk)&&member(hk)){ hatir++; x.uygula(member(hk),false); continue; }
+    bekleyen.push(x);
+  }
+  return {bekleyen,hatir};
+}
+function eslesmeSor(bekleyen,kaynak){
+  window._esles={bekleyen,kaynak};
+  const satir=(x,i)=>{
+    const ops=x.adaylar.map(id=>{ const m=member(id); return m?`<option value="${id}">${esc(m.ad)} · Defter no ${esc(m.defterNo??'—')} · ${esc(m.durum||'')}${m.telefon?' · tel …'+esc(String(m.telefon).replace(/\s/g,'').slice(-4)):''}${m.email?' · '+esc(m.email):''}</option>`:''; }).join('');
+    return `<div class="esles-s"><div class="esles-a"><b>${esc(x.ad)}</b>${_noNorm(x.no)?` · dosyada no <b>${esc(_noNorm(x.no))}</b>`:''} <span class="muted">· ${esc(x.grupAd||x.grup)}</span><div class="muted esles-n">${esc(x.neden)}</div></div>
+      <select id="es_${i}" aria-label="${esc(x.ad)} için seçim"><option value="atla">Atla — bu satırı uygulama</option>${ops}${x.yeni?'<option value="yeni">Yeni üye olarak ekle</option>':''}</select></div>`;
+  };
+  modal('Eşleştirme seçimi gerekiyor',`<p style="margin:0 0 10px">${esc(kaynak)} içindeki <b>${bekleyen.length} satır</b> tek bir üyeyle kesin eşleştirilemedi. Kendiliğinden birleştirme yapılmadı; her satır için hangi üyeye ait olduğunu seçin. Seçmediğiniz satırlar atlanır.</p>
+    <div class="esles-l">${bekleyen.map(satir).join('')}</div>
+    <label class="esles-h"><input type="checkbox" id="es_hatirla" checked> Seçimlerimi hatırla (sonraki aktarımlarda aynı satırlar için sormasın)</label>`,
+    `<button class="btn primary" onclick="eslesmeUygula()">Seçimleri uygula</button>`,true);
+}
+function eslesmeUygula(){
+  const e=window._esles; if(!e){ closeModal(); return; }
+  if(!need('ayar')) return;
+  const hatirla=document.getElementById('es_hatirla')?.checked;
+  const kararlar=S.ayarlar.eslesmeKararlari=S.ayarlar.eslesmeKararlari||{};
+  let n=0,atla=0;
+  e.bekleyen.forEach((x,i)=>{ const v=val('es_'+i)||'atla'; let hedef=null;
+    if(v==='yeni'&&x.yeni){ hedef=x.yeni(); x.uygula(hedef,true); n++; }
+    else if(v!=='atla'&&member(v)){ hedef=member(v); x.uygula(hedef,false); n++; }
+    else atla++;
+    if(hatirla&&x.tekil) kararlar[x.grup+'|'+x.key]=hedef?hedef.id:'atla';
+  });
+  window._esles=null; persist(); closeModal(); render();
+  toast(`✓ ${n} satır uygulandı${atla?`, ${atla} satır atlandı`:''}`);
+}
+function eslesmeKararUnut(){ if(!need('ayar')) return; S.ayarlar.eslesmeKararlari={}; persist(); render(); toast('Hatırlanan eşleştirme seçimleri silindi'); }
+function eslesmeSonuc(sonuc,kaynak,manual){
+  if(!sonuc.bekleyen.length) return '';
+  if(manual) setTimeout(()=>eslesmeSor(sonuc.bekleyen,kaynak),400);
+  else { window._eslesBekleyen={sonuc,kaynak}; setTimeout(()=>toastAction(`⚠ ${sonuc.bekleyen.length} satır için eşleştirme seçimi bekleniyor`,'Seçimleri göster',()=>eslesmeSor(sonuc.bekleyen,kaynak)),2200); }
+  return `, ${sonuc.bekleyen.length} satır seçiminizi bekliyor`;
 }
 async function sheetsPull(manual){
   if(!can('ayar')){ if(manual) toast('🔒 Google Sheets senkronunu yalnızca yönetici başlatabilir'); return; }
@@ -874,6 +1123,20 @@ async function sheetsPull(manual){
   if(!sh.csvUyeler&&!sh.csvOdemeler&&!sh.csvBasvurular&&!sh.yilCsv){ if(manual){ toast('Sheets bağlantısı tanımlı değil — Ayarlar → Entegrasyonlar'); go('ayarlar'); ayarTab='ent'; render(); } return; }
   toast('⟳ Google Sheets ile senkronize ediliyor…');
   let nU=0,uU=0,nP=0,nB=0,nS=0;
+  const satirlar=[];
+  const KAY='Google Sheets';
+  const odemeYaz=(m,yil,r,kolon)=>{ // yıl sayfası ve ödemeler sayfası için ortak ödeme güncellemesi
+    let p=S.payments.find(x=>String(x.uyeId)===String(m.id)&&Number(x.yil)===yil&&isAidatTip(x));
+    const once=p?kopya(p):null;
+    if(!p){ p={id:nid('p'),uyeId:m.id,yil,tip:'AIDAT',tutar:null,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Sheets'}; S.payments.push(p); nP++; }
+    const durum=normDurum(cval(r,kolon.durum),p.durum);
+    const tutar=parseTutar(cval(r,kolon.tutar))??p.tutar;
+    const trh=parseTarih(cval(r,['Ödeme Tarihi']));
+    Object.assign(p,{tutar,durum,odemeTarihi:trh||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(tutar||0):p.odenenTutar});
+    if(once) farkYaz(p,once,'odeme',KAY); else gecmisYaz(p,KAY+' aktarımıyla oluşturuldu','odeme');
+  };
+  const yeniUye=(ad,no,ek)=>()=>{ const m={id:nid('m'),ad:ad.trim(),defterNo:parseInt(_noNorm(no))||null,kayitTarihi:null,ykKararTarihi:null,dogumYili:null,notlar:'Sheets',ucretsiz:false,email:'',telefon:'',uyelikTuru:'Gerçek Üye',gorev:'',durum:'AKTİF',...ek}; S.members.push(m); nU++; gecmisYaz(m,KAY+' aktarımıyla oluşturuldu','uye'); return m; };
+  const noDoldur=(m,no)=>{ const n=parseInt(_noNorm(no)); if(!m.defterNo&&n) m.defterNo=n; };
   try{
     // Yıl sayfaları: "2026: link" satırları — mevcut Excel yapısıyla (Ad Soyad/İsim, Aidat Tutarı, Aidat Durumu, Ödeme Tarihi) doğrudan çalışır
     if(sh.yilCsv){
@@ -884,38 +1147,37 @@ async function sheetsPull(manual){
         const objs=csvToObjects(await fetchCsv(url));
         objs.forEach(r=>{
           const ad=cval(r,['Ad Soyad','İsim','ADI - SOYADI','Üye Adı Soyadı / Kurum','Ad']); if(!ad) return;
+          const no=cval(r,NO_KOLON);
           const siraNo=+cval(r,['Sıra','SIRA','Sıra No','No'])||null;
-          let m=S.members.find(x=>trNorm(x.ad)===trNorm(ad));
-          if(!m){ m={id:nid('m'),ad:ad.trim(),defterNo:null,kayitTarihi:null,ykKararTarihi:null,dogumYili:null,notlar:'Sheets '+yil,ucretsiz:false,email:'',telefon:'',uyelikTuru:cval(r,['Üyelik Türü'])||'Gerçek Üye',gorev:cval(r,['Görevi','Meslek','Görev'])||'',durum:'AKTİF'}; S.members.push(m); nU++; }
-          else { const tur=cval(r,['Üyelik Türü']), grv=cval(r,['Görevi','Meslek','Görev']); if(tur) m.uyelikTuru=tur; if(grv) m.gorev=grv; uU++; }
-          if(siraNo&&yil>=THIS_YEAR){ m.sira=siraNo; nS++; } // listedeki güncel sıra numarası
-          let p=S.payments.find(x=>String(x.uyeId)===String(m.id)&&Number(x.yil)===yil&&isAidatTip(x));
-          if(!p){ p={id:nid('p'),uyeId:m.id,yil,tip:'AIDAT',tutar:null,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Sheets'}; S.payments.push(p); nP++; }
-          const durum=normDurum(cval(r,['Aidat Durumu','Durum','ÖDEME BİLGİSİ']),p.durum);
-          const tutar=parseTutar(cval(r,['Aidat Tutarı','Tutar','Alınacak Tutar']))??p.tutar;
-          const trh=parseTarih(cval(r,['Ödeme Tarihi']));
-          Object.assign(p,{tutar,durum,odemeTarihi:trh||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(tutar||0):p.odenenTutar});
+          const tur=cval(r,['Üyelik Türü']), grv=cval(r,['Görevi','Meslek','Görev']);
+          satirlar.push({grup:'yil'+yil,grupAd:yil+' yılı sayfası',ad,no,
+            yeni:yeniUye(ad,no,{notlar:'Sheets '+yil,uyelikTuru:tur||'Gerçek Üye',gorev:grv||''}),
+            uygula:(m,yeni)=>{ const once=kopya(m);
+              if(!yeni){ if(tur) m.uyelikTuru=tur; if(grv) m.gorev=grv; noDoldur(m,no); uU++; }
+              if(siraNo&&yil>=THIS_YEAR){ m.sira=siraNo; nS++; } // listedeki güncel sıra numarası
+              if(!yeni) farkYaz(m,once,'uye',KAY);
+              odemeYaz(m,yil,r,{durum:['Aidat Durumu','Durum','ÖDEME BİLGİSİ'],tutar:['Aidat Tutarı','Tutar','Alınacak Tutar']}); }});
         });
       }
     }
     if(sh.csvUyeler){
       const objs=csvToObjects(await fetchCsv(sh.csvUyeler));
       objs.forEach(r=>{ const ad=cval(r,['Ad Soyad','İsim','ADI - SOYADI','Üye Adı Soyadı / Kurum','Ad','AD SOYAD','ad soyad']); if(!ad) return;
-        const ex=S.members.find(m=>trNorm(m.ad)===trNorm(ad));
-        const data={uyelikTuru:cval(r,['Üyelik Türü','ÜYELİK TÜRÜ'])||ex?.uyelikTuru||'Gerçek Üye',gorev:cval(r,['Meslek','Görevi','Görev'])||ex?.gorev||'',durum:normUyeDurum(cval(r,['Durum','AKTİF/PASİF']),ex?.durum),email:cval(r,['E-posta','E-Posta','Email'])||ex?.email||'',telefon:cval(r,['Telefon'])||ex?.telefon||''};
-        if(ex){Object.assign(ex,data);uU++;}
-        else{S.members.push({id:nid('m'),ad:ad.trim(),defterNo:null,kayitTarihi:null,ykKararTarihi:null,dogumYili:null,notlar:'Sheets',ucretsiz:false,...data});nU++;} });
+        const no=cval(r,NO_KOLON);
+        const veri=ex=>({uyelikTuru:cval(r,['Üyelik Türü','ÜYELİK TÜRÜ'])||ex?.uyelikTuru||'Gerçek Üye',gorev:cval(r,['Meslek','Görevi','Görev'])||ex?.gorev||'',durum:normUyeDurum(cval(r,['Durum','AKTİF/PASİF']),ex?.durum),email:cval(r,['E-posta','E-Posta','Email'])||ex?.email||'',telefon:cval(r,['Telefon'])||ex?.telefon||''});
+        satirlar.push({grup:'uyeler',grupAd:'Üyeler sayfası',ad,no,yeni:yeniUye(ad,no,veri()),
+          uygula:(m,yeni)=>{ if(yeni) return; const once=kopya(m); Object.assign(m,veri(m)); noDoldur(m,no); uU++; farkYaz(m,once,'uye',KAY); }});
+      });
     }
     if(sh.csvOdemeler){
       const objs=csvToObjects(await fetchCsv(sh.csvOdemeler));
       objs.forEach(r=>{ const ad=cval(r,['Ad Soyad','İsim','ADI - SOYADI','Üye Adı Soyadı / Kurum','Ad']),yil=+cval(r,['Yıl','Yil','YIL','Dönem']); if(!ad||!yil) return;
-        const m=S.members.find(m=>trNorm(m.ad)===trNorm(ad)); if(!m) return;
-        let p=S.payments.find(p=>String(p.uyeId)===String(m.id)&&Number(p.yil)===yil&&isAidatTip(p));
-        if(!p){p={id:nid('p'),uyeId:m.id,yil,tip:'AIDAT',tutar:null,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Sheets'};S.payments.push(p);nP++;}
-        const durum=normDurum(cval(r,['Durum','Aidat Durumu','ÖDEME BİLGİSİ']),p.durum);
-        const tutar=parseTutar(cval(r,['Tutar','Aidat Tutarı','Alınacak Tutar']))??p.tutar;
-        Object.assign(p,{tutar,durum,odemeTarihi:parseTarih(cval(r,['Ödeme Tarihi']))||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(tutar||0):p.odenenTutar}); });
+        // Ödemeler sayfasında panelde olmayan üye için yeni kayıt açılmaz (eskisi gibi atlanır).
+        satirlar.push({grup:'odemeler'+yil,grupAd:'Ödemeler sayfası ('+yil+')',ad,no:cval(r,NO_KOLON),yeni:null,
+          uygula:m=>odemeYaz(m,yil,r,{durum:['Durum','Aidat Durumu','ÖDEME BİLGİSİ'],tutar:['Tutar','Aidat Tutarı','Alınacak Tutar']})});
+      });
     }
+    const sonuc=eslesmeIsle(satirlar);
     if(sh.csvBasvurular){
       const objs=csvToObjects(await fetchCsv(sh.csvBasvurular));
       objs.forEach(r=>{ const ad=cval(r,['Ad Soyad','Ad','ad','ad soyad','İsim']); if(!ad) return;
@@ -924,11 +1186,12 @@ async function sheetsPull(manual){
     }
     persist(); render();
     document.getElementById('syncDot').classList.remove('off');
-    toast(`✓ Senkron tamam: ${nU} yeni üye, ${uU} güncelleme, ${nP} ödeme, ${nB} başvuru${nS?`, ${nS} sıra no`:''}`);
-    if(S.ayarlar.sheets.yilCsv&&!nS) setTimeout(()=>toast('⚠ Sıra kolonu okunamadı — Sheets birkaç dakika önbellekte eski kalabilir, biraz sonra tekrar Senkron deneyin'),1600);
+    const ek=eslesmeSonuc(sonuc,'Google Sheets verisi',manual);
+    toast(`✓ Senkron tamam: ${nU} yeni üye, ${uU} güncelleme, ${nP} ödeme, ${nB} başvuru${nS?`, ${nS} sıra no`:''}${sonuc.hatir?`, ${sonuc.hatir} satır hatırlanan seçiminizle`:''}${ek}`);
+    if(S.ayarlar.sheets.yilCsv&&!nS&&!sonuc.bekleyen.length) setTimeout(()=>toast('⚠ Sıra kolonu okunamadı — Sheets birkaç dakika önbellekte eski kalabilir, biraz sonra tekrar Senkron deneyin'),1600);
     const _g={}; S.members.forEach(m=>{ const k=trNorm(m.ad); _g[k]=(_g[k]||0)+1; });
     const _dup=Object.values(_g).filter(c=>c>1).length;
-    if(_dup) setTimeout(()=>toast('⚠ '+_dup+' olası mükerrer üye tespit edildi — Ayarlar → Entegrasyonlar → 🧹 Birleştir'),1800);
+    if(_dup&&!sonuc.bekleyen.length) setTimeout(()=>toast('⚠ '+_dup+' olası mükerrer üye tespit edildi — Ayarlar → Entegrasyonlar → 🧹 Birleştir'),1800);
   }catch(e){ console.error(e); toast('⚠ Sheets verisi çekilemedi. Yayınlama linkini ve erişimi kontrol edin.'); }
 }
 async function sheetsPush(){
@@ -939,7 +1202,7 @@ async function sheetsPush(){
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',
       body:JSON.stringify({
         uyeler:S.members.map(m=>({'Ad Soyad':m.ad,'Üyelik Türü':m.uyelikTuru,'Meslek':m.gorev,'Durum':m.durum,'E-posta':m.email,'Telefon':m.telefon,'Defter No':m.defterNo,'YK Tarihi':m.ykKararTarihi})),
-        odemeler:S.payments.map(p=>({'Ad Soyad':member(p.uyeId)?.ad,'Yıl':p.yil,'Tip':tipKey(p),'Tutar':p.tutar,'Durum':p.durum,'Ödenen':odenenTutari(p),'Ödeme Tarihi':p.odemeTarihi})),
+        odemeler:S.payments.map(p=>({'Defter No':member(p.uyeId)?.defterNo??'','Ad Soyad':member(p.uyeId)?.ad,'Yıl':p.yil,'Tip':tipKey(p),'Tutar':p.tutar,'Durum':p.durum,'Ödenen':odenenTutari(p),'Ödeme Tarihi':p.odemeTarihi})),
         basvurular:S.basvurular.map(b=>({'Ad Soyad':b.ad,'E-posta':b.email||'','Telefon':b.telefon||'','Meslek':b.gorev||'','Durum':b.durum,'Tarih':b.basvuruTarihi||''}))
       })});
     // Apps Script hata verirse yanıt {ok:true} olmaz; eski kodla gönderim sessizce başarısız oluyordu.
@@ -1007,29 +1270,31 @@ function pageDashboard(){
   const aday=S.basvurular.filter(b=>!['ONAYLANDI','REDDEDİLDİ'].includes(b.durum));
   const py=S.payments.filter(p=>p.yil===THIS_YEAR&&isAidatTip(p));
   const odenen=py.filter(p=>p.durum==='ÖDENDİ').reduce((s,p)=>s+(p.tutar||0),0)+py.filter(p=>p.durum==='KISMİ').reduce((s,p)=>s+(p.odenenTutar||0),0);
-  const bekleyen=py.reduce((s,p)=>s+kalan(p),0);
-  const odemeyenler=py.filter(p=>['ÖDENMEDİ','KISMİ'].includes(p.durum)&&member(p.uyeId)?.durum==='AKTİF');
-  const muaf=py.filter(p=>p.durum==='MUAF').length, odendiC=py.filter(p=>p.durum==='ÖDENDİ').length;
+  // Tanımlar: bekleyen aidat ve ödemeyen üye yalnızca aktif üyeleri sayar; "ödeme alındı" kısmi ödemeleri de içerir.
+  const aktifMi=p=>member(p.uyeId)?.durum==='AKTİF';
+  const bekleyen=py.filter(aktifMi).reduce((s,p)=>s+kalan(p),0);
+  const odemeyenler=py.filter(p=>['ÖDENMEDİ','KISMİ'].includes(p.durum)&&aktifMi(p));
+  const muaf=py.filter(p=>p.durum==='MUAF').length, odendiC=py.filter(p=>p.durum==='ÖDENDİ').length, kismiC=py.filter(p=>p.durum==='KISMİ').length;
   const oran=py.length-muaf>0?Math.round(odendiC/(py.length-muaf)*100):0;
   const sonOdemeler=S.payments.filter(p=>p.odemeTarihi).sort((a,b)=>String(b.odemeTarihi).localeCompare(String(a.odemeTarihi))).slice(0,7);
   const sonUyeler=[...S.members].sort((a,b)=>String(b.ykKararTarihi||b.kayitTarihi||'').localeCompare(String(a.ykKararTarihi||a.kayitTarihi||''))).slice(0,7);
   const yearTotals=years().sort().map(y=>{const ps=S.payments.filter(p=>p.yil===y&&isAidatTip(p));
     return [y,ps.filter(p=>p.durum==='ÖDENDİ').reduce((s,p)=>s+(p.tutar||0),0)+ps.filter(p=>p.durum==='KISMİ').reduce((s,p)=>s+(p.odenenTutar||0),0)];});
   const maxT=Math.max(...yearTotals.map(t=>t[1]),1), C=2*Math.PI*52;
-  const kp=(cls,ico,l,v,d,target)=>`<div class="kpi" onclick="go('${target}')"><div class="ico ${cls}">${ico}</div><div class="l">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+  const kp=(cls,ico,l,v,d,target,ipucu)=>`<div class="kpi" onclick="go('${target}')" title="${esc(ipucu)}"><div class="ico ${cls}">${ico}</div><div class="l">${l} ${ipucuHTML()}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
   return `
   <div class="pagehead"><div><h2>Hoş geldiniz 👋</h2><div class="sub">${new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${esc(S.ayarlar.dernekAdi)}</div></div>
   <div class="actions"><button class="btn" onclick="window.print()">🖨 Yazdır</button><button class="btn gold" onclick="go('asistan')">✨ AI Asistan</button></div></div>
   ${yedekHatirlatma()}
   ${(()=>{const y2=[THIS_YEAR-1,THIS_YEAR];const kronik=S.members.filter(m=>m.durum==='AKTİF'&&y2.every(yy=>S.payments.some(p=>String(p.uyeId)===String(m.id)&&Number(p.yil)===yy&&isAidatTip(p)&&['ÖDENMEDİ','KISMİ'].includes(p.durum))));return kronik.length?`<div class="banner amber" style="cursor:pointer" onclick="go('mesajlar')"><span>⚠</span><span><b>${kronik.length} üyenin</b> aidatı üst üste 2 yıldır (${THIS_YEAR-1}–${THIS_YEAR}) açık: ${esc(kronik.slice(0,5).map(m=>m.ad).join(', '))}${kronik.length>5?' … (+'+(kronik.length-5)+')':''} — hatırlatma listesi için tıklayın</span></div>`:''})()}
   <div class="kpis">
-    ${kp('t-blue','👥','Toplam Üye',S.members.length,'kayıtlı üye defteri','uyeler')}
-    ${kp('t-green','✓','Aktif Üye',aktif.length,aktif.filter(m=>m.ucretsiz).length+' ücretsiz statüde','uyeler')}
-    ${kp('t-gray','⏸','Pasif Üye',pasif.length,'YK kararı / ayrılma','uyeler')}
-    ${kp('t-violet','📋','Aday Üye',aday.length,'başvuru sürecinde','basvurular')}
-    ${kp('t-gold','₺',THIS_YEAR+' Tahsilat','<span style="font-size:19px">'+fmt(odenen)+'</span>',odendiC+' ödeme alındı','aidat')}
-    ${kp('t-amber','⏳','Bekleyen Aidat','<span style="font-size:19px">'+fmt(bekleyen)+'</span>','tahsil edilecek','aidat')}
-    ${kp('t-red','!','Ödemeyen Üye',odemeyenler.length,THIS_YEAR+' aidatı açık','raporlar')}
+    ${kp('t-blue','👥','Toplam Üye',S.members.length,'kayıtlı üye defteri','uyeler','Üye defterindeki bütün kayıtlar: aktif ve pasif üyelerin toplamı. Adaylar dahil değildir.')}
+    ${kp('t-green','✓','Aktif Üye',aktif.length,aktif.filter(m=>m.ucretsiz).length+' ücretsiz statüde','uyeler','Durumu "Aktif" olan üyeler. Ücretsiz statüdeki aktif üyeler de bu sayıya dahildir.')}
+    ${kp('t-gray','⏸','Pasif Üye',pasif.length,'YK kararı / ayrılma','uyeler','Durumu "Pasif" olan üyeler (YK kararıyla çıkarılan, ayrılan veya kişisel verisi silinen).')}
+    ${kp('t-violet','📋','Aday Üye',aday.length,'başvuru sürecinde','basvurular','Henüz onaylanmamış veya reddedilmemiş üyelik başvuruları.')}
+    ${kp('t-gold','₺',THIS_YEAR+' Tahsilat','<span style="font-size:19px">'+fmt(odenen)+'</span>',(odendiC+kismiC)+' ödeme alındı'+(kismiC?' ('+kismiC+' kısmi)':''),'aidat',THIS_YEAR+' yılı aidatlarından tahsil edilen toplam tutar (tam ödemeler + kısmi ödemelerin ödenen kısmı). Ödeme sayısı tam ve kısmi ödemeleri birlikte sayar. Giriş aidatı ve bağışlar dahil değildir.')}
+    ${kp('t-amber','⏳','Bekleyen Aidat','<span style="font-size:19px">'+fmt(bekleyen)+'</span>','aktif üyelerden tahsil edilecek','aidat','Yalnızca aktif üyelerin '+THIS_YEAR+' aidatlarında kalan tutar: ödenmeyenlerin tamamı + kısmi ödemelerin kalanı. Pasif üyeler ve muaf kayıtlar sayılmaz.')}
+    ${kp('t-red','!','Ödemeyen Üye',odemeyenler.length,THIS_YEAR+' aidatı açık (aktif)','raporlar','Aktif olup '+THIS_YEAR+' aidatı ödenmemiş veya kısmen ödenmiş üye sayısı. Pasif üyeler ve muaf kayıtlar sayılmaz.')}
   </div>
   <div class="grid2">
     <div>
@@ -1067,25 +1332,33 @@ function pageDashboard(){
    AI ASİSTAN SAYFASI
 ================================================================ */
 function pageAsistan(){
-  const a=S.ayarlar.ai;
-  const provName={'claude':'Claude (panel içi, anahtarsız)','anthropic-key':'Anthropic API','openai':'OpenAI','gemini':'Google Gemini','custom':'Özel uç nokta'}[a.provider];
+  const a=S.ayarlar.ai, chat=chatList(), durum=aiDurum();
+  const eski=isAdmin()&&Array.isArray(S.eskiOrtakSohbet)&&S.eskiOrtakSohbet.length?S.eskiOrtakSohbet:null;
+  const msgHTML=m=>`<div class="msg ${m.r}">${esc(m.t)}${m.acts?m.acts.map(x=>`<div class="act">✓ ${esc(x)}</div>`).join(''):''}${m.mod==='basit'?'<div class="mod">basit mod</div>':''}</div>`;
   return `
-  <div class="pagehead"><div><h2>AI Asistan</h2><div class="sub">Doğal dilde yazın; asistan işlemleri sizin onayınızla sisteme işlesin</div></div>
-  <div class="actions"><button class="btn" onclick="ayarTab='ai';go('ayarlar')">⚙ Sağlayıcı: ${provName}</button></div></div>
+  <div class="pagehead"><div><h2>AI Asistan</h2><div class="sub">Doğal dilde yazın; asistan işlemleri sizin onayınızla sisteme işlesin · sohbet geçmişi size özeldir</div></div>
+  <div class="actions"><button class="btn" onclick="ayarTab='ai';go('ayarlar')" ${can('ayar')?'':'disabled title="Sağlayıcıyı yalnızca yönetici değiştirebilir"'}>⚙ Sağlayıcı: ${esc(AI_ADLAR[a.provider]||a.provider)}</button></div></div>
+  ${durum==='bagli'?'':`<div class="banner ${durum==='yok'?'amber':'blue'}" id="aiNot" style="align-items:center;flex-wrap:wrap"><span>${durum==='yok'
+    ?'⚠ <b>Yapay zekâ bağlı değil, basit modda yanıtlanıyor.</b> Ayarlar\'dan bağlayabilirsiniz.'
+    :'ℹ Yapay zekâ bağlantısı henüz denenmedi. Bağlı değilse asistan basit modda yanıtlar.'}</span>
+    <span class="actions" style="margin-left:auto"><button class="btn sm" onclick="aiTest()">Bağlantıyı test et</button>${can('ayar')?`<button class="btn sm" onclick="ayarTab='ai';go('ayarlar')">Ayarlar</button>`:''}</span>
+    <div id="aiTestOut" style="flex-basis:100%"></div></div>`}
   <div class="card"><div class="card-b">
     <div class="chatlog" id="chatlog">
-      ${S.chat.length?S.chat.map(m=>`<div class="msg ${m.r}">${esc(m.t)}${m.acts?m.acts.map(x=>`<div class="act">✓ ${esc(x)}</div>`).join(''):''}</div>`).join(''):'<div class="empty">Örnek: "Murat Bey 2026 aidatını ödedi" · "Ayşe Yılmaz\'ı pasife al" · "Kaç üyemiz aidat ödemedi?"</div>'}
+      ${chat.length?chat.map(msgHTML).join(''):'<div class="empty">Örnek: "Murat Bey 2026 aidatını ödedi" · "Ayşe Yılmaz\'ı pasife al" · "Kaç üyemiz aidat ödemedi?"</div>'}
     </div>
     <div style="display:flex;gap:8px">
       <input id="chatInput" placeholder="Komutunuzu yazın…" onkeydown="if(event.key==='Enter'){runCommand(this.value,true);this.value=''}">
       <button class="btn primary" onclick="const i=document.getElementById('chatInput');runCommand(i.value,true);i.value=''">Gönder</button>
-      ${S.chat.length?`<button class="btn ghost" onclick="S.chat=[];persist();render()">Temizle</button>`:''}
+      ${chat.length?`<button class="btn ghost" onclick="chatClear()">Temizle</button>`:''}
     </div>
     <div class="suggest">
       ${['Murat Bey ödemesini yaptı','Aidat ödemeyenler kimler?','Zeynep Kaya adına yeni başvuru aç','Toplam tahsilat ne durumda?'].map(s=>`<button onclick="runCommand('${s}',true)">${s}</button>`).join('')}
     </div>
   </div></div>
-  <div class="banner blue">💡 İşlemler uygulanmadan önce onay penceresi açılır (Ayarlar → Yapay Zekâ bölümünden kapatılabilir). API bağlantısı yoksa asistan yerel kural moduna geçer ve temel komutları yine anlar.</div>`;
+  ${eski?`<div class="card"><details><summary class="card-h" style="cursor:pointer;list-style:none"><h3>🗂 Eski ortak sohbet <span class="tag t-gray nodot">${eski.length} mesaj · yalnızca yönetici görür</span></h3><span class="muted">göster / gizle</span></summary>
+    <div class="card-b"><p class="muted" style="margin-bottom:10px">Sohbetler kişiye özel hâle gelmeden önce tüm kullanıcıların ortak kullandığı geçmiş. Salt okunurdur.</p><div class="chatlog" style="max-height:360px">${eski.map(msgHTML).join('')}</div></div></details></div>`:''}
+  <div class="banner blue">💡 İşlemler uygulanmadan önce onay penceresi açılır (Ayarlar → Yapay Zekâ bölümünden kapatılabilir). Yapay zekâ bağlı değilse asistan basit modda temel komutları yine anlar.</div>`;
 }
 
 /* ================================================================
@@ -1116,16 +1389,16 @@ function pageUyeler(){
 function memberTable(list){
   if(!list.length) return '<div class="empty">Filtreye uyan üye bulunamadı.</div>';
   const y=THIS_YEAR;
-  return `<table><thead><tr><th>No</th><th>Üye</th><th>Üyelik Türü</th><th>Meslek</th><th>Durum</th><th>${y} Aidat</th><th>YK Tarihi</th><th></th></tr></thead><tbody>
+  return `<table class="kart-tablo"><thead><tr><th>No</th><th>Üye</th><th>Üyelik Türü</th><th>Meslek</th><th>Durum</th><th>${y} Aidat</th><th>YK Tarihi</th><th></th></tr></thead><tbody>
   ${list.map(m=>{const p=S.payments.find(p=>p.uyeId===m.id&&p.yil===y&&isAidatTip(p));
     return `<tr class="clickable" onclick="openMember('${m.id}')">
-      <td class="num">${uyeNo(m)??'—'}</td>
-      <td><div class="name-cell"><span class="avatar">${initials(m.ad)}</span><div><div class="nm">${esc(m.ad)}</div>${m.ucretsiz?'<div class="sb">ücretsiz statü</div>':''}</div></div></td>
-      <td>${esc(m.uyelikTuru||'—')}</td><td>${esc(m.gorev||'—')}</td>
-      <td><span class="tag ${stTag(m.durum)}">${esc(m.durum)}</span></td>
-      <td>${p?`<span class="tag ${payTag(p.durum)}">${esc(p.durum)}</span>`:'<span class="tag t-gray">kayıt yok</span>'}</td>
-      <td>${dfmt(m.ykKararTarihi)}</td>
-      <td onclick="event.stopPropagation()">${can('uye')?`<button class="btn sm ghost" onclick="editMember('${m.id}')">Düzenle</button>`:''}</td></tr>`;}).join('')}
+      <td class="num" data-label="No">${uyeNo(m)??'—'}</td>
+      <td class="kt-bas" data-label="Üye"><div class="name-cell"><span class="avatar">${initials(m.ad)}</span><div><div class="nm">${esc(m.ad)}</div>${m.ucretsiz?'<div class="sb">ücretsiz statü</div>':''}</div></div></td>
+      <td data-label="Üyelik türü">${esc(m.uyelikTuru||'—')}</td><td data-label="Meslek">${esc(m.gorev||'—')}</td>
+      <td data-label="Durum"><span class="tag ${stTag(m.durum)}">${esc(m.durum)}</span></td>
+      <td data-label="${y} aidat">${p?`<span class="tag ${payTag(p.durum)}">${esc(p.durum)}</span>`:'<span class="tag t-gray">kayıt yok</span>'}</td>
+      <td data-label="YK tarihi">${dfmt(m.ykKararTarihi)}</td>
+      <td class="kt-islem" onclick="event.stopPropagation()">${can('uye')?`<button class="btn sm ghost" onclick="editMember('${m.id}')">Düzenle</button>`:''}</td></tr>`;}).join('')}
   </tbody></table>`;
 }
 function renderKF(id){ render(); requestAnimationFrame(()=>{ const el=document.getElementById(id); if(el){ el.focus(); try{ const v=el.value; el.setSelectionRange(v.length,v.length); }catch(e){} } }); }
@@ -1143,6 +1416,7 @@ function openMember(id){
     <div style="display:flex;align-items:center;gap:13px;margin-bottom:18px"><span class="avatar" style="width:44px;height:44px;font-size:15px">${initials(m.ad)}</span>
       <div><div style="font-size:16px;font-weight:720">${esc(m.ad)}</div><div class="muted">${esc(m.uyelikTuru||'')} · ${esc(m.gorev||'')}</div></div>
       <span class="tag ${stTag(m.durum)}" style="margin-left:auto">${esc(m.durum)}</span></div>
+    ${m.anonim?`<div class="banner">🛡 Bu kaydın kişisel verileri ${dfmt(m.anonimTarihi)} tarihinde KVKK kapsamında silindi. Aidat kayıtları yalnızca istatistik için tutuluyor.</div>`:''}
     <div class="detail-grid">
       <div><div class="dl">Liste Sırası</div><div class="dv">${m.sira??'—'}</div></div>
       <div><div class="dl">Defter No</div><div class="dv">${m.defterNo??'—'}</div></div>
@@ -1157,14 +1431,15 @@ function openMember(id){
     </div>
     ${m.notlar?`<div class="banner amber">📝 ${esc(m.notlar)}</div>`:''}
     <h3 style="font-size:13.5px;margin:4px 0 9px;font-weight:700">Ödeme Geçmişi</h3>
-    ${hist.length?`<div class="tbl-wrap"><table><thead><tr><th>Yıl</th><th>Tip</th><th class="num">Tutar</th><th>Durum</th><th>Tarih</th>${can('aidat')?'<th></th>':''}</tr></thead><tbody>
-    ${hist.map(p=>`<tr><td>${esc(p.yil)}</td><td>${esc(tipKey(p))}</td><td class="num">${fmt(p.tutar)}${p.durum==='KISMİ'?`<div class="sb" style="font-size:11px;color:var(--faint)">ödenen ${fmt(p.odenenTutar)}</div>`:''}</td>
-      <td><span class="tag ${payTag(p.durum)}">${esc(p.durum)}</span></td><td>${dfmt(p.odemeTarihi)}</td>
-      ${can('aidat')?`<td><button class="btn sm ghost" onclick="editPayment('${p.id}')">Düzenle</button></td>`:''}</tr>`).join('')}
+    ${hist.length?`<div class="tbl-wrap"><table class="kart-tablo"><thead><tr><th>Yıl</th><th>Tip</th><th class="num">Tutar</th><th>Durum</th><th>Tarih</th>${can('aidat')?'<th></th>':''}</tr></thead><tbody>
+    ${hist.map(p=>`<tr><td class="kt-bas" data-label="Yıl"><b>${esc(p.yil)}</b>&nbsp;<span class="muted">${esc(tipKey(p)==='GİRİŞ'?'Giriş ödentisi':'Yıllık aidat')}</span></td><td data-label="Tip">${esc(tipKey(p))}</td><td class="num" data-label="Tutar">${fmt(p.tutar)}${p.durum==='KISMİ'?`<div class="sb" style="font-size:11px;color:var(--faint)">ödenen ${fmt(p.odenenTutar)}</div>`:''}</td>
+      <td data-label="Durum"><span class="tag ${payTag(p.durum)}">${esc(p.durum)}</span></td><td data-label="Ödeme tarihi">${dfmt(p.odemeTarihi)}</td>
+      ${can('aidat')?`<td class="kt-islem">${makbuzVar(p)?`<button class="btn sm ghost" onclick="makbuz('${p.id}')" title="Ödeme makbuzu (PDF)">🧾 Makbuz</button>`:''}<button class="btn sm ghost" onclick="editPayment('${p.id}')">Düzenle</button></td>`:''}</tr>`).join('')}
     </tbody></table></div>`:'<div class="empty">Ödeme kaydı yok.</div>'}
     ${memberKararHTML(m)}
-    ${HZ.relatedHTML('member',id)}`,
-  `${hist.some(p=>isAidatTip(p)&&['ÖDENMEDİ','KISMİ'].includes(p.durum))?`<button class="btn" onclick="closeModal();msj.tip='aidat_wp';msj.uye='${id}';go('mesajlar')">💬 Aidat hatırlatması</button>`:''}${can('uye')?`<button class="btn" onclick="closeModal();editMember('${id}')">Üyeyi Düzenle</button>`:''}`);
+    ${HZ.relatedHTML('member',id)}
+    ${gecmisHTML(m)}`,
+  `${can('uye')&&!m.anonim?`<button class="btn danger ghost" onclick="kvkkSil('${id}')" title="Kişisel bilgileri kalıcı olarak anonimleştirir; aidat kayıtları istatistik için kalır">🛡 Kişisel verileri sil (KVKK)</button>`:''}${hist.some(p=>isAidatTip(p)&&['ÖDENMEDİ','KISMİ'].includes(p.durum))?`<button class="btn" onclick="closeModal();msj.tip='aidat_wp';msj.uye='${id}';go('mesajlar')">💬 Aidat hatırlatması</button>`:''}${can('uye')?`<button class="btn" onclick="closeModal();editMember('${id}')">Üyeyi Düzenle</button>`:''}`);
 }
 // Üye kartında, adı geçen YK kararları (yalnızca okunur bağlantı; veri değişmez).
 function memberKararHTML(m){
@@ -1173,6 +1448,79 @@ function memberKararHTML(m){
   if(!list.length) return '';
   return `<h3 style="font-size:13.5px;margin:16px 0 9px;font-weight:700">⚖ YK Kararları</h3><div class="tbl-wrap"><table><thead><tr><th>No</th><th>Tarih</th><th>Konu</th><th>Statü</th></tr></thead><tbody>
     ${list.map(k=>`<tr><td><b>${esc(k.no??'—')}</b></td><td>${dfmt(k.tarih)}</td><td>${esc(k.konu||'—')}</td><td>${k.durum?`<span class="tag t-gray nodot">${esc(k.durum)}</span>`:'—'}</td></tr>`).join('')}</tbody></table></div>`;
+}
+/* ---------- Ödeme makbuzu (PDF) ----------
+   Tarayıcının "PDF olarak kaydet" yazdırma seçeneğiyle kurumsal görünümlü tek sayfalık makbuz üretir.
+   Makbuz no ödeme kaydının kimliğinden türetilir; aynı ödeme için her zaman aynı numara çıkar ve veri değişmez. */
+const makbuzVar=p=>!!p&&(p.durum==='ÖDENDİ'||(p.durum==='KISMİ'&&+p.odenenTutar>0));
+const makbuzNo=p=>`${p.yil}/${String(p.id).split('-')[0].toUpperCase()}`;
+function makbuzHTML(p){
+  const m=member(p.uyeId)||{ad:'—'}, a=S.ayarlar||{};
+  const odenen=odenenTutari(p), kal=kalan(p), uzun={day:'numeric',month:'long',year:'numeric'};
+  const tarih=p.odemeTarihi?new Date(toISOdate(p.odemeTarihi)+'T12:00:00').toLocaleDateString('tr-TR',uzun):'—';
+  const satir=(k,v)=>`<tr><th>${k}</th><td>${v}</td></tr>`;
+  return `<div class="mk">
+    <div class="mk-h"><div class="mk-logo">${esc(initials(a.dernekAdi||'FOYDER'))}</div><div class="mk-org"><div class="mk-ad">${esc(a.dernekAdi||'FOYDER Derneği')}</div>${a.iban?`<div class="mk-alt">IBAN: ${esc(a.iban)}</div>`:''}</div>
+      <div class="mk-no"><div class="mk-t">ÖDEME MAKBUZU</div><div>No: <b>${esc(makbuzNo(p))}</b></div><div>Düzenleme: ${esc(new Date().toLocaleDateString('tr-TR',uzun))}</div></div></div>
+    <table class="mk-tb">
+      ${satir('Üye',`<b>${esc(m.ad)}</b>`)}
+      ${satir('Üye / Defter No',esc(m.defterNo??'—'))}
+      ${satir('Üyelik Türü',esc(m.uyelikTuru||'—'))}
+      ${satir('Ödeme Türü',tipKey(p)==='GİRİŞ'?'Giriş ödentisi':'Yıllık üyelik aidatı')}
+      ${satir('Dönem',esc(p.yil))}
+      ${satir('Tahakkuk Eden Tutar',fmt(p.tutar))}
+      ${satir('Ödenen Tutar',`<b class="mk-tut">${fmt(odenen)}</b>`)}
+      ${satir('Yazıyla',`<i>${esc(tutarYaziyla(odenen))}</i>`)}
+      ${p.durum==='KISMİ'?satir('Kalan Tutar',fmt(kal)+' <span class="mk-k">(kısmi ödeme)</span>'):''}
+      ${satir('Ödeme Tarihi',esc(tarih))}
+    </table>
+    <p class="mk-a">Yukarıda bilgileri yazılı ödeme ${esc(a.dernekAdi||'dernek')} hesabına tahsil edilmiştir.</p>
+    <div class="mk-imza"><div><span>Ödemeyi Yapan</span><b>${esc(m.ad)}</b></div><div><span>Tahsil Eden (Sayman / Yetkili)</span><b>&nbsp;</b></div></div>
+    <p class="mk-not">Bu makbuz bilgilendirme amaçlıdır; dernek mevzuatı gereği düzenlenmesi gereken resmî <b>Alındı Belgesi</b>'nin yerine geçmez.</p>
+    <div class="mk-f"><span>FOYDER OS</span><span>Makbuz ${esc(makbuzNo(p))}</span></div>
+  </div>`;
+}
+function makbuz(pid){
+  if(!need('aidat')) return;
+  const p=S.payments.find(x=>x.id===pid); if(!p) return goneToast();
+  if(!makbuzVar(p)){ toast('Makbuz yalnızca ödenmiş veya kısmen ödenmiş kayıtlar için düzenlenir'); return; }
+  let el=document.getElementById('mkPrint');
+  if(!el){ el=document.createElement('div'); el.id='mkPrint'; document.body.appendChild(el); }
+  el.innerHTML=makbuzHTML(p);
+  const old=document.title; document.title='Makbuz '+makbuzNo(p).replace('/','-')+' '+(member(p.uyeId)?.ad||'');
+  document.body.classList.add('mk-printing');
+  const done=()=>{ document.body.classList.remove('mk-printing'); document.title=old; window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done);
+  setTimeout(()=>{ window.print(); setTimeout(done,1500); },60);
+  toast('🧾 Yazdırma penceresinde "PDF olarak kaydet"i seçin');
+}
+
+/* ---------- KVKK: kişisel verileri sil (anonimleştirme) ----------
+   Üye kaydı silinmez; kimliği belirleyen bilgiler kalıcı olarak boşaltılır, kayıt pasife alınır.
+   Aidat kayıtları (yıl, tutar, durum) istatistik için kalır. İşlemden önce otomatik yedek indirilir. */
+const KVKK_KALAN=['id','defterNo','sira','uyelikTuru','durum','kayitTarihi','ykKararTarihi','ucretsiz'];
+function kvkkSil(id){
+  if(!need('uye')) return;
+  const m=member(id); if(!m) return goneToast();
+  if(m.anonim){ toast('Bu kaydın kişisel verileri zaten silinmiş'); return; }
+  const adN=trNorm(m.ad), ps=S.payments.filter(p=>p.uyeId===id);
+  const kararSay=(S.kararlar||[]).filter(k=>trNorm(k.uyeAdi)===adN).length;
+  const bas=(S.basvurular||[]).filter(b=>trNorm(b.ad)===adN&&(b.durum==='ONAYLANDI'||(m.email&&b.email===m.email)||(m.telefon&&b.telefon===m.telefon)));
+  if(!confirm(`1. adım / 2 — ${m.ad} için kişisel veriler silinecek (KVKK).\n\n• Ad soyad, e-posta, telefon, meslek, doğum yılı, notlar ve değişiklik geçmişi kalıcı olarak silinir; kayıt "Anonim Üye" olarak pasife alınır.\n• ${ps.length} aidat/ödeme kaydı istatistik için kalır (yıl, tutar, durum).\n${bas.length?`• Bu kişiye ait ${bas.length} başvuru kaydındaki kişisel bilgiler de silinir.\n`:''}${kararSay?`• Adının geçtiği ${kararSay} YK kararı yasal kayıt olduğu için değiştirilmez.\n`:''}\nİşlemden önce tüm verilerin yedeği bilgisayarınıza indirilecek. Bu işlem geri alınamaz. Devam edilsin mi?`)) return;
+  const onay=prompt(`2. adım / 2 — Son onay\n\n${m.ad} kişisel verilerinin silinmesini onaylamak için büyük harflerle SİL yazın.`);
+  if(onay===null) return;
+  if(!['SİL','SIL'].includes(String(onay).trim().toLocaleUpperCase('tr'))){ toast('Onay metni eşleşmedi — hiçbir şey silinmedi'); return; }
+  exportJson(true);
+  const etiket='Anonim Üye #'+(m.defterNo||String(id).split('-')[0]);
+  const ad=m.ad, adParca=adN.split(' ').filter(t=>t.length>=3);
+  for(const k of Object.keys(m)) if(!KVKK_KALAN.includes(k)) delete m[k];
+  Object.assign(m,{ad:etiket,email:'',telefon:'',gorev:'',dogumYili:null,notlar:'',durum:'PASİF',anonim:true,anonimTarihi:TODAY,gecmis:[]});
+  gecmisYaz(m,'Kişisel veriler KVKK kapsamında silindi (kayıt anonimleştirildi)','uye');
+  ps.forEach(p=>{ if(p.not&&adParca.some(t=>trNorm(p.not).includes(t))) p.not=''; p.gecmis=[]; gecmisYaz(p,'Üyenin kişisel verileri silindi; ödeme bilgisi istatistik için korundu','odeme'); });
+  bas.forEach(b=>Object.assign(b,{ad:etiket,email:'',telefon:'',gorev:'',referans1:'',referans2:'',notlar:'',anonim:true}));
+  const kar=S.ayarlar.eslesmeKararlari; if(kar) for(const k of Object.keys(kar)) if(kar[k]===id||k.includes('|'+adN+'#')) delete kar[k];
+  persist(); closeModal(); render();
+  toast(`🛡 ${ad} kişisel verileri silindi; kayıt "${etiket}" olarak kaldı`);
 }
 function editMember(id){
   const m=id?member(id):{ad:'',uyelikTuru:'Gerçek Üye',gorev:'',durum:'AKTİF',ykKararTarihi:'',kayitTarihi:TODAY,dogumYili:'',email:'',telefon:'',notlar:'',ucretsiz:false,defterNo:''};
@@ -1200,9 +1548,20 @@ function saveMember(id){
     ykKararTarihi:val('f_yk')||null,kayitTarihi:val('f_kayit')||null,dogumYili:val('f_dogum')?+val('f_dogum'):null,
     ucretsiz:val('f_ucretsiz')==='1',email:val('f_email'),telefon:val('f_tel'),notlar:val('f_not')};
   if(id){ if(!member(id)) return goneToast();
-    Object.assign(member(id),pickChanged(data,{ad:'f_ad',uyelikTuru:'f_tur',gorev:'f_gorev',durum:'f_durum',defterNo:'f_no',ykKararTarihi:'f_yk',kayitTarihi:'f_kayit',dogumYili:'f_dogum',ucretsiz:'f_ucretsiz',email:'f_email',telefon:'f_tel',notlar:'f_not'})); toast('Üye güncellendi'); }
-  else{ const mid=nid('m'); S.members.push({id:mid,...data});
-    S.payments.push({id:nid('p'),uyeId:mid,yil:THIS_YEAR,tip:'AIDAT',tutar:S.ayarlar.aidat[THIS_YEAR]||0,durum:data.ucretsiz?'MUAF':'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:''});
+    const m=member(id), once=kopya(m);
+    Object.assign(m,pickChanged(data,{ad:'f_ad',uyelikTuru:'f_tur',gorev:'f_gorev',durum:'f_durum',defterNo:'f_no',ykKararTarihi:'f_yk',kayitTarihi:'f_kayit',dogumYili:'f_dogum',ucretsiz:'f_ucretsiz',email:'f_email',telefon:'f_tel',notlar:'f_not'}));
+    farkYaz(m,once,'uye');
+    // Ücretsiz statüye geçince bu yılın açık aidatı sorulur; kendiliğinden değiştirilmez.
+    if(!once.ucretsiz&&m.ucretsiz){
+      const acik=S.payments.filter(p=>p.uyeId===id&&Number(p.yil)===THIS_YEAR&&isAidatTip(p)&&['ÖDENMEDİ','KISMİ'].includes(p.durum));
+      if(acik.length&&confirm(`${m.ad} ücretsiz statüye alındı.\n\nBu yılın (${THIS_YEAR}) açık aidatı Muaf yapılsın mı?${acik.some(p=>p.durum==='KISMİ')?'\n(Kısmi ödenen tutar kayıtta kalır.)':''}`)){
+        acik.forEach(p=>{ const o=kopya(p); p.durum='MUAF'; farkYaz(p,o,'odeme','Ücretsiz statü nedeniyle'); });
+        toast('Üye güncellendi · '+THIS_YEAR+' aidatı Muaf yapıldı');
+      } else toast('Üye güncellendi');
+    } else toast('Üye güncellendi'); }
+  else{ const mid=nid('m'); const yeni={id:mid,...data}; gecmisYaz(yeni,'Üye kaydı oluşturuldu','uye'); S.members.push(yeni);
+    const p={id:nid('p'),uyeId:mid,yil:THIS_YEAR,tip:'AIDAT',tutar:S.ayarlar.aidat[THIS_YEAR]||0,durum:data.ucretsiz?'MUAF':'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:''};
+    gecmisYaz(p,'Yeni üye için aidat kaydı oluşturuldu','odeme'); S.payments.push(p);
     toast('Üye eklendi · '+THIS_YEAR+' aidat borcu oluşturuldu'); }
   persist(); closeModal(); render();
 }
@@ -1226,10 +1585,10 @@ function pageAidat(){
     <button class="btn" onclick="exportPaymentsXlsx()">⬇ Excel</button></div></div>
   ${can('aidat')?'':'<div class="role-note">🔒 Mevcut rolünüz ödeme kayıtlarını yalnızca görüntüleyebilir.</div>'}
   <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(195px,1fr))">
-    <div class="kpi"><div class="l">${fA.yil} Planlanan</div><div class="v" style="font-size:19px">${fmt(tplan)}</div></div>
-    <div class="kpi"><div class="l">Tahsil Edilen</div><div class="v" style="font-size:19px;color:var(--green)">${fmt(ttah)}</div></div>
-    <div class="kpi"><div class="l">Bekleyen</div><div class="v" style="font-size:19px;color:var(--amber)">${fmt(tplan-ttah)}</div></div>
-    <div class="kpi"><div class="l">Açık Kayıt</div><div class="v" style="color:var(--red)">${list.filter(p=>['ÖDENMEDİ','KISMİ'].includes(p.durum)).length}</div></div>
+    <div class="kpi" title="Aşağıdaki listede (seçili yıl, tür ve filtrelerle) muaf olmayan kayıtların toplam tutarı. Pasif üyelerin kayıtları da listedeyse dahildir."><div class="l">${fA.yil} Planlanan ${ipucuHTML()}</div><div class="v" style="font-size:19px">${fmt(tplan)}</div></div>
+    <div class="kpi" title="Listedeki kayıtlardan tahsil edilen tutar: tam ödemeler + kısmi ödemelerin ödenen kısmı."><div class="l">Tahsil Edilen ${ipucuHTML()}</div><div class="v" style="font-size:19px;color:var(--green)">${fmt(ttah)}</div></div>
+    <div class="kpi" title="Planlanan eksi tahsil edilen. Listedeki tüm kayıtları kapsar; ana sayfadaki &quot;Bekleyen Aidat&quot; ise yalnızca aktif üyeleri sayar."><div class="l">Bekleyen ${ipucuHTML()}</div><div class="v" style="font-size:19px;color:var(--amber)">${fmt(tplan-ttah)}</div></div>
+    <div class="kpi" title="Listede durumu Ödenmedi veya Kısmi olan kayıt sayısı."><div class="l">Açık Kayıt ${ipucuHTML()}</div><div class="v" style="color:var(--red)">${list.filter(p=>['ÖDENMEDİ','KISMİ'].includes(p.durum)).length}</div></div>
   </div>
   <div class="card"><div class="filters">
     <select onchange="fA.yil=this.value;render()">${ys.map(y=>`<option ${+fA.yil===y?'selected':''}>${y}</option>`).join('')}</select>
@@ -1238,16 +1597,16 @@ function pageAidat(){
     <input type="search" id="aqInput" placeholder="Üye ara…" value="${esc(fA.q)}" oninput="fA.q=this.value;renderKF('aqInput')">
     <span class="count">${list.length} kayıt</span>
   </div><div class="card-b np tbl-wrap">
-  ${list.length?`<table><thead><tr><th>Üye</th><th>Tür</th><th class="num">Tutar</th><th class="num">Kalan</th><th>Durum</th><th>Tarih</th><th></th></tr></thead><tbody>
+  ${list.length?`<table class="kart-tablo"><thead><tr><th>Üye</th><th>Tür</th><th class="num">Tutar</th><th class="num">Kalan</th><th>Durum</th><th>Tarih</th><th></th></tr></thead><tbody>
   ${list.map(p=>{const m=member(p.uyeId);return `<tr>
-    <td class="clickable" onclick="openMember('${p.uyeId}')"><div class="name-cell"><span class="avatar">${initials(m?.ad||'?')}</span><span class="nm">${esc(m?.ad||'?')}</span></div></td>
-    <td>${esc(m?.uyelikTuru||'—')}</td><td class="num">${fmt(p.tutar)}</td><td class="num">${fmt(kalan(p))}</td>
-    <td><span class="tag ${payTag(p.durum)}">${esc(p.durum)}</span></td><td>${dfmt(p.odemeTarihi)}</td>
-    <td>${can('aidat')?`${!['ÖDENDİ','MUAF'].includes(p.durum)?`<button class="btn sm" onclick="quickPaid('${p.id}')">✓ Ödendi</button>`:''} <button class="btn sm ghost" onclick="editPayment('${p.id}')">Düzenle</button>`:''}</td>
+    <td class="clickable kt-bas" data-label="Üye" onclick="openMember('${p.uyeId}')"><div class="name-cell"><span class="avatar">${initials(m?.ad||'?')}</span><span class="nm">${esc(m?.ad||'?')}</span></div></td>
+    <td data-label="Üyelik türü">${esc(m?.uyelikTuru||'—')}</td><td class="num" data-label="Tutar">${fmt(p.tutar)}</td><td class="num" data-label="Kalan">${fmt(kalan(p))}</td>
+    <td data-label="Durum"><span class="tag ${payTag(p.durum)}">${esc(p.durum)}</span></td><td data-label="Ödeme tarihi">${dfmt(p.odemeTarihi)}</td>
+    <td class="kt-islem">${can('aidat')?`${!['ÖDENDİ','MUAF'].includes(p.durum)?`<button class="btn sm" onclick="quickPaid('${p.id}')">✓ Ödendi</button>`:''}${makbuzVar(p)?`<button class="btn sm ghost" onclick="makbuz('${p.id}')" title="Ödeme makbuzu (PDF)">🧾 Makbuz</button>`:''} <button class="btn sm ghost" onclick="editPayment('${p.id}')">Düzenle</button>`:''}</td>
   </tr>`}).join('')}</tbody></table>`:'<div class="empty">Bu filtrede kayıt yok. "⚡ Yıl Borcu Oluştur" ile tüm aktif üyelere tek seferde borç yazabilirsiniz.</div>'}
   </div></div>`;
 }
-function quickPaid(pid){ if(!need('aidat')) return; const p=S.payments.find(x=>x.id===pid); p.durum='ÖDENDİ'; p.odenenTutar=p.tutar; p.odemeTarihi=TODAY; persist(); render(); toast('✓ Ödendi işaretlendi'); }
+function quickPaid(pid){ if(!need('aidat')) return; const p=S.payments.find(x=>x.id===pid); if(!p) return goneToast(); const once=kopya(p); p.durum='ÖDENDİ'; p.odenenTutar=p.tutar; p.odemeTarihi=TODAY; farkYaz(p,once,'odeme','Hızlı "Ödendi"'); persist(); render(); toast('✓ Ödendi işaretlendi'); }
 function editPayment(pid){
   const p=pid?S.payments.find(x=>x.id===pid):{uyeId:'',yil:THIS_YEAR,tip:fA.tip,tutar:S.ayarlar.aidat[THIS_YEAR]||'',durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:'',not:''};
   const opts=[...S.members].sort(byName).map(m=>`<option value="${m.id}" ${p.uyeId===m.id?'selected':''}>${esc(m.ad)}</option>`).join('');
@@ -1261,8 +1620,9 @@ function editPayment(pid){
     <div id="kismiBox" style="display:${p.durum==='KISMİ'?'block':'none'}"><label>Ödenen Tutar (kısmi)</label><input id="p_kismi" type="number" value="${p.odenenTutar||''}"></div>
     <div><label>Ödeme Tarihi</label><input id="p_tarih" type="date" value="${p.odemeTarihi||''}"></div>
     <div class="full"><label>Not</label><input id="p_not" value="${esc(p.not||'')}"></div>
-  </div>`,
-  `${pid&&can('aidat')?`<button class="btn danger" onclick="delPayment('${pid}')">Sil</button>`:''}<button class="btn primary" onclick="savePayment('${pid||''}')">Kaydet</button>`);
+  </div>
+  ${pid?gecmisHTML(p):''}`,
+  `${pid&&can('aidat')?`<button class="btn danger" onclick="delPayment('${pid}')">Sil</button>`:''}${pid&&makbuzVar(p)?`<button class="btn" onclick="makbuz('${pid}')">🧾 Makbuz (PDF)</button>`:''}<button class="btn primary" onclick="savePayment('${pid||''}')">Kaydet</button>`);
 }
 function savePayment(pid){
   if(!need('aidat')) return;
@@ -1277,13 +1637,17 @@ function savePayment(pid){
     odenenTutar:durum==='KISMİ'?(+val('p_kismi')||0):(durum==='ÖDENDİ'?(+val('p_tutar')||0):0),
     odemeTarihi:val('p_tarih')||null,not:val('p_not')};
   if(pid){ const cur=S.payments.find(x=>x.id===pid); if(!cur) return goneToast();
-    Object.assign(cur,pickChanged(data,{yil:'p_yil',tip:'p_tip',tutar:'p_tutar',durum:'p_durum',odenenTutar:['p_durum','p_tutar','p_kismi'],odemeTarihi:'p_tarih',not:'p_not'})); }
-  else S.payments.push({id:nid('p'),...data});
+    const once=kopya(cur);
+    Object.assign(cur,pickChanged(data,{yil:'p_yil',tip:'p_tip',tutar:'p_tutar',durum:'p_durum',odenenTutar:['p_durum','p_tutar','p_kismi'],odemeTarihi:'p_tarih',not:'p_not'}));
+    farkYaz(cur,once,'odeme'); }
+  else S.payments.push(gecmisEkleYeni({id:nid('p'),...data},'Ödeme kaydı oluşturuldu','odeme'));
   persist(); closeModal(); render(); toast('Ödeme kaydedildi');
 }
 function delPayment(pid){ if(!need('aidat')) return; if(!confirm('Bu ödeme kaydı silinsin mi?'))return;
   const i=S.payments.findIndex(p=>p.id===pid), old=S.payments[i];
-  S.payments=S.payments.filter(p=>p.id!==pid); persist(); closeModal(); render();
+  S.payments=S.payments.filter(p=>p.id!==pid);
+  if(old) gecmisYaz(member(old.uyeId),`${old.yil} ${tipKey(old)==='GİRİŞ'?'giriş ödentisi':'aidat'} kaydı silindi (${old.durum}, ${fmt(old.tutar)})`,'uye');
+  persist(); closeModal(); render();
   toastAction('🗑 Ödeme kaydı silindi','Geri al',()=>{ if(!S.payments.some(p=>p.id===pid)) S.payments.splice(Math.min(i,S.payments.length),0,old); persist(); render(); toast('↺ Ödeme kaydı geri getirildi'); }); }
 function yilBorcuOlustur(){
   if(!need('aidat')) return;
@@ -1296,7 +1660,7 @@ function yilBorcuOlustur(){
   S.ayarlar.aidat[hedef]=tutar; let n=0;
   S.members.filter(m=>m.durum==='AKTİF').forEach(m=>{
     if(S.payments.some(p=>p.uyeId===m.id&&Number(p.yil)===hedef&&isAidatTip(p)))return;
-    S.payments.push({id:nid('p'),uyeId:m.id,yil:hedef,tip:'AIDAT',tutar,durum:m.ucretsiz?'MUAF':'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Otomatik yıl borcu'}); n++; });
+    S.payments.push(gecmisEkleYeni({id:nid('p'),uyeId:m.id,yil:hedef,tip:'AIDAT',tutar,durum:m.ucretsiz?'MUAF':'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Otomatik yıl borcu'},'"Yıl Borcu Oluştur" ile oluşturuldu'+(m.ucretsiz?' (ücretsiz statü: Muaf)':''),'odeme')); n++; });
   fA.yil=hedef; persist(); render(); toast(`✓ ${hedef} için ${n} üyeye borç oluşturuldu`);
 }
 
@@ -1389,9 +1753,9 @@ function onaylaBasvuru(id){
   if(eksik.length&&!confirm('Eksik evrak var: '+eksik.join(', ')+'\nYine de üyeliğe alınsın mı?'))return;
   if(!confirm(`${b.ad} aktif üye olarak kaydedilecek; ${THIS_YEAR} aidatı ve giriş ödentisi borcu oluşturulacak. Onaylıyor musunuz?`))return;
   const mid=nid('m');
-  S.members.push({id:mid,ad:b.ad,defterNo:Math.max(0,...S.members.map(m=>m.defterNo||0))+1,kayitTarihi:TODAY,uyelikTuru:b.uyelikTuru,gorev:b.gorev,durum:'AKTİF',ykKararTarihi:TODAY,dogumYili:null,notlar:b.notlar,ucretsiz:false,email:b.email,telefon:b.telefon});
-  S.payments.push({id:nid('p'),uyeId:mid,yil:THIS_YEAR,tip:'AIDAT',tutar:S.ayarlar.aidat[THIS_YEAR]||0,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Yeni üye'});
-  S.payments.push({id:nid('p'),uyeId:mid,yil:THIS_YEAR,tip:'GİRİŞ',tutar:S.ayarlar.girisOdentisi||0,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Giriş ödentisi'});
+  S.members.push(gecmisEkleYeni({id:mid,ad:b.ad,defterNo:Math.max(0,...S.members.map(m=>m.defterNo||0))+1,kayitTarihi:TODAY,uyelikTuru:b.uyelikTuru,gorev:b.gorev,durum:'AKTİF',ykKararTarihi:TODAY,dogumYili:null,notlar:b.notlar,ucretsiz:false,email:b.email,telefon:b.telefon},'Başvuru onaylanarak üye kaydı oluşturuldu','uye'));
+  S.payments.push(gecmisEkleYeni({id:nid('p'),uyeId:mid,yil:THIS_YEAR,tip:'AIDAT',tutar:S.ayarlar.aidat[THIS_YEAR]||0,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Yeni üye'},'Başvuru onayıyla oluşturuldu','odeme'));
+  S.payments.push(gecmisEkleYeni({id:nid('p'),uyeId:mid,yil:THIS_YEAR,tip:'GİRİŞ',tutar:S.ayarlar.girisOdentisi||0,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Giriş ödentisi'},'Başvuru onayıyla oluşturuldu','odeme'));
   b.durum='ONAYLANDI';
   // YK kararı kaydı: karar numarası başvuruda yazılıysa o, değilse sıradaki numara.
   let kararMsg='';
@@ -4154,7 +4518,7 @@ function pageAyarlar(){
     <div style="margin-top:10px"><button class="btn sm" onclick="const y=prompt('Yıl?',${THIS_YEAR+1});if(y){S.ayarlar.aidat[y]=S.ayarlar.aidat[${THIS_YEAR}]||0;persist();render()}">+ Yıl Ekle</button></div>`;
   }
   if(ayarTab==='ai'){
-    const P=[['claude','Claude (bu panelde anahtarsız)'],['anthropic-key','Anthropic API (kendi anahtarım)'],['openai','OpenAI (ChatGPT)'],['gemini','Google Gemini'],['custom','Özel / OpenAI-uyumlu sunucu']];
+    const P=[['claude','Claude (anahtarsız — yalnızca Claude içinde açıldığında)'],['anthropic-key','Anthropic API (kendi anahtarım)'],['openai','OpenAI (ChatGPT)'],['gemini','Google Gemini'],['custom','Özel / OpenAI-uyumlu sunucu']];
     const needKey=A.ai.provider!=='claude', needEp=A.ai.provider==='custom';
     body=`
     <div class="setrow"><div><div class="sl">Sağlayıcı</div><div class="sd">"Murat Bey ödemesini yaptı" gibi komutları işleyen yapay zekâ. Claude seçeneği bu panel Claude içinde açıkken anahtarsız çalışır; diğerleri için kendi API anahtarınızı girersiniz.</div></div>
@@ -4167,8 +4531,8 @@ function pageAyarlar(){
       <div class="ctl" style="min-width:340px"><input value="${esc(A.ai.endpoint)}" placeholder="https://…/v1/chat/completions" onchange="setAyar('ai.endpoint',this.value)"></div></div>`:''}
     <div class="setrow"><div><div class="sl">İşlem öncesi onay iste</div><div class="sd">Açıkken AI'ın önerdiği her kayıt önce onay penceresinde gösterilir. Kapatmanız önerilmez.</div></div>
       <div class="ctl" style="min-width:auto"><label class="switch"><input type="checkbox" ${A.ai.onayla?'checked':''} onchange="setAyar('ai.onayla',this.checked)"><i></i></label></div></div>
-    <div class="setrow" style="border-bottom:0"><div><div class="sl">Bağlantı Testi</div><div class="sd">Seçili sağlayıcıya kısa bir deneme isteği gönderir.</div></div>
-      <div class="ctl" style="min-width:auto"><button class="btn primary" onclick="aiTest()">▶ Test Et</button></div></div>
+    <div class="setrow" style="border-bottom:0"><div><div class="sl">Bağlantı durumu <span id="aiDurumSatir">${aiDurumHTML()}</span></div><div class="sd">Seçili sağlayıcıya kısa bir deneme isteği gönderir ve çalışıp çalışmadığını gösterir.</div></div>
+      <div class="ctl" style="min-width:auto"><button class="btn primary" onclick="aiTest()">Bağlantıyı test et</button></div></div>
     <div id="aiTestOut"></div>
     <div class="tpl" style="margin-top:14px"><b>Örnek komutlar</b>
 • Murat Bey 2026 aidatının tamamını bugün ödedi
@@ -4199,7 +4563,9 @@ function pageAyarlar(){
       <button class="btn primary" onclick="sheetsPull(true)">⟳ Şimdi Çek</button>
       <button class="btn" onclick="sheetsPush()">⬆ Sheets'e Gönder</button>
       <button class="btn" onclick="mergeDuplicates()">🧹 Mükerrer Üyeleri Birleştir</button>
+      ${Object.keys(S.ayarlar.eslesmeKararlari||{}).length?`<button class="btn ghost" onclick="eslesmeKararUnut()" title="Sheets/Excel aktarımında belirsiz satırlar için verdiğiniz ve hatırlanan seçimler">↺ Hatırlanan eşleştirmeleri unut (${Object.keys(S.ayarlar.eslesmeKararlari).length})</button>`:''}
     </div>
+    <p class="muted" style="margin:4px 0 0">Eşleştirme: satırlar önce <b>Defter No / Üye No</b> sütunuyla, numara yoksa adla üyeye bağlanır. Aynı adla birden çok kayıt varsa birleştirme kendiliğinden yapılmaz; size seçim listesi gösterilir.</p>
     <div class="tabs" style="margin-top:18px"><button class="on">Apps Script Kodları</button></div>
     <p class="muted"><b>1) Gmail → Sheet: üye başvurusu e-postalarını otomatik listeye çevirir.</b> Google Sheets'te Uzantılar → Apps Script'e yapıştırın, <code>etiket</code> adını Gmail'de başvuru maillerine verdiğiniz etiketle değiştirin, tetikleyiciyi 10 dakikada bire kurun.</p>
     <div class="code" id="gs1">function basvurulariAktar(){
@@ -4281,7 +4647,7 @@ function pageAyarlar(){
       <div class="ctl" style="min-width:auto"><button class="btn danger" onclick="resetData()">⚠ Sıfırla</button></div></div>`;
   }
   if(ayarTab==='kul'){
-    body=`<p class="muted" style="margin-bottom:12px">Panele kaydolan herkes burada <b>BEKLİYOR</b> durumunda listelenir; siz onaylamadan veriye erişemez. <b>Yönetici</b> rolündeki kişiler buradan kullanıcıları onaylayabilir, reddedebilir ve her kullanıcıya ayrı <b>rol</b> atayabilir. Onayı dilediğiniz an geri alabilirsiniz.</p>
+    body=`<p class="muted" style="margin-bottom:12px">Panelde kendi kendine kayıt kapalıdır. <b>Yeni kullanıcı eklemek için:</b> Supabase → Authentication → Users → <i>Add user</i> ile e-posta ve parola (ya da davet) oluşturun; kişi burada <b>BEKLİYOR</b> olarak görünür. Ardından onaylayıp <b>rol</b> atayın. Onayı dilediğiniz an geri alabilirsiniz. Supabase → Authentication ayarlarında <i>Allow new users to sign up</i> seçeneğinin kapalı olduğundan emin olun.</p>
     <div id="kulList"><div class="empty">⟳ Kullanıcı listesi yükleniyor…</div></div>`;
     setTimeout(loadProfiles,60);
   }
@@ -4362,15 +4728,24 @@ async function rejectUser(id,email){
   else { toast('Kullanıcı reddedildi ve listeden kaldırıldı'); loadProfiles(); }
 }
 
+// "Bağlantıyı test et": hangi sağlayıcının çalıştığını ve çalışmıyorsa nedenini gösterir (Ayarlar ve Asistan sayfası).
 async function aiTest(){
-  const out=document.getElementById('aiTestOut');
-  out.innerHTML='<p class="muted" style="margin-top:10px">⟳ Bağlantı deneniyor…</p>';
+  const out=document.getElementById('aiTestOut'); const a=S.ayarlar.ai;
+  const ad=`${AI_ADLAR[a.provider]||a.provider}${a.model?` · model ${a.model}`:''}`;
+  if(out) out.innerHTML=`<p class="muted" style="margin-top:8px">⟳ ${esc(ad)} deneniyor…</p>`;
   try{
-    const r=await aiCall('Test: yalnızca {"tip":"bilgi","soru":"test"} JSON nesnesini döndür.');
-    out.innerHTML='<p style="margin-top:10px;color:var(--green);font-weight:600">✓ Bağlantı başarılı — yanıt alındı.</p>';
+    await aiCall('Test: yalnızca {"actions":[],"cevap":"test"} JSON nesnesini döndür.');
+    if(out) out.innerHTML=`<p style="margin-top:8px;color:var(--green);font-weight:650">✓ Çalışıyor: ${esc(ad)}. Asistan tam yapay zekâ modunda.</p>`;
+    toast('✓ Yapay zekâ bağlantısı çalışıyor');
   }catch(e){
-    out.innerHTML=`<p style="margin-top:10px;color:var(--red);font-weight:600">✗ Başarısız: ${esc(e.message||e)}</p><p class="muted" style="margin-top:4px">Anahtarı, modeli ve (özel sunucuda) CORS iznini kontrol edin. Claude seçeneği yalnızca panel Claude artifact'ı içinde açıkken anahtarsız çalışır.</p>`;
+    console.warn('AI testi',e);
+    if(out) out.innerHTML=`<p style="margin-top:8px;color:var(--red);font-weight:650">✗ Çalışmıyor: ${esc(ad)}</p><p class="muted" style="margin-top:2px">${esc(aiHataNedeni(e))} Asistan basit modda yanıtlamaya devam eder.</p>`;
   }
+  if(route==='ayarlar'){ const d=document.getElementById('aiDurumSatir'); if(d) d.innerHTML=aiDurumHTML(); }
+}
+function aiDurumHTML(){
+  const d=aiDurum();
+  return d==='bagli'?'<span class="tag t-green">Çalışıyor</span>':d==='yok'?'<span class="tag t-red">Bağlı değil — asistan basit modda</span>':'<span class="tag t-gray">Henüz denenmedi</span>';
 }
 
 /* ================================================================
@@ -4388,7 +4763,7 @@ function exportMembersXlsx(){
 function exportPaymentsXlsx(){
   const book=wb();
   for(const y of years()){
-    const rows=S.payments.filter(p=>p.yil===y).map(p=>{const m=member(p.uyeId)||{};return {'Ad Soyad':m.ad||'?','Tip':p.tip||'AİDAT','Tutar':p.tutar,'Durum':p.durum,'Ödenen':p.odenenTutar||0,'Kalan':kalan(p),'Ödeme Tarihi':p.odemeTarihi||'','Not':p.not||''};});
+    const rows=S.payments.filter(p=>p.yil===y).map(p=>{const m=member(p.uyeId)||{};return {'Defter No':m.defterNo||'','Ad Soyad':m.ad||'?','Tip':p.tip||'AİDAT','Tutar':p.tutar,'Durum':p.durum,'Ödenen':p.odenenTutar||0,'Kalan':kalan(p),'Ödeme Tarihi':p.odemeTarihi||'','Not':p.not||''};});
     if(rows.length) shAppend(book,String(y),rows);
   }
   XLSX.writeFile(book,'FOYDER_Aidat.xlsx'); toast('⬇ Aidat kayıtları indirildi');
@@ -4402,7 +4777,7 @@ function exportFullXlsx(){
   const book=wb();
   shAppend(book,'ÜYELER',S.members.map(m=>({'Defter No':m.defterNo||'','Ad Soyad':m.ad,'Üyelik Türü':m.uyelikTuru,'Meslek/Görev':m.gorev||'','Durum':m.durum,'YK Karar Tarihi':m.ykKararTarihi||'','Kayıt Tarihi':m.kayitTarihi||'','E-posta':m.email||'','Telefon':m.telefon||''})));
   for(const y of years()){
-    const rows=S.payments.filter(p=>p.yil===y).map(p=>{const m=member(p.uyeId)||{};return {'Ad Soyad':m.ad||'?','Tip':p.tip||'AİDAT','Aidat Tutarı':p.tutar,'Aidat Durumu':p.durum,'Ödenen':p.odenenTutar||0,'Ödeme Tarihi':p.odemeTarihi||''};});
+    const rows=S.payments.filter(p=>p.yil===y).map(p=>{const m=member(p.uyeId)||{};return {'Defter No':m.defterNo||'','Ad Soyad':m.ad||'?','Tip':p.tip||'AİDAT','Aidat Tutarı':p.tutar,'Aidat Durumu':p.durum,'Ödenen':p.odenenTutar||0,'Ödeme Tarihi':p.odemeTarihi||''};});
     if(rows.length) shAppend(book,String(y),rows);
   }
   if(S.basvurular.length) shAppend(book,'BAŞVURULAR',S.basvurular.map(b=>({'Ad Soyad':b.ad,'E-posta':b.email||'','Telefon':b.telefon||'','Meslek':b.gorev||'','Üyelik Türü':b.uyelikTuru||'','Durum':b.durum,'Tarih':b.basvuruTarihi||''})));
@@ -4412,7 +4787,7 @@ function exportFullXlsx(){
 function downloadTemplate(){
   const book=wb();
   shAppend(book,'ÜYELER',[{'Ad Soyad':'Örnek Üye','Üyelik Türü':'Gerçek Üye','Meslek/Görev':'Danışman','Durum':'AKTİF','Defter No':1,'YK Karar Tarihi':'2026-01-15','E-posta':'ornek@mail.com','Telefon':'05xx'}]);
-  shAppend(book,String(THIS_YEAR),[{'Ad Soyad':'Örnek Üye','Aidat Tutarı':S.ayarlar.aidat[THIS_YEAR]||6500,'Aidat Durumu':'ÖDENDİ','Ödeme Tarihi':'2026-02-01'}]);
+  shAppend(book,String(THIS_YEAR),[{'Defter No':1,'Ad Soyad':'Örnek Üye','Aidat Tutarı':S.ayarlar.aidat[THIS_YEAR]||6500,'Aidat Durumu':'ÖDENDİ','Ödeme Tarihi':'2026-02-01'}]);
   XLSX.writeFile(book,'FOYDER_Sablon.xlsx');
 }
 function importXlsx(file){
@@ -4422,31 +4797,41 @@ function importXlsx(file){
     try{
       const book=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
       let nU=0,uU=0,nP=0;
-      const findM=ad=>{const k=trNorm(ad);return S.members.find(m=>trNorm(m.ad)===k);};
+      const KAY='Excel içe aktarma', satirlar=[];
+      const noAl=r=>{ for(const k of NO_KOLON) if(String(r[k]??'').trim()) return String(r[k]).trim(); return ''; };
+      const yeniUye=(ad,ek)=>()=>{ const m={id:nid('m'),ad,uyelikTuru:'Gerçek Üye',gorev:'',durum:'AKTİF',kayitTarihi:TODAY,email:'',telefon:'',notlar:'',ucretsiz:false,...ek}; S.members.push(m); nU++; gecmisYaz(m,KAY+' ile oluşturuldu','uye'); return m; };
       for(const name of book.SheetNames){
         const rows=XLSX.utils.sheet_to_json(book.Sheets[name],{defval:''});
         const yil=parseInt(name);
         if(/üye|uye/i.test(name)&&!yil){
           for(const r of rows){
             const ad=String(r['Ad Soyad']||r['İsim']||r['ad']||'').trim(); if(!ad) continue;
-            let m=findM(ad);
-            if(m){ Object.assign(m,{uyelikTuru:r['Üyelik Türü']||m.uyelikTuru,gorev:r['Meslek/Görev']||r['Görevi']||m.gorev,durum:normUyeDurum(r['Durum'],m.durum),email:r['E-posta']||m.email,telefon:String(r['Telefon']||m.telefon||'')}); uU++; }
-            else { S.members.push({id:nid('m'),ad,uyelikTuru:r['Üyelik Türü']||'Gerçek Üye',gorev:r['Meslek/Görev']||r['Görevi']||'',durum:normUyeDurum(r['Durum']),defterNo:parseInt(r['Defter No'])||null,ykKararTarihi:parseTarih(r['YK Karar Tarihi']),kayitTarihi:TODAY,email:r['E-posta']||'',telefon:String(r['Telefon']||''),notlar:'',ucretsiz:false}); nU++; }
+            const no=noAl(r);
+            satirlar.push({grup:'uye:'+name,grupAd:'"'+name+'" sayfası',ad,no,
+              yeni:yeniUye(ad,{uyelikTuru:r['Üyelik Türü']||'Gerçek Üye',gorev:r['Meslek/Görev']||r['Görevi']||'',durum:normUyeDurum(r['Durum']),defterNo:parseInt(_noNorm(no))||null,ykKararTarihi:parseTarih(r['YK Karar Tarihi']),email:r['E-posta']||'',telefon:String(r['Telefon']||'')}),
+              uygula:(m,yeni)=>{ if(yeni) return; const once=kopya(m);
+                Object.assign(m,{uyelikTuru:r['Üyelik Türü']||m.uyelikTuru,gorev:r['Meslek/Görev']||r['Görevi']||m.gorev,durum:normUyeDurum(r['Durum'],m.durum),email:r['E-posta']||m.email,telefon:String(r['Telefon']||m.telefon||'')});
+                const n=parseInt(_noNorm(no)); if(!m.defterNo&&n) m.defterNo=n;
+                uU++; farkYaz(m,once,'uye',KAY); }});
           }
         } else if(yil>2000&&yil<2100){
           for(const r of rows){
             const ad=String(r['Ad Soyad']||r['İsim']||r['ad']||'').trim(); if(!ad) continue;
-            let m=findM(ad);
-            if(!m){ m={id:nid('m'),ad,uyelikTuru:'Gerçek Üye',gorev:'',durum:'AKTİF',kayitTarihi:TODAY,email:'',telefon:'',notlar:'',ucretsiz:false}; S.members.push(m); nU++; }
-            const durum=normDurum(r['Aidat Durumu']||r['Durum']);
-            const tutar=parseTutar(r['Aidat Tutarı'])??parseTutar(r['Tutar'])??S.ayarlar.aidat[yil]??0;
-            if(!S.payments.some(p=>p.uyeId===m.id&&Number(p.yil)===yil&&isAidatTip(p))){
-              S.payments.push({id:nid('p'),uyeId:m.id,yil,tip:'AIDAT',tutar,durum,odenenTutar:durum==='ÖDENDİ'?tutar:(parseTutar(r['Ödenen'])||0),odemeTarihi:parseTarih(r['Ödeme Tarihi']),not:''}); nP++;
-            }
+            satirlar.push({grup:'yil:'+name,grupAd:'"'+name+'" sayfası',ad,no:noAl(r),yeni:yeniUye(ad,{}),
+              uygula:m=>{
+                const durum=normDurum(r['Aidat Durumu']||r['Durum']);
+                const tutar=parseTutar(r['Aidat Tutarı'])??parseTutar(r['Tutar'])??S.ayarlar.aidat[yil]??0;
+                if(!S.payments.some(p=>p.uyeId===m.id&&Number(p.yil)===yil&&isAidatTip(p))){
+                  const p={id:nid('p'),uyeId:m.id,yil,tip:'AIDAT',tutar,durum,odenenTutar:durum==='ÖDENDİ'?tutar:(parseTutar(r['Ödenen'])||0),odemeTarihi:parseTarih(r['Ödeme Tarihi']),not:''};
+                  S.payments.push(p); gecmisYaz(p,KAY+' ile oluşturuldu','odeme'); nP++;
+                } }});
           }
         }
       }
-      persist(); render(); toast(`✓ İçe aktarıldı: ${nU} yeni üye, ${uU} güncelleme, ${nP} ödeme kaydı`);
+      const sonuc=eslesmeIsle(satirlar);
+      persist(); render();
+      const ek=eslesmeSonuc(sonuc,'Excel dosyası',true);
+      toast(`✓ İçe aktarıldı: ${nU} yeni üye, ${uU} güncelleme, ${nP} ödeme kaydı${sonuc.hatir?`, ${sonuc.hatir} satır hatırlanan seçiminizle`:''}${ek}`);
     }catch(err){ console.error(err); toast('⚠ Dosya okunamadı — şablon düzenine uygunluğunu kontrol edin'); }
   };
   rd.readAsArrayBuffer(file);
@@ -4469,7 +4854,7 @@ function importJson(file){
     const key=S.ayarlar&&S.ayarlar.ai?S.ayarlar.ai.apiKey:'';
     S=d; const def=defaultState();
     S.ayarlar={...def.ayarlar,...S.ayarlar}; S.ayarlar.ai={...def.ayarlar.ai,...(S.ayarlar.ai||{}),apiKey:key}; S.ayarlar.sheets={...def.ayarlar.sheets,...(S.ayarlar.sheets||{})};
-    S.basvurular=S.basvurular||[]; S.kararlar=S.kararlar||[]; S.chat=S.chat||[]; S.seq={m:0,p:0,b:0,k:0,...(S.seq||{})};
+    migrateState(S); S.seq={m:0,p:0,b:0,k:0,...(S.seq||{})};
     window._allowWipe=true;
     persist(); render(); toast('✓ Yedek geri yüklendi');
   };
@@ -4503,46 +4888,27 @@ const SB_URL='https://oanrxvzxbajilsjowcps.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hbnJ4dnp4YmFqaWxzam93Y3BzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNjA0MzAsImV4cCI6MjA5NjgzNjQzMH0.aClq_mf907cVRRqkCFc0d6Mrx1L-Le0HNjRyNexEf2E';
 window._sb=window.supabase?window.supabase.createClient(SB_URL,SB_KEY):null;
 window._sbUser=null;
-let _authIsSignup=false; /* kayıt kapalı: kullanıcılar Supabase panelinden eklenir */
-
-function authMode(m){
-  _authIsSignup=(m==='up');
-  document.getElementById('authTitle').textContent=_authIsSignup?'FOYDER OS — Kayıt':'FOYDER OS — Giriş';
-  document.getElementById('authBtn').textContent=_authIsSignup?'Kaydol':'Giriş Yap';
-  document.getElementById('authNameRow').classList.toggle('auth-hide',!_authIsSignup);
-  document.getElementById('authSw').innerHTML=_authIsSignup
-    ?'Zaten hesabınız var mı? <a href="#" onclick="authMode(\'in\');return false">Giriş yapın</a>'
-    :'Hesabınız yok mu? <a href="#" onclick="authMode(\'up\');return false">Kaydolun</a>';
-  document.getElementById('authErr').textContent='';
-}
+// Panele kayıt kapalıdır: yeni kullanıcıyı yönetici Supabase'ten ekler, Ayarlar → Kullanıcı Onayları'ndan onaylar.
 async function authSubmit(){
   const email=document.getElementById('authEmail').value.trim();
   const pass=document.getElementById('authPass').value;
   const err=document.getElementById('authErr'), btn=document.getElementById('authBtn');
-  err.classList.remove('ok'); err.textContent='';
+  err.textContent='';
   if(!email||!pass){ err.textContent='E-posta ve parola gerekli.'; return; }
-  if(!window._sb){ err.textContent='Supabase SDK yüklenemedi — interneti kontrol edin.'; return; }
+  if(!window._sb){ err.textContent='Bağlantı kurulamadı — internetinizi kontrol edip sayfayı yenileyin.'; return; }
   btn.disabled=true; btn.textContent='⟳ Bekleyin…';
   try{
-    if(_authIsSignup){
-      const name=document.getElementById('authName').value.trim();
-      const {data,error}=await window._sb.auth.signUp({email,password:pass,options:{data:{name}}});
-      if(error) throw error;
-      if(data.session){ window._sbUser=data.user; boot(); }
-      else { err.classList.add('ok'); err.textContent='✓ Kayıt alındı. E-postanıza gelen doğrulama bağlantısına tıklayıp giriş yapın.'; authMode('in'); }
-    } else {
-      const {data,error}=await window._sb.auth.signInWithPassword({email,password:pass});
-      if(error) throw error;
-      window._sbUser=data.user; boot();
-    }
+    const {data,error}=await window._sb.auth.signInWithPassword({email,password:pass});
+    if(error) throw error;
+    window._sbUser=data.user; boot();
   }catch(e){
     const m=String(e.message||e);
     err.textContent=m.includes('Invalid login')?'E-posta veya parola hatalı.'
-      :m.includes('already registered')?'Bu e-posta zaten kayıtlı — giriş yapın.'
       :m.includes('Email not confirmed')?'E-posta henüz doğrulanmadı — gelen kutunuzu kontrol edin.'
-      :'Hata: '+m;
+      :'Giriş yapılamadı. Lütfen biraz sonra tekrar deneyin.';
+    console.error('giriş',e);
   }
-  btn.disabled=false; authMode(_authIsSignup?'up':'in');
+  btn.disabled=false; btn.textContent='Giriş Yap';
 }
 async function authSignOut(){
   if(!confirm('Oturum kapatılsın mı?')) return;
@@ -4561,8 +4927,7 @@ async function cloudLoad(){
       S.ayarlar={...d.ayarlar,...(S.ayarlar||{})};
       S.ayarlar.ai={...d.ayarlar.ai,...(S.ayarlar.ai||{})};
       S.ayarlar.sheets={...d.ayarlar.sheets,...(S.ayarlar.sheets||{})};
-      S.chat=S.chat||[]; S.basvurular=S.basvurular||[];
-      ['members','payments','kararlar'].forEach(k=>{ if(!Array.isArray(S[k])) S[k]=[]; });
+      migrateState(S);
       S.seq={m:0,p:0,b:0,k:0,...(S.seq||{})};
       restoreAiKey();
       return 'ok';
@@ -4611,7 +4976,7 @@ async function boot(){
   // Okuma hatasında boş başlangıç verisi buluta YAZILMAZ; kullanıcı yeniden dener.
   if(loaded==='error'){ showLoadError(); return; }
   document.getElementById('loadErrWrap')?.classList.add('auth-hide');
-  if(loaded==='empty'){ await loadState(); persist(); }
+  if(loaded==='empty'){ loadState(); persist(); }
   render();
   ensureSyncBanner(); watchCloud();
   toast('👋 Hoş geldiniz, '+(window._sbUser?.user_metadata?.name||window._sbUser?.email||''));
