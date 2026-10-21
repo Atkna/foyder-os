@@ -6,7 +6,8 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230E1A33%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 text-anchor=%22middle%22 fill=%22%23C2992E%22 font-family=%22Georgia%22 font-weight=%22bold%22>F</text></svg>">
 <title>FOYDER OS · Üye ve Aidat Yönetim Sistemi</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Sürüm sabit ve bütünlük karması ile: CDN'deki dosya değişirse tarayıcı yüklemez. Güncellerken karmayı da yenileyin. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/inter-ui/3.19.3/inter.min.css">
 <style>
 :root{
@@ -224,7 +225,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)!important;box-s
   .nav button{justify-content:center}.nav .pill{display:none}
   .main{padding:calc(var(--tb) + 16px) 14px 60px}
   .frm,.checks{grid-template-columns:1fr}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .kpi{padding:12px}.kpi .v{font-size:19px}.kpi .ico{width:26px;height:26px;margin-bottom:6px}
   .cmdbar .hint{display:none}.crumb{display:none}
+  .topnav{padding:0 12px;gap:8px}.top-actions .btn .t{display:none}
 }
 </style>
 </head>
@@ -250,7 +254,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)!important;box-s
   </div>
   <div class="top-actions">
     <span class="sync-dot off" id="syncDot" title="Google Sheets bağlantısı"></span>
-    <button class="btn ghost sm no-print" onclick="sheetsPull(true)" title="Google Sheets'ten verileri çek">⟳ Senkron</button>
+    <button class="btn ghost sm no-print" onclick="sheetsPull(true)" title="Google Sheets'ten verileri çek">⟳ <span class="t">Senkron</span></button>
   </div>
 </header>
 
@@ -298,13 +302,85 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)!important;box-s
 <div class="toast" id="toast"></div>
 
 <script id="seedData" type="application/json">{"members":[],"payments":[],"kararlar":[]}</script>
+<script id="foyder-core">
+/* ================================================================
+   FOYDER OS — ekrandan bağımsız yardımcılar
+   İsim sadeleştirme, Excel/Sheets değer okuyucuları, tahsilat hesabı ve eşzamanlı
+   kayıt birleştirmesi. tests/panel.test.js bu bloğu index.html içinden okuyup çalıştırır.
+================================================================ */
+function trNorm(s){ return String(s||'').toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[çğıöşüâî]/g,c=>({'ç':'c','ğ':'g','ı':'i','ö':'o','ş':'s','ü':'u','â':'a','î':'i'}[c]||c)).replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+function toISOdate(v){ if(!v) return null; v=String(v).trim(); let m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'); m=v.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/); if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'); return null; }
+// Bir ödeme kaydından tahsil edilen tutar (Dashboard, raporlar ve asistan aynı hesabı kullanır).
+const odenenTutari=p=>p.durum==='ÖDENDİ'?(+p.tutar||0):p.durum==='KISMİ'?(+p.odenenTutar||0):0;
+const isAidatTip=p=>{ const t=String(p.tip||'AIDAT').toLocaleUpperCase('tr'); return t==='AIDAT'||t==='AİDAT'; };
+// Kayıtlardaki "AIDAT"/"AİDAT"/boş ve "GİRİŞ"/"GIRIS" yazımlarını tek anahtara çevirir (veriyi değiştirmez).
+const tipKey=p=>isAidatTip(p)?'AIDAT':(trNorm(p.tip)==='giris'?'GİRİŞ':String(p.tip||''));
+/* Excel ve Google Sheets'ten gelen değerleri tek biçime çeviren okuyucular */
+function normDurum(v,fallback){
+  const t=trNorm(v); if(!t) return fallback||'ÖDENMEDİ';
+  if(/muaf|ucretsiz/.test(t)) return 'MUAF';
+  if(/kismi|kismen/.test(t)) return 'KISMİ';
+  if(/odenmedi|odenmemis|odemedi|borclu|bekliyor|hayir/.test(t)) return 'ÖDENMEDİ';
+  if(/odendi|odenmis|odedi|tahsil|alindi|tamam|evet/.test(t)) return 'ÖDENDİ';
+  return fallback||'ÖDENMEDİ';
+}
+function normUyeDurum(v,fallback){ const t=trNorm(v); return /pasif/.test(t)?'PASİF':/aktif/.test(t)?'AKTİF':(fallback||'AKTİF'); }
+// "6.500", "6.500,00 TL", "6500.5", 6500 → sayı. Okunamazsa null.
+function parseTutar(v){
+  if(typeof v==='number') return isFinite(v)?v:null;
+  let t=String(v??'').replace(/[^0-9.,-]/g,''); if(!t||!/\d/.test(t)) return null;
+  if(t.includes(',')&&t.includes('.')) t=t.lastIndexOf(',')>t.lastIndexOf('.')?t.replace(/\./g,'').replace(',','.'):t.replace(/,/g,'');
+  else if(t.includes(',')) t=/,\d{1,2}$/.test(t)?t.replace(/\./g,'').replace(',','.'):t.replace(/,/g,'');
+  else if(/\.\d{3}(\.|$)/.test(t)) t=t.replace(/\./g,'');
+  const n=parseFloat(t); return isFinite(n)?Math.round(n*100)/100:null;
+}
+// Excel seri tarihi (ör. 46054), Date nesnesi, "2026-02-01" veya "01.02.2026" → "YYYY-MM-DD".
+function parseTarih(v){
+  if(v==null||v==='') return null;
+  if(Object.prototype.toString.call(v)==='[object Date]') return isNaN(v)?null:`${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;
+  if(typeof v==='number'||/^\d{5}(\.\d+)?$/.test(String(v).trim())){ const n=+v; if(n<20000||n>80000) return null; const d=new Date(Date.UTC(1899,11,30)+Math.floor(n)*864e5); return d.toISOString().slice(0,10); }
+  return toISOdate(v);
+}
+const STATE_LISTS=['members','payments','basvurular','kararlar'];
+const _same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const _isObj=v=>v&&typeof v==='object'&&!Array.isArray(v);
+function mergeValue(b,l,r){
+  if(_same(l,b)) return r;
+  if(_same(r,b)||_same(l,r)) return l;
+  if(_isObj(l)&&_isObj(r)){ const out={}; for(const k of new Set([...Object.keys(l),...Object.keys(r)])){ const v=mergeValue(_isObj(b)?b[k]:undefined,l[k],r[k]); if(v!==undefined) out[k]=v; } return out; }
+  return l;
+}
+// Aynı kaydı iki taraf da değiştirdiyse alanları ayrı ayrı birleştirir; aynı alan ikisinde de değiştiyse bu tarayıcıdaki kazanır.
+function mergeById(b,l,r){
+  const B=new Map(b.map(x=>[x&&x.id,x])), L=new Map(l.map(x=>[x&&x.id,x])), R=new Map(r.map(x=>[x&&x.id,x]));
+  const out=[], seen=new Set();
+  for(const id of [...R.keys(),...L.keys()]){
+    if(seen.has(id)) continue; seen.add(id);
+    const bi=B.get(id), li=L.get(id), ri=R.get(id);
+    if(li&&ri) out.push(_same(li,ri)?li:bi?mergeValue(bi,li,ri):li);
+    else if(li){ if(!bi||!_same(li,bi)) out.push(li); }        // başka yerde silinmiş; burada değişmediyse silinmiş kalsın
+    else if(!bi||!_same(ri,bi)) out.push(ri);                   // burada silinmiş; başka yerde değişmediyse silinmiş kalsın
+  }
+  return out;
+}
+function mergeState(b,l,r){
+  b=b||{}; const out={};
+  for(const k of new Set([...Object.keys(l),...Object.keys(r)])){
+    if(k==='hafiza'){ out[k]=l[k]!==undefined?l[k]:r[k]; continue; }   // Toplantılar ve Görevler kendi birleştirmesini yapar
+    if(STATE_LISTS.includes(k)) out[k]=mergeById(Array.isArray(b[k])?b[k]:[],Array.isArray(l[k])?l[k]:[],Array.isArray(r[k])?r[k]:[]);
+    else if(k==='seq'){ out[k]={}; for(const q of new Set([...Object.keys(l.seq||{}),...Object.keys(r.seq||{})])) out[k][q]=Math.max(+(l.seq||{})[q]||0,+(r.seq||{})[q]||0); }
+    else { const v=mergeValue(b[k],l[k],r[k]); if(v!==undefined) out[k]=v; }
+  }
+  return out;
+}
+</script>
 <script>
 /* ================================================================
    FOYDER OS — Çekirdek: durum, depolama, yardımcılar
 ================================================================ */
 const SEED = JSON.parse(document.getElementById('seedData').textContent);
 const THIS_YEAR = new Date().getFullYear();
-const TODAY = new Date().toISOString().slice(0,10);
+const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)(new Date()); // yerel tarih
 let S=null, route='dashboard', saveTimer=null;
 const HAS_STORE = !!(window.storage && window.storage.get);
 
@@ -337,20 +413,86 @@ function persist(){
   saveTimer=setTimeout(()=>cloudQueue(async()=>{
     // AI anahtari yalnizca bu tarayicida saklanir; buluta ve ortak depoya asla yazilmaz
     try{ localStorage.setItem('foyder:aikey', (S.ayarlar&&S.ayarlar.ai&&S.ayarlar.ai.apiKey)||''); }catch(e){}
-    const out=JSON.parse(JSON.stringify(S)); if(out.ayarlar&&out.ayarlar.ai) out.ayarlar.ai.apiKey='';
+    const out=stripForCloud(S);
     try{ if(HAS_STORE) await window.storage.set('foyder:v2',JSON.stringify(out)); }catch(e){}
-    try{ if(window._sb&&window._sbUser){
-      window._lastSaveAt=Date.now();
-      // Toplantılar ve Görevler verisi buluttaki son hâlle birleştirilir; başka kullanıcının eklediği görev silinmez
-      const hzSent=await HZ.prepareOut(out);
-      const {error}=await window._sb.from('app_state').upsert({id:'main',data:out,updated_at:new Date().toISOString()});
-      if(error) throw error;
-      HZ.synced(hzSent,out.hafiza);
+    // Okuyucu rolü hiçbir şeyi değiştiremez; buluta yazmaz (ör. asistan sohbeti yalnızca bu tarayıcıda kalır).
+    if(!(window._sb&&window._sbUser)||!canWriteAny()) return;
+    try{
+      let hzSent=null;
+      // Başka bir kullanıcının bu arada yaptığı değişiklikler korunur: kayıt kayıt, alan alan birleştirme.
+      const res=await cloudCommit(async remote=>{
+        const merged=remote?mergeState(_base||remote,out,remote):JSON.parse(JSON.stringify(out));
+        if(remote&&(remote.members||[]).length&&!(merged.members||[]).length&&!window._allowWipe) throw new Error('Tüm üye listesini silecek bir kayıt engellendi');
+        hzSent=await HZ.prepareOut(merged,remote?remote.hafiza||null:undefined);
+        return merged;
+      });
+      window._allowWipe=false;
+      adoptMerged(out,res.data);
+      HZ.synced(hzSent,res.data.hafiza);
       const d=document.getElementById('syncDot'); if(d) d.classList.remove('off');
-    }}catch(e){ console.error(e); toast('⚠ Buluta kaydedilemedi — bağlantıyı kontrol edin'); }
+    }catch(e){ console.error(e); toast(/silecek/.test(e.message||'')?'⚠ Kayıt durduruldu: bu işlem tüm üye listesini silecekti. Sayfayı yenileyip tekrar deneyin.':'⚠ Buluta kaydedilemedi — bağlantıyı kontrol edin'); }
     schedulePushDurum();
   }),350);
 }
+/* ---------- Eşzamanlı kullanım: üç yönlü birleştirme ----------
+   _base: buluttan en son okunan ya da buluta yazılan hâl. Kaydederken bulut yeniden okunur;
+   yalnızca bu tarayıcıda değişen kayıtlar ve alanlar yazılır, başkasının değişikliği ezilmez. */
+let _base=null;
+function stripForCloud(s){ const o=JSON.parse(JSON.stringify(s)); if(o.ayarlar&&o.ayarlar.ai) o.ayarlar.ai.apiKey=''; return o; }
+function setBase(data){ _base=data?JSON.parse(JSON.stringify(data)):null; if(_base) delete _base.hafiza; }
+// Kayıt bittiğinde buluttaki birleşik hâli yerel duruma işler; kayıt sürerken yapılan yerel değişiklikler korunur.
+function adoptMerged(sent,merged){
+  const key=S.ayarlar&&S.ayarlar.ai?S.ayarlar.ai.apiKey:'';
+  const before=JSON.stringify(stripForCloud(S));
+  const next=mergeState(sent,stripForCloud(S),merged);
+  next.hafiza=S.hafiza;
+  if(next.ayarlar&&next.ayarlar.ai) next.ayarlar.ai.apiKey=key;
+  const changed=JSON.stringify(stripForCloud(next))!==before;
+  S=next; setBase(merged);
+  if(changed&&typeof render==='function'&&!document.getElementById('modalRoot').innerHTML) render();
+  return changed;
+}
+// Başka bir kullanıcı kaydettiğinde (canlı bildirim) değişiklikleri sayfayı yenilemeden alır.
+function pullRemote(){
+  if(!(window._sb&&window._sbUser)||!S) return Promise.resolve();
+  return cloudQueue(async()=>{
+    const {data:row,error}=await window._sb.from('app_state').select('data').eq('id','main').maybeSingle();
+    if(error||!row||!row.data) throw error||new Error('veri yok');
+    const remote=row.data, local=stripForCloud(S);
+    const hadLocal=_base&&!_same({...local,hafiza:undefined},{..._base,hafiza:undefined});
+    const changed=adoptMerged(local,mergeState(_base||remote,local,remote));
+    setBase(remote);
+    HZ.synced(null,remote.hafiza||null);
+    if(hadLocal) persist();
+    if(changed) toast('🔄 Başka bir kullanıcının değişiklikleri alındı');
+  }).catch(e=>{ console.warn('canlı eşitleme',e); const b=document.getElementById('syncBanner'); if(b) b.style.display='flex'; });
+}
+/* Bulut satırını oku → birleştir → yalnızca okunan sürüm hâlâ en güncelse yaz (iyimser kilit).
+   Arada başka biri kaydettiyse satır yeniden okunur ve yeniden birleştirilir; hiçbir değişiklik ezilmez.
+   build(remoteData) yeni veriyi (ya da yazılmayacaksa null) döndürür. */
+async function cloudCommit(build){
+  for(let deneme=0;deneme<5;deneme++){
+    const {data:row,error}=await window._sb.from('app_state').select('data,updated_at').eq('id','main').maybeSingle();
+    if(error) throw error;
+    const next=await build(row?row.data:null);
+    if(!next) return null;
+    const stamp=new Date().toISOString();
+    window._lastSaveAt=Date.now();
+    if(!row){
+      const {error:e}=await window._sb.from('app_state').insert({id:'main',data:next,updated_at:stamp});
+      if(!e) return {data:next,remote:null};
+      if(!/duplicate|conflict|23505/i.test(e.message||e.code||'')) throw e;
+      continue;
+    }
+    let q=window._sb.from('app_state').update({data:next,updated_at:stamp}).eq('id','main');
+    if(row.updated_at) q=q.eq('updated_at',row.updated_at);
+    const {data:upd,error:e2}=await q.select('id');
+    if(e2) throw e2;
+    if(upd&&upd.length) return {data:next,remote:row.data};
+  }
+  throw new Error('Kayıt çakışması çözülemedi');
+}
+function canWriteAny(){ return Object.values(PERM[window._myRole]||PERM.okuyucu).some(Boolean); }
 let _pushTimer=null;
 function schedulePushDurum(){
   const sh=S&&S.ayarlar&&S.ayarlar.sheets; if(!sh||!sh.webhook||!sh.autoPush) return;
@@ -369,17 +511,23 @@ function restoreAiKey(){
     else if(S.ayarlar.ai.apiKey) localStorage.setItem('foyder:aikey',S.ayarlar.ai.apiKey);
   }catch(e){}
 }
-function nid(p){ S.seq[p]++; return p.toUpperCase()+String(S.seq[p]).padStart(p==='p'?4:3,'0'); }
+// Sıra numarası + kısa rastgele ek: iki kullanıcı aynı anda kayıt eklese de kimlikler çakışmaz.
+function nid(p){ S.seq[p]=(+S.seq[p]||0)+1; return p.toUpperCase()+String(S.seq[p]).padStart(p==='p'?4:3,'0')+'-'+Math.random().toString(36).slice(2,6); }
 
 const fmt=n=>n==null||isNaN(n)?'—':new Intl.NumberFormat('tr-TR').format(Math.round(n))+' ₺';
-function toISOdate(v){ if(!v) return null; v=String(v).trim(); let m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'); m=v.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/); if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'); return null; }
-const dfmt=d=>{ if(!d) return '—'; const iso=toISOdate(d); if(!iso) return String(d); const dt=new Date(iso+'T00:00:00'); return isNaN(dt)?String(d):dt.toLocaleDateString('tr-TR'); };
+const dfmt=d=>{ if(!d) return '—'; const iso=toISOdate(d); if(!iso) return esc(String(d)); const dt=new Date(iso+'T00:00:00'); return isNaN(dt)?String(d):dt.toLocaleDateString('tr-TR'); };
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const byName=(a,b)=>a.ad.localeCompare(b.ad,'tr');
 const uyeNo=m=>{ const sheetMode=S.members.some(x=>x.sira!=null); return sheetMode?(m.sira??null):(m.defterNo??null); };
 const byDefter=(a,b)=>((uyeNo(a)??1e9)-(uyeNo(b)??1e9))||byName(a,b);
 const initials=ad=>ad.split(' ').map(w=>w[0]).slice(0,2).join('').toLocaleUpperCase('tr');
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+// Düğmeli bildirim (ör. silme sonrası "Geri al").
+function toastAction(m,label,fn){
+  const t=document.getElementById('toast'); t.textContent=m;
+  const b=document.createElement('button'); b.textContent=label; b.onclick=()=>{ t.classList.remove('show'); fn(); };
+  t.appendChild(b); t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),7000);
+}
 function member(id){ return S.members.find(m=>m.id===id); }
 function payTag(d){ return {'ÖDENDİ':'t-green','ÖDENMEDİ':'t-red','KISMİ':'t-amber','MUAF':'t-gray'}[d]||'t-gray'; }
 function stTag(d){ return d==='AKTİF'?'t-green':(d==='PASİF'?'t-gray':'t-blue'); }
@@ -391,12 +539,13 @@ const val=id=>document.getElementById(id)?.value??'';
 const PERM={admin:{uye:1,aidat:1,basvuru:1,karar:1,ayar:1,gorev:1},operasyon:{uye:1,aidat:0,basvuru:1,karar:1,ayar:0,gorev:1},muhasebe:{uye:0,aidat:1,basvuru:0,karar:0,ayar:0,gorev:1},okuyucu:{uye:0,aidat:0,basvuru:0,karar:0,ayar:0,gorev:0}};
 window._myRole='okuyucu';
 function can(k){ return !!(PERM[window._myRole]||PERM.okuyucu)[k]; }
+// Veriyi değiştiren her işlev bunu çağırır: düğme gizli olsa da (ör. AI komutu, konsol) yetkisiz değişiklik yapılamaz.
+function need(k){ if(can(k)) return true; toast('🔒 Bu işlem için yetkiniz yok'); return false; }
 function isAdmin(){ return window._myRole==='admin'; }
 
 /* ================================================================
    İSİM EŞLEŞTİRME (TR normalize + bulanık)
 ================================================================ */
-function trNorm(s){ return String(s||'').toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[çğıöşüâî]/g,c=>({'ç':'c','ğ':'g','ı':'i','ö':'o','ş':'s','ü':'u','â':'a','î':'i'}[c]||c)).replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
 function resolveMembers(nameStr){
   const q=trNorm(nameStr).replace(/\b(bey|hanim|bey'?in|hanim'?in)\b/g,'').trim();
   if(!q) return [];
@@ -428,37 +577,36 @@ Eylem tipleri:
 Kurallar: Ad alanına yalnızca metinde geçen ismi yaz; uydurma. Tutar belirtilmemişse null. "ödedi/yatırdı/ödemesi alındı" → odeme.
 SORU/SORGU ise (kim, kaç, ne kadar, listele, hangi, var mı, toplam, oran, durumu ne, borcu var mı gibi) MUTLAKA {"type":"bilgi","soru":"<kullanıcının sorusu aynen>"} kullan ve başka eylem ekleme. Sadece kesin bir kayıt değişikliği (ödeme işle, üye ekle, durum değiştir) istendiğinde işlem eylemi üret. Emin değilsen bilgi olarak işaretle.`;
 
-async function aiCall(userText){
+// Tüm yapay zekâ istekleri buradan geçer (komutlar, analiz yorumu, toplantı kontrolü ve özeti).
+// system: OpenAI uyumlu sağlayıcılarda ayrı sistem mesajı olarak, diğerlerinde metnin başına eklenir.
+async function aiRequest(prompt,{system='',maxTokens=1200}={}){
   const a=S.ayarlar.ai;
-  const messages=[{role:'user',content:AI_SYS+'\n\nKomut: '+userText}];
-  if(a.provider==='claude'){
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:a.model||'claude-sonnet-4-6',max_tokens:1000,messages})});
-    const d=await r.json(); if(d.error) throw new Error(d.error.message||'API hatası');
-    return d.content.map(c=>c.text||'').join('');
-  }
-  if(a.provider==='anthropic-key'){
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':a.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:a.model||'claude-sonnet-4-6',max_tokens:1000,messages})});
-    const d=await r.json(); if(d.error) throw new Error(d.error.message||'API hatası');
-    return d.content.map(c=>c.text||'').join('');
+  const full=system?system+'\n\n'+prompt:prompt;
+  const read=async r=>{ let d=null; try{ d=await r.json(); }catch(_){} if(!r.ok||!d||d.error) throw new Error((d&&d.error&&(d.error.message||d.error))||('HTTP '+r.status)); return d; };
+  if(a.provider==='claude'||a.provider==='anthropic-key'){
+    const headers={'Content-Type':'application/json'};
+    if(a.provider==='anthropic-key') Object.assign(headers,{'x-api-key':a.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'});
+    const d=await read(await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,
+      body:JSON.stringify({model:a.model||'claude-sonnet-4-6',max_tokens:maxTokens,messages:[{role:'user',content:full}]})}));
+    return (d.content||[]).map(c=>c.text||'').join('').trim();
   }
   if(a.provider==='openai'||a.provider==='custom'){
-    const base=a.provider==='custom'?(a.endpoint||'').replace(/\/$/,''):'https://api.openai.com';
-    const r=await fetch(base+'/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+a.apiKey},
-      body:JSON.stringify({model:a.model||'gpt-4o-mini',messages:[{role:'system',content:AI_SYS},{role:'user',content:userText}]})});
-    const d=await r.json(); if(d.error) throw new Error(d.error.message||'API hatası');
-    return d.choices[0].message.content;
+    // Özel sunucu: tam adres (…/v1/chat/completions) ya da kök adres girilebilir.
+    const ep=(a.endpoint||'').trim().replace(/\/$/,'');
+    const url=a.provider==='custom'?(/\/chat\/completions$/.test(ep)?ep:ep+'/v1/chat/completions'):'https://api.openai.com/v1/chat/completions';
+    const messages=system?[{role:'system',content:system},{role:'user',content:prompt}]:[{role:'user',content:prompt}];
+    const d=await read(await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+a.apiKey},
+      body:JSON.stringify({model:a.model||'gpt-4o-mini',max_tokens:maxTokens,messages})}));
+    return String(d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content||'').trim();
   }
   if(a.provider==='gemini'){
-    const mdl=a.model||'gemini-2.0-flash';
-    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${mdl}:generateContent?key=${a.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:AI_SYS+'\n\nKomut: '+userText}]}]})});
-    const d=await r.json(); if(d.error) throw new Error(d.error.message||'API hatası');
-    return d.candidates[0].content.parts.map(p=>p.text).join('');
+    const d=await read(await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(a.model||'gemini-2.0-flash')}:generateContent?key=${encodeURIComponent(a.apiKey)}`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:full}]}]})}));
+    return ((d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts)||[]).map(p=>p.text||'').join('').trim();
   }
   throw new Error('AI sağlayıcı yapılandırılmamış');
 }
+const aiCall=userText=>aiRequest('Komut: '+userText,{system:AI_SYS,maxTokens:1000});
 function parseAiJson(text){
   const m=text.match(/\{[\s\S]*\}/); if(!m) throw new Error('JSON bulunamadı');
   return JSON.parse(m[0]);
@@ -468,14 +616,18 @@ function parseAiJson(text){
 function localParse(t){
   const lo=trNorm(t); const actions=[];
   const yil=(t.match(/\b(20\d{2})\b/)||[])[1];
-  const tutar=(t.replace(/\./g,'').match(/\b(\d{3,6})\s*(tl|₺|lira)?\b/i)||[])[1];
+  // Tutar: "TL/₺/lira" ile yazılan sayı öncelikli; yıl (ör. 2026) tutar sanılmaz.
+  const sayilar=[...t.replace(/(\d)\.(\d{3})/g,'$1$2').matchAll(/(\d{3,7})\s*(tl|₺|lira)?/gi)];
+  const tutar=(sayilar.find(x=>x[2])||sayilar.find(x=>!/^(19|20)\d{2}$/.test(x[1]))||[])[1];
+  // Soru cümlesi ("tahsilat ne durumda?", "ödedi mi?") işlem olarak yorumlanmaz.
+  const soru=t.includes('?')||/(^| )(kac|kim|kimler|ne kadar|ne durumda|listele|hangi|var mi|mi$|mu$|mı$|toplam|oran)( |$)/.test(lo);
   const nameGuess=(()=>{ // üye listesinden metinde geçen ismi bul
     let best=null,bl=0;
     for(const m of S.members){ const parts=trNorm(m.ad).split(' ');
       const hits=parts.filter(p=>lo.includes(p)).length;
       if(hits>bl||(hits===bl&&hits>0&&best&&m.ad.length>best.length)){ bl=hits; best=m.ad; } }
     return bl>0?best:null; })();
-  if(/(odedi|odendi|odemesini yapti|odeme yapti|tahsil|yatirdi|odemesi alindi|parasini)/.test(lo)){
+  if(!soru&&/(odedi|odendi|odemesini yapti|odeme yapti|tahsil edildi|yatirdi|odemesi alindi|parasini)/.test(lo)){
     actions.push({type:'odeme',uye:nameGuess||t,yil:yil?+yil:THIS_YEAR,tutar:tutar?+tutar:null,durum:/kismi|kismen/.test(lo)?'KISMİ':'ÖDENDİ',tarih:TODAY});
   } else if(/pasif(e| yap| al)/.test(lo)&&nameGuess){ actions.push({type:'uye_durum',uye:nameGuess,durum:'PASİF'});
   } else if(/aktif(e| yap| al)/.test(lo)&&nameGuess){ actions.push({type:'uye_durum',uye:nameGuess,durum:'AKTİF'});
@@ -525,7 +677,7 @@ function confirmActions(plan){
       const cands=resolveMembers(a.uye);
       const sel=cands.length?`<select id="act_uye_${i}">${cands.map((c,j)=>`<option value="${c.id}">${esc(c.ad)}</option>`).join('')}${'<option value="">— eşleşme yanlışsa iptal —</option>'}</select>`
         :`<span class="tag t-red nodot">Üye bulunamadı: ${esc(a.uye)}</span>`;
-      const det=a.type==='odeme'?`${a.yil} · ${a.tutar?fmt(a.tutar):'kayıtlı tutar'} · ${a.durum}`:(a.type==='uye_durum'?('Durum → '+a.durum):('Not: '+esc(a.not)));
+      const det=a.type==='odeme'?`${esc(a.yil)} · ${a.tutar?fmt(a.tutar):'kayıtlı tutar'} · ${esc(a.durum)}`:(a.type==='uye_durum'?('Durum → '+esc(a.durum)):('Not: '+esc(a.not)));
       return `<tr><td><span class="tag t-gold nodot">${a.type==='odeme'?'💰 Ödeme':a.type==='uye_durum'?'🔄 Durum':'📝 Not'}</span></td><td>${sel}</td><td>${det}</td></tr>`;
     }
     if(a.type==='uye_ekle') return `<tr><td><span class="tag t-blue nodot">👤 Yeni Üye</span></td><td><b>${esc(a.ad)}</b></td><td>${esc(a.uyelikTuru||'Gerçek Üye')} · ${esc(a.gorev||'—')}</td></tr>`;
@@ -547,13 +699,15 @@ function execPending(){
   persist(); closeModal(); render();
   toast(sum.length?('✓ '+sum.join(' · ')):'Uygulanacak işlem yoktu');
 }
+const ACTION_PERM={odeme:'aidat',uye_durum:'uye',not_ekle:'uye',uye_ekle:'uye',basvuru_ekle:'basvuru'};
 function applyActions(actions){
   const sum=[];
   for(const a of actions){
+    if(ACTION_PERM[a.type]&&!can(ACTION_PERM[a.type])){ sum.push('🔒 Yetkiniz olmadığı için uygulanmadı: '+({odeme:'ödeme kaydı',uye_durum:'üye durumu',not_ekle:'üye notu',uye_ekle:'yeni üye',basvuru_ekle:'başvuru'}[a.type])); continue; }
     if(a.type==='odeme'){
       const mid=a._uyeId??(resolveMembers(a.uye)[0]?.id); if(!mid){ sum.push('⚠ üye bulunamadı'); continue; }
       const yil=+a.yil||THIS_YEAR;
-      let p=S.payments.find(p=>p.uyeId===mid&&p.yil===yil&&((p.tip||'AIDAT').toUpperCase()==='AIDAT'||(p.tip||'').toUpperCase()==='AİDAT'));
+      let p=S.payments.find(p=>p.uyeId===mid&&Number(p.yil)===yil&&isAidatTip(p));
       if(!p){ p={id:nid('p'),uyeId:mid,yil,tip:'AIDAT',tutar:a.tutar||S.ayarlar.aidat[yil]||null,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Asistan'}; S.payments.push(p); }
       if(a.tutar) p.tutar=a.tutar;
       p.durum=a.durum==='KISMİ'?'KISMİ':'ÖDENDİ';
@@ -586,14 +740,14 @@ function applyActions(actions){
 function answerQuery(q){
   const lo=trNorm(q||'');
   const YIL=(lo.match(/\b(20\d{2})\b/)||[])[1]; const yil=YIL?+YIL:THIS_YEAR;
-  const aidat=p=>(p.tip||'AIDAT').toUpperCase()==='AIDAT'||(p.tip||'').toUpperCase()==='AİDAT';
-  const py=S.payments.filter(p=>p.yil===yil && aidat(p));
+  const aidat=isAidatTip;
+  const py=S.payments.filter(p=>Number(p.yil)===yil && aidat(p));
   const aktif=S.members.filter(m=>m.durum==='AKTİF');
   const pasif=S.members.filter(m=>m.durum==='PASİF');
   const odendi=py.filter(p=>p.durum==='ÖDENDİ');
   const muaf=py.filter(p=>p.durum==='MUAF');
   const acik=py.filter(p=>['ÖDENMEDİ','KISMİ'].includes(p.durum)&&member(p.uyeId)?.durum==='AKTİF');
-  const tahsilat=odendi.reduce((s,p)=>s+(p.odenenTutar||p.tutar||0),0);
+  const tahsilat=py.reduce((s,p)=>s+odenenTutari(p),0);
   const beklenen=py.filter(p=>p.durum!=='MUAF'&&member(p.uyeId)?.durum==='AKTİF').reduce((s,p)=>s+(p.tutar||0),0);
   const isimList=(arr,n=15)=>arr.slice(0,n).map(x=>member(x.uyeId)?.ad).filter(Boolean).join(', ')+(arr.length>n?` … (+${arr.length-n})`:'');
 
@@ -628,7 +782,7 @@ function answerQuery(q){
   }
   // 5) Tahsilat / gelir / borç toplamı
   if(/(tahsilat|gelir|toplandi|ne kadar topla|kasa)/.test(lo)){
-    return `${yil} tahsilatı: ${fmt(tahsilat)} (${odendi.length} ödeme).\nBeklenen toplam: ${fmt(beklenen)} · Açık: ${fmt(Math.max(0,beklenen-tahsilat))}.`;
+    return `${yil} tahsilatı: ${fmt(tahsilat)} (${odendi.length} tam, ${py.filter(p=>p.durum==='KISMİ').length} kısmi ödeme).\nBeklenen toplam: ${fmt(beklenen)} · Açık: ${fmt(Math.max(0,beklenen-tahsilat))}.`;
   }
   if(/(kalan|acik tutar|tahsil edilecek|borc toplam)/.test(lo)){
     return `${yil} açık tutar: ${fmt(Math.max(0,beklenen-tahsilat))} (${acik.length} üye).`;
@@ -686,8 +840,8 @@ async function fetchCsv(url){
 }
 // Google Sheets kolon takma adlari: farkli baslik adlarini panelin bekledigi alanlara esler
 const cval=(r,keys)=>{ for(const k of keys){ if(r[k]!=null&&String(r[k]).trim()!=='') return String(r[k]).trim(); } return ''; };
-const isAidatTip=p=>{ const t=String(p.tip||'AIDAT').toLocaleUpperCase('tr'); return t==='AIDAT'||t==='AİDAT'; };
 function mergeDuplicates(){
+  if(!need('uye')) return;
   if(!confirm('Aynı isme sahip üye kayıtları birleştirilecek: ödemeler tek kayda taşınır, boş alanlar dolu olandan tamamlanır, fazla kayıt silinir. Devam edilsin mi?')) return;
   const groups={};
   S.members.forEach(m=>{ const k=trNorm(m.ad); (groups[k]=groups[k]||[]).push(m); });
@@ -715,6 +869,7 @@ function mergeDuplicates(){
   else toast('Mükerrer üye bulunamadı — kayıtlar temiz ✓');
 }
 async function sheetsPull(manual){
+  if(!can('ayar')){ if(manual) toast('🔒 Google Sheets senkronunu yalnızca yönetici başlatabilir'); return; }
   const sh=S.ayarlar.sheets;
   if(!sh.csvUyeler&&!sh.csvOdemeler&&!sh.csvBasvurular&&!sh.yilCsv){ if(manual){ toast('Sheets bağlantısı tanımlı değil — Ayarlar → Entegrasyonlar'); go('ayarlar'); ayarTab='ent'; render(); } return; }
   toast('⟳ Google Sheets ile senkronize ediliyor…');
@@ -736,11 +891,10 @@ async function sheetsPull(manual){
           if(siraNo&&yil>=THIS_YEAR){ m.sira=siraNo; nS++; } // listedeki güncel sıra numarası
           let p=S.payments.find(x=>String(x.uyeId)===String(m.id)&&Number(x.yil)===yil&&isAidatTip(x));
           if(!p){ p={id:nid('p'),uyeId:m.id,yil,tip:'AIDAT',tutar:null,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Sheets'}; S.payments.push(p); nP++; }
-          const dRaw=cval(r,['Aidat Durumu','Durum','ÖDEME BİLGİSİ']);
-          const durum=dRaw?dRaw.toLocaleUpperCase('tr').replace('ODENDI','ÖDENDİ').replace('ODENMEDI','ÖDENMEDİ'):p.durum;
-          const tRaw=cval(r,['Aidat Tutarı','Tutar','Alınacak Tutar']);
-          const trh=toISOdate(cval(r,['Ödeme Tarihi']));
-          Object.assign(p,{tutar:tRaw?+tRaw.replace(/[^0-9]/g,'')||p.tutar:p.tutar,durum,odemeTarihi:trh||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(p.tutar||0):p.odenenTutar});
+          const durum=normDurum(cval(r,['Aidat Durumu','Durum','ÖDEME BİLGİSİ']),p.durum);
+          const tutar=parseTutar(cval(r,['Aidat Tutarı','Tutar','Alınacak Tutar']))??p.tutar;
+          const trh=parseTarih(cval(r,['Ödeme Tarihi']));
+          Object.assign(p,{tutar,durum,odemeTarihi:trh||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(tutar||0):p.odenenTutar});
         });
       }
     }
@@ -748,7 +902,7 @@ async function sheetsPull(manual){
       const objs=csvToObjects(await fetchCsv(sh.csvUyeler));
       objs.forEach(r=>{ const ad=cval(r,['Ad Soyad','İsim','ADI - SOYADI','Üye Adı Soyadı / Kurum','Ad','AD SOYAD','ad soyad']); if(!ad) return;
         const ex=S.members.find(m=>trNorm(m.ad)===trNorm(ad));
-        const data={uyelikTuru:cval(r,['Üyelik Türü','ÜYELİK TÜRÜ'])||ex?.uyelikTuru||'Gerçek Üye',gorev:cval(r,['Meslek','Görevi','Görev'])||ex?.gorev||'',durum:(cval(r,['Durum','AKTİF/PASİF'])||ex?.durum||'AKTİF').toLocaleUpperCase('tr'),email:cval(r,['E-posta','E-Posta','Email'])||ex?.email||'',telefon:cval(r,['Telefon'])||ex?.telefon||''};
+        const data={uyelikTuru:cval(r,['Üyelik Türü','ÜYELİK TÜRÜ'])||ex?.uyelikTuru||'Gerçek Üye',gorev:cval(r,['Meslek','Görevi','Görev'])||ex?.gorev||'',durum:normUyeDurum(cval(r,['Durum','AKTİF/PASİF']),ex?.durum),email:cval(r,['E-posta','E-Posta','Email'])||ex?.email||'',telefon:cval(r,['Telefon'])||ex?.telefon||''};
         if(ex){Object.assign(ex,data);uU++;}
         else{S.members.push({id:nid('m'),ad:ad.trim(),defterNo:null,kayitTarihi:null,ykKararTarihi:null,dogumYili:null,notlar:'Sheets',ucretsiz:false,...data});nU++;} });
     }
@@ -758,16 +912,15 @@ async function sheetsPull(manual){
         const m=S.members.find(m=>trNorm(m.ad)===trNorm(ad)); if(!m) return;
         let p=S.payments.find(p=>String(p.uyeId)===String(m.id)&&Number(p.yil)===yil&&isAidatTip(p));
         if(!p){p={id:nid('p'),uyeId:m.id,yil,tip:'AIDAT',tutar:null,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Sheets'};S.payments.push(p);nP++;}
-        const dRaw=cval(r,['Durum','Aidat Durumu','ÖDEME BİLGİSİ'])||p.durum;
-        const durum=dRaw.toLocaleUpperCase('tr').replace('ODENDI','ÖDENDİ').replace('ODENMEDI','ÖDENMEDİ');
-        const tRaw=cval(r,['Tutar','Aidat Tutarı','Alınacak Tutar']);
-        Object.assign(p,{tutar:tRaw?+tRaw.replace(/[^0-9]/g,''):p.tutar,durum,odemeTarihi:toISOdate(cval(r,['Ödeme Tarihi']))||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(p.tutar||0):p.odenenTutar}); });
+        const durum=normDurum(cval(r,['Durum','Aidat Durumu','ÖDEME BİLGİSİ']),p.durum);
+        const tutar=parseTutar(cval(r,['Tutar','Aidat Tutarı','Alınacak Tutar']))??p.tutar;
+        Object.assign(p,{tutar,durum,odemeTarihi:parseTarih(cval(r,['Ödeme Tarihi']))||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(tutar||0):p.odenenTutar}); });
     }
     if(sh.csvBasvurular){
       const objs=csvToObjects(await fetchCsv(sh.csvBasvurular));
-      objs.forEach(r=>{ const ad=r['Ad Soyad']||r['Ad']; if(!ad) return;
+      objs.forEach(r=>{ const ad=cval(r,['Ad Soyad','Ad','ad','ad soyad','İsim']); if(!ad) return;
         if(S.basvurular.some(b=>trNorm(b.ad)===trNorm(ad))||S.members.some(m=>trNorm(m.ad)===trNorm(ad))) return;
-        S.basvurular.push({id:nid('b'),ad:ad.trim(),email:r['E-posta']||'',telefon:r['Telefon']||'',gorev:r['Meslek']||'',uyelikTuru:r['Üyelik Türü']||'Gerçek Üye',basvuruTarihi:r['Tarih']||TODAY,durum:'YENİ',komiteDurumu:'',ykKararNo:'',referans1:r['Referans 1']||'',referans2:r['Referans 2']||'',evraklar:{},notlar:'E-posta/Form aktarımı'}); nB++; });
+        S.basvurular.push({id:nid('b'),ad:ad.trim(),email:cval(r,['E-posta','email','Email','E-Posta']),telefon:cval(r,['Telefon','telefon']),gorev:cval(r,['Meslek','meslek','Görev']),uyelikTuru:cval(r,['Üyelik Türü'])||'Gerçek Üye',basvuruTarihi:parseTarih(cval(r,['Tarih','tarih']))||TODAY,durum:'YENİ',komiteDurumu:'',ykKararNo:'',referans1:r['Referans 1']||'',referans2:r['Referans 2']||'',evraklar:{},notlar:'E-posta/Form aktarımı'}); nB++; });
     }
     persist(); render();
     document.getElementById('syncDot').classList.remove('off');
@@ -783,13 +936,16 @@ async function sheetsPush(){
   if(!url){ toast('Apps Script webhook adresi tanımlı değil'); return; }
   toast('⟳ Sheets\'e gönderiliyor…');
   try{
-    await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',
       body:JSON.stringify({
         uyeler:S.members.map(m=>({'Ad Soyad':m.ad,'Üyelik Türü':m.uyelikTuru,'Meslek':m.gorev,'Durum':m.durum,'E-posta':m.email,'Telefon':m.telefon,'Defter No':m.defterNo,'YK Tarihi':m.ykKararTarihi})),
-        odemeler:S.payments.map(p=>({'Ad Soyad':member(p.uyeId)?.ad,'Yıl':p.yil,'Tip':p.tip,'Tutar':p.tutar,'Durum':p.durum,'Ödeme Tarihi':p.odemeTarihi}))
+        odemeler:S.payments.map(p=>({'Ad Soyad':member(p.uyeId)?.ad,'Yıl':p.yil,'Tip':tipKey(p),'Tutar':p.tutar,'Durum':p.durum,'Ödenen':odenenTutari(p),'Ödeme Tarihi':p.odemeTarihi})),
+        basvurular:S.basvurular.map(b=>({'Ad Soyad':b.ad,'E-posta':b.email||'','Telefon':b.telefon||'','Meslek':b.gorev||'','Durum':b.durum,'Tarih':b.basvuruTarihi||''}))
       })});
-    toast('✓ Veriler Google Sheets\'e gönderildi');
-  }catch(e){ toast('⚠ Gönderilemedi: '+e.message); }
+    // Apps Script hata verirse yanıt {ok:true} olmaz; eski kodla gönderim sessizce başarısız oluyordu.
+    let ok=r.ok; try{ const j=await r.json(); ok=ok&&j&&j.ok===true; }catch(_){ ok=false; }
+    toast(ok?'✓ Veriler Google Sheets\'e gönderildi':'⚠ Sheets yanıt vermedi. Ayarlar → Entegrasyonlar\'daki güncel Apps Script kodunu (2) yeniden kopyalayıp dağıtın.');
+  }catch(e){ console.error(e); toast('⚠ Sheets\'e gönderilemedi — webhook adresini ve internet bağlantısını kontrol edin'); }
 }
 </script>
 <script>
@@ -833,6 +989,14 @@ function renderNav(){
   const sh=S.ayarlar.sheets;
   document.getElementById('syncDot').classList.toggle('off',!(sh.csvUyeler||sh.csvOdemeler||sh.yilCsv||sh.webhook));
 }
+// Yöneticiye 30 günden uzun süredir JSON yedeği alınmadıysa hatırlatır (yalnızca bu tarayıcıda izlenir).
+function yedekHatirlatma(){
+  if(!can('ayar')) return '';
+  let son=null; try{ son=localStorage.getItem('foyder:sonYedek'); }catch(e){}
+  const gun=son?Math.floor((Date.now()-new Date(son).getTime())/864e5):null;
+  if(gun!==null&&gun<30) return '';
+  return `<div class="banner blue" style="align-items:center;flex-wrap:wrap"><span>💾 ${gun===null?'Bu tarayıcıdan henüz JSON yedeği alınmadı.':`Son JSON yedeği ${gun} gün önce alındı.`} Düzenli yedek, yanlışlıkla silinen kayıtları geri getirmenin en güvenli yoludur.</span> <button class="btn sm" onclick="exportJson()">⬇ Şimdi yedek al</button></div>`;
+}
 function go(r){ route=r; render(); window.scrollTo(0,0); }
 
 /* ================================================================
@@ -854,9 +1018,10 @@ function pageDashboard(){
   const maxT=Math.max(...yearTotals.map(t=>t[1]),1), C=2*Math.PI*52;
   const kp=(cls,ico,l,v,d,target)=>`<div class="kpi" onclick="go('${target}')"><div class="ico ${cls}">${ico}</div><div class="l">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
   return `
-  <div class="pagehead"><div><h2>Hoş geldiniz 👋</h2><div class="sub">${new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${S.ayarlar.dernekAdi}</div></div>
+  <div class="pagehead"><div><h2>Hoş geldiniz 👋</h2><div class="sub">${new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${esc(S.ayarlar.dernekAdi)}</div></div>
   <div class="actions"><button class="btn" onclick="window.print()">🖨 Yazdır</button><button class="btn gold" onclick="go('asistan')">✨ AI Asistan</button></div></div>
-  ${(()=>{const y2=[THIS_YEAR-1,THIS_YEAR];const kronik=S.members.filter(m=>m.durum==='AKTİF'&&y2.every(yy=>S.payments.some(p=>String(p.uyeId)===String(m.id)&&Number(p.yil)===yy&&isAidatTip(p)&&['ÖDENMEDİ','KISMİ'].includes(p.durum))));return kronik.length?`<div class="banner amber" style="cursor:pointer" onclick="go('mesajlar')">⚠ <b>${kronik.length} üyenin</b> aidatı üst üste 2 yıldır (${THIS_YEAR-1}–${THIS_YEAR}) açık: ${esc(kronik.slice(0,5).map(m=>m.ad).join(', '))}${kronik.length>5?' … (+'+(kronik.length-5)+')':''} — hatırlatma listesi için tıklayın</div>`:''})()}
+  ${yedekHatirlatma()}
+  ${(()=>{const y2=[THIS_YEAR-1,THIS_YEAR];const kronik=S.members.filter(m=>m.durum==='AKTİF'&&y2.every(yy=>S.payments.some(p=>String(p.uyeId)===String(m.id)&&Number(p.yil)===yy&&isAidatTip(p)&&['ÖDENMEDİ','KISMİ'].includes(p.durum))));return kronik.length?`<div class="banner amber" style="cursor:pointer" onclick="go('mesajlar')"><span>⚠</span><span><b>${kronik.length} üyenin</b> aidatı üst üste 2 yıldır (${THIS_YEAR-1}–${THIS_YEAR}) açık: ${esc(kronik.slice(0,5).map(m=>m.ad).join(', '))}${kronik.length>5?' … (+'+(kronik.length-5)+')':''} — hatırlatma listesi için tıklayın</span></div>`:''})()}
   <div class="kpis">
     ${kp('t-blue','👥','Toplam Üye',S.members.length,'kayıtlı üye defteri','uyeler')}
     ${kp('t-green','✓','Aktif Üye',aktif.length,aktif.filter(m=>m.ucretsiz).length+' ücretsiz statüde','uyeler')}
@@ -957,8 +1122,8 @@ function memberTable(list){
       <td class="num">${uyeNo(m)??'—'}</td>
       <td><div class="name-cell"><span class="avatar">${initials(m.ad)}</span><div><div class="nm">${esc(m.ad)}</div>${m.ucretsiz?'<div class="sb">ücretsiz statü</div>':''}</div></div></td>
       <td>${esc(m.uyelikTuru||'—')}</td><td>${esc(m.gorev||'—')}</td>
-      <td><span class="tag ${stTag(m.durum)}">${m.durum}</span></td>
-      <td>${p?`<span class="tag ${payTag(p.durum)}">${p.durum}</span>`:'<span class="tag t-gray">kayıt yok</span>'}</td>
+      <td><span class="tag ${stTag(m.durum)}">${esc(m.durum)}</span></td>
+      <td>${p?`<span class="tag ${payTag(p.durum)}">${esc(p.durum)}</span>`:'<span class="tag t-gray">kayıt yok</span>'}</td>
       <td>${dfmt(m.ykKararTarihi)}</td>
       <td onclick="event.stopPropagation()">${can('uye')?`<button class="btn sm ghost" onclick="editMember('${m.id}')">Düzenle</button>`:''}</td></tr>`;}).join('')}
   </tbody></table>`;
@@ -977,7 +1142,7 @@ function openMember(id){
   modal('Üye Detayı',`
     <div style="display:flex;align-items:center;gap:13px;margin-bottom:18px"><span class="avatar" style="width:44px;height:44px;font-size:15px">${initials(m.ad)}</span>
       <div><div style="font-size:16px;font-weight:720">${esc(m.ad)}</div><div class="muted">${esc(m.uyelikTuru||'')} · ${esc(m.gorev||'')}</div></div>
-      <span class="tag ${stTag(m.durum)}" style="margin-left:auto">${m.durum}</span></div>
+      <span class="tag ${stTag(m.durum)}" style="margin-left:auto">${esc(m.durum)}</span></div>
     <div class="detail-grid">
       <div><div class="dl">Liste Sırası</div><div class="dv">${m.sira??'—'}</div></div>
       <div><div class="dl">Defter No</div><div class="dv">${m.defterNo??'—'}</div></div>
@@ -993,12 +1158,21 @@ function openMember(id){
     ${m.notlar?`<div class="banner amber">📝 ${esc(m.notlar)}</div>`:''}
     <h3 style="font-size:13.5px;margin:4px 0 9px;font-weight:700">Ödeme Geçmişi</h3>
     ${hist.length?`<div class="tbl-wrap"><table><thead><tr><th>Yıl</th><th>Tip</th><th class="num">Tutar</th><th>Durum</th><th>Tarih</th>${can('aidat')?'<th></th>':''}</tr></thead><tbody>
-    ${hist.map(p=>`<tr><td>${p.yil}</td><td>${p.tip}</td><td class="num">${fmt(p.tutar)}${p.durum==='KISMİ'?`<div class="sb" style="font-size:11px;color:var(--faint)">ödenen ${fmt(p.odenenTutar)}</div>`:''}</td>
-      <td><span class="tag ${payTag(p.durum)}">${p.durum}</span></td><td>${dfmt(p.odemeTarihi)}</td>
+    ${hist.map(p=>`<tr><td>${esc(p.yil)}</td><td>${esc(tipKey(p))}</td><td class="num">${fmt(p.tutar)}${p.durum==='KISMİ'?`<div class="sb" style="font-size:11px;color:var(--faint)">ödenen ${fmt(p.odenenTutar)}</div>`:''}</td>
+      <td><span class="tag ${payTag(p.durum)}">${esc(p.durum)}</span></td><td>${dfmt(p.odemeTarihi)}</td>
       ${can('aidat')?`<td><button class="btn sm ghost" onclick="editPayment('${p.id}')">Düzenle</button></td>`:''}</tr>`).join('')}
     </tbody></table></div>`:'<div class="empty">Ödeme kaydı yok.</div>'}
+    ${memberKararHTML(m)}
     ${HZ.relatedHTML('member',id)}`,
-  can('uye')?`<button class="btn" onclick="closeModal();editMember('${id}')">Üyeyi Düzenle</button>`:'');
+  `${hist.some(p=>isAidatTip(p)&&['ÖDENMEDİ','KISMİ'].includes(p.durum))?`<button class="btn" onclick="closeModal();msj.tip='aidat_wp';msj.uye='${id}';go('mesajlar')">💬 Aidat hatırlatması</button>`:''}${can('uye')?`<button class="btn" onclick="closeModal();editMember('${id}')">Üyeyi Düzenle</button>`:''}`);
+}
+// Üye kartında, adı geçen YK kararları (yalnızca okunur bağlantı; veri değişmez).
+function memberKararHTML(m){
+  const ad=trNorm(m.ad); if(!ad) return '';
+  const list=(S.kararlar||[]).filter(k=>trNorm(k.uyeAdi)===ad).sort((a,b)=>(b.no||0)-(a.no||0));
+  if(!list.length) return '';
+  return `<h3 style="font-size:13.5px;margin:16px 0 9px;font-weight:700">⚖ YK Kararları</h3><div class="tbl-wrap"><table><thead><tr><th>No</th><th>Tarih</th><th>Konu</th><th>Statü</th></tr></thead><tbody>
+    ${list.map(k=>`<tr><td><b>${esc(k.no??'—')}</b></td><td>${dfmt(k.tarih)}</td><td>${esc(k.konu||'—')}</td><td>${k.durum?`<span class="tag t-gray nodot">${esc(k.durum)}</span>`:'—'}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function editMember(id){
   const m=id?member(id):{ad:'',uyelikTuru:'Gerçek Üye',gorev:'',durum:'AKTİF',ykKararTarihi:'',kayitTarihi:TODAY,dogumYili:'',email:'',telefon:'',notlar:'',ucretsiz:false,defterNo:''};
@@ -1020,11 +1194,13 @@ function editMember(id){
   </div>`,`<button class="btn primary" onclick="saveMember('${id||''}')">Kaydet</button>`);
 }
 function saveMember(id){
+  if(!need('uye')) return;
   const ad=val('f_ad').trim(); if(!ad){ toast('Ad Soyad zorunludur'); return; }
   const data={ad,uyelikTuru:val('f_tur'),gorev:val('f_gorev'),durum:val('f_durum'),defterNo:val('f_no')?+val('f_no'):null,
     ykKararTarihi:val('f_yk')||null,kayitTarihi:val('f_kayit')||null,dogumYili:val('f_dogum')?+val('f_dogum'):null,
     ucretsiz:val('f_ucretsiz')==='1',email:val('f_email'),telefon:val('f_tel'),notlar:val('f_not')};
-  if(id){ Object.assign(member(id),data); toast('Üye güncellendi'); }
+  if(id){ if(!member(id)) return goneToast();
+    Object.assign(member(id),pickChanged(data,{ad:'f_ad',uyelikTuru:'f_tur',gorev:'f_gorev',durum:'f_durum',defterNo:'f_no',ykKararTarihi:'f_yk',kayitTarihi:'f_kayit',dogumYili:'f_dogum',ucretsiz:'f_ucretsiz',email:'f_email',telefon:'f_tel',notlar:'f_not'})); toast('Üye güncellendi'); }
   else{ const mid=nid('m'); S.members.push({id:mid,...data});
     S.payments.push({id:nid('p'),uyeId:mid,yil:THIS_YEAR,tip:'AIDAT',tutar:S.ayarlar.aidat[THIS_YEAR]||0,durum:data.ucretsiz?'MUAF':'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:''});
     toast('Üye eklendi · '+THIS_YEAR+' aidat borcu oluşturuldu'); }
@@ -1038,7 +1214,7 @@ function saveMember(id){
 let fA={yil:THIS_YEAR,durum:'',q:'',tip:'AIDAT'};
 function pageAidat(){
   const ys=years();
-  const list=S.payments.filter(p=>p.yil===+fA.yil&&p.tip===fA.tip&&(!fA.durum||p.durum===fA.durum)&&
+  const list=S.payments.filter(p=>Number(p.yil)===+fA.yil&&tipKey(p)===fA.tip&&(!fA.durum||p.durum===fA.durum)&&
     (!fA.q||trNorm(member(p.uyeId)?.ad||'').includes(trNorm(fA.q))))
     .sort((a,b)=>byName(member(a.uyeId)||{ad:''},member(b.uyeId)||{ad:''}));
   const tplan=list.reduce((s,p)=>s+(p.durum!=='MUAF'?(p.tutar||0):0),0);
@@ -1066,12 +1242,12 @@ function pageAidat(){
   ${list.map(p=>{const m=member(p.uyeId);return `<tr>
     <td class="clickable" onclick="openMember('${p.uyeId}')"><div class="name-cell"><span class="avatar">${initials(m?.ad||'?')}</span><span class="nm">${esc(m?.ad||'?')}</span></div></td>
     <td>${esc(m?.uyelikTuru||'—')}</td><td class="num">${fmt(p.tutar)}</td><td class="num">${fmt(kalan(p))}</td>
-    <td><span class="tag ${payTag(p.durum)}">${p.durum}</span></td><td>${dfmt(p.odemeTarihi)}</td>
+    <td><span class="tag ${payTag(p.durum)}">${esc(p.durum)}</span></td><td>${dfmt(p.odemeTarihi)}</td>
     <td>${can('aidat')?`${!['ÖDENDİ','MUAF'].includes(p.durum)?`<button class="btn sm" onclick="quickPaid('${p.id}')">✓ Ödendi</button>`:''} <button class="btn sm ghost" onclick="editPayment('${p.id}')">Düzenle</button>`:''}</td>
   </tr>`}).join('')}</tbody></table>`:'<div class="empty">Bu filtrede kayıt yok. "⚡ Yıl Borcu Oluştur" ile tüm aktif üyelere tek seferde borç yazabilirsiniz.</div>'}
   </div></div>`;
 }
-function quickPaid(pid){ const p=S.payments.find(x=>x.id===pid); p.durum='ÖDENDİ'; p.odenenTutar=p.tutar; p.odemeTarihi=TODAY; persist(); render(); toast('✓ Ödendi işaretlendi'); }
+function quickPaid(pid){ if(!need('aidat')) return; const p=S.payments.find(x=>x.id===pid); p.durum='ÖDENDİ'; p.odenenTutar=p.tutar; p.odemeTarihi=TODAY; persist(); render(); toast('✓ Ödendi işaretlendi'); }
 function editPayment(pid){
   const p=pid?S.payments.find(x=>x.id===pid):{uyeId:'',yil:THIS_YEAR,tip:fA.tip,tutar:S.ayarlar.aidat[THIS_YEAR]||'',durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:'',not:''};
   const opts=[...S.members].sort(byName).map(m=>`<option value="${m.id}" ${p.uyeId===m.id?'selected':''}>${esc(m.ad)}</option>`).join('');
@@ -1089,23 +1265,37 @@ function editPayment(pid){
   `${pid&&can('aidat')?`<button class="btn danger" onclick="delPayment('${pid}')">Sil</button>`:''}<button class="btn primary" onclick="savePayment('${pid||''}')">Kaydet</button>`);
 }
 function savePayment(pid){
+  if(!need('aidat')) return;
   const uye=pid?S.payments.find(x=>x.id===pid).uyeId:val('p_uye');
   if(!uye){ toast('Üye seçiniz'); return; }
   const durum=val('p_durum');
+  const yil=+val('p_yil'), tip=val('p_tip');
+  if(!yil||yil<1990||yil>2100){ toast('Geçerli bir yıl giriniz'); return; }
+  const cift=S.payments.find(p=>p.id!==pid&&p.uyeId===uye&&Number(p.yil)===yil&&tipKey(p)===tipKey({tip}));
+  if(cift&&!confirm(`${member(uye)?.ad||'Bu üye'} için ${yil} yılına ait bir ${tip==='GİRİŞ'?'giriş ödentisi':'aidat'} kaydı zaten var (${cift.durum}). İkinci bir kayıt toplamları iki kez sayar.\n\nYine de eklensin mi?`)) return;
   const data={uyeId:uye,yil:+val('p_yil'),tip:val('p_tip'),tutar:val('p_tutar')?+val('p_tutar'):null,durum,
     odenenTutar:durum==='KISMİ'?(+val('p_kismi')||0):(durum==='ÖDENDİ'?(+val('p_tutar')||0):0),
     odemeTarihi:val('p_tarih')||null,not:val('p_not')};
-  if(pid) Object.assign(S.payments.find(x=>x.id===pid),data); else S.payments.push({id:nid('p'),...data});
+  if(pid){ const cur=S.payments.find(x=>x.id===pid); if(!cur) return goneToast();
+    Object.assign(cur,pickChanged(data,{yil:'p_yil',tip:'p_tip',tutar:'p_tutar',durum:'p_durum',odenenTutar:['p_durum','p_tutar','p_kismi'],odemeTarihi:'p_tarih',not:'p_not'})); }
+  else S.payments.push({id:nid('p'),...data});
   persist(); closeModal(); render(); toast('Ödeme kaydedildi');
 }
-function delPayment(pid){ if(!confirm('Bu ödeme kaydı silinsin mi?'))return; S.payments=S.payments.filter(p=>p.id!==pid); persist(); closeModal(); render(); toast('Kayıt silindi'); }
+function delPayment(pid){ if(!need('aidat')) return; if(!confirm('Bu ödeme kaydı silinsin mi?'))return;
+  const i=S.payments.findIndex(p=>p.id===pid), old=S.payments[i];
+  S.payments=S.payments.filter(p=>p.id!==pid); persist(); closeModal(); render();
+  toastAction('🗑 Ödeme kaydı silindi','Geri al',()=>{ if(!S.payments.some(p=>p.id===pid)) S.payments.splice(Math.min(i,S.payments.length),0,old); persist(); render(); toast('↺ Ödeme kaydı geri getirildi'); }); }
 function yilBorcuOlustur(){
-  const hedef=S.payments.some(p=>p.yil===THIS_YEAR&&isAidatTip(p))?THIS_YEAR+1:THIS_YEAR;
-  const t=prompt(`${hedef} yılı aidat tutarı (₺)?\nTüm AKTİF üyeler için borç kaydı oluşturulacak; ücretsiz statüdekiler MUAF işaretlenecek.`,S.ayarlar.aidat[hedef]||S.ayarlar.aidat[THIS_YEAR]||6500);
+  if(!need('aidat')) return;
+  // Bu yıl kaydı olmayan aktif üye varsa önce bu yıl tamamlanır (eskiden tek bir kayıt bile varsa gelecek yıla geçiyordu).
+  const eksik=y=>S.members.filter(m=>m.durum==='AKTİF'&&!S.payments.some(p=>p.uyeId===m.id&&Number(p.yil)===y&&isAidatTip(p))).length;
+  const hedef=eksik(THIS_YEAR)?THIS_YEAR:THIS_YEAR+1;
+  if(!eksik(hedef)){ toast(`${hedef} için tüm aktif üyelerin aidat kaydı zaten var`); return; }
+  const t=prompt(`${hedef} yılı aidat tutarı (₺)?\n${eksik(hedef)} aktif üye için borç kaydı oluşturulacak (kaydı olanlar atlanır); ücretsiz statüdekiler MUAF işaretlenecek.`,S.ayarlar.aidat[hedef]||S.ayarlar.aidat[THIS_YEAR]||6500);
   if(t===null)return; const tutar=+t; if(!tutar){toast('Geçerli tutar giriniz');return;}
   S.ayarlar.aidat[hedef]=tutar; let n=0;
   S.members.filter(m=>m.durum==='AKTİF').forEach(m=>{
-    if(S.payments.some(p=>p.uyeId===m.id&&p.yil===hedef&&isAidatTip(p)))return;
+    if(S.payments.some(p=>p.uyeId===m.id&&Number(p.yil)===hedef&&isAidatTip(p)))return;
     S.payments.push({id:nid('p'),uyeId:m.id,yil:hedef,tip:'AIDAT',tutar,durum:m.ucretsiz?'MUAF':'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Otomatik yıl borcu'}); n++; });
   fA.yil=hedef; persist(); render(); toast(`✓ ${hedef} için ${n} üyeye borç oluşturuldu`);
 }
@@ -1126,7 +1316,7 @@ function pageBasvurular(){
     return `<tr><td><div class="name-cell"><span class="avatar" style="background:var(--violet-soft);color:var(--violet)">${initials(b.ad)}</span><div><div class="nm">${esc(b.ad)}</div><div class="sb">${esc(b.gorev||b.email||'')}</div></div></div></td>
     <td>${esc(b.uyelikTuru)}</td><td>${dfmt(b.basvuruTarihi)}</td>
     <td>${eksik.length?`<span class="tag t-amber">${eksik.length} eksik</span>`:'<span class="tag t-green">Tamam</span>'}</td>
-    <td>${esc(b.komiteDurumu||'—')}</td><td><span class="tag ${stB(b.durum)}">${b.durum}</span></td>
+    <td>${esc(b.komiteDurumu||'—')}</td><td><span class="tag ${stB(b.durum)}">${esc(b.durum)}</span></td>
     <td>${can('basvuru')?`<button class="btn sm ghost" onclick="editBasvuru('${b.id}')">Aç</button>${b.durum!=='ONAYLANDI'?` <button class="btn sm" onclick="onaylaBasvuru('${b.id}')">✓ Üyeliğe Al</button>`:''}`:''}</td></tr>`;}).join('')}
   </tbody></table>`:`<div class="empty">Henüz başvuru yok.${can('basvuru')?' Bir başvuru e-postası geldiğinde "✉ E-postadan Aktar" ile içeriği yapıştırın; bilgiler otomatik forma dönüşür.':''}</div>`}
   </div></div>
@@ -1143,7 +1333,7 @@ async function parseEmail(){
   toast('✨ E-posta ayrıştırılıyor…');
   let info=null;
   try{
-    const r=await aiCall(`Aşağıdaki üyelik başvuru e-postasından bilgileri çıkar. SADECE şu JSON'u döndür: {"ad":"...","email":null,"telefon":null,"gorev":null,"uyelikTuru":"Gerçek Üye","not":"1 cümle özet"}\n\nE-posta:\n${raw}`);
+    const r=await aiCallText(`Aşağıdaki üyelik başvuru e-postasından bilgileri çıkar. SADECE şu JSON'u döndür: {"ad":"...","email":null,"telefon":null,"gorev":null,"uyelikTuru":"Gerçek Üye","not":"1 cümle özet"}\n\nE-posta:\n${raw}`);
     info=parseAiJson(r);
   }catch(e){
     info={ad:(raw.match(/(?:ad[ıi]?\s*soyad[ıi]?|isim)\s*[:\-]\s*(.+)/i)||raw.match(/([A-ZÇĞİÖŞÜ][a-zçğıöşü]+\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)/)||[])[1]||'',
@@ -1177,16 +1367,23 @@ function editBasvuru(id,prefill){
   `${id&&can('basvuru')?`<button class="btn danger" onclick="delBasvuru('${id}')">Sil</button>`:''}<button class="btn primary" onclick="saveBasvuru('${id||''}')">Kaydet</button>`);
 }
 function saveBasvuru(id){
+  if(!need('basvuru')) return;
   const ad=val('b_ad').trim(); if(!ad){ toast('Ad Soyad zorunludur'); return; }
   const evraklar={}; EVRAKLAR.forEach(([k])=>evraklar[k]=document.getElementById('ev_'+k).checked);
   const data={ad,uyelikTuru:val('b_tur'),gorev:val('b_gorev'),email:val('b_email'),telefon:val('b_tel'),
     basvuruTarihi:val('b_tarih')||null,durum:val('b_durum'),komiteDurumu:val('b_komite'),ykKararNo:val('b_yk'),
     referans1:val('b_ref1'),referans2:val('b_ref2'),evraklar,notlar:val('b_not')};
-  if(id) Object.assign(S.basvurular.find(x=>x.id===id),data); else S.basvurular.push({id:nid('b'),...data});
+  if(id){ const cur=S.basvurular.find(x=>x.id===id); if(!cur) return goneToast();
+    Object.assign(cur,pickChanged(data,{ad:'b_ad',uyelikTuru:'b_tur',gorev:'b_gorev',email:'b_email',telefon:'b_tel',basvuruTarihi:'b_tarih',durum:'b_durum',komiteDurumu:'b_komite',ykKararNo:'b_yk',referans1:'b_ref1',referans2:'b_ref2',evraklar:EVRAKLAR.map(([k])=>'ev_'+k),notlar:'b_not'})); }
+  else S.basvurular.push({id:nid('b'),...data});
   persist(); closeModal(); render(); toast('Başvuru kaydedildi');
 }
-function delBasvuru(id){ if(!confirm('Başvuru silinsin mi?'))return; S.basvurular=S.basvurular.filter(b=>b.id!==id); persist(); closeModal(); render(); }
+function delBasvuru(id){ if(!need('basvuru')) return; if(!confirm('Başvuru silinsin mi?'))return;
+  const i=S.basvurular.findIndex(b=>b.id===id), old=S.basvurular[i];
+  S.basvurular=S.basvurular.filter(b=>b.id!==id); persist(); closeModal(); render();
+  toastAction('🗑 Başvuru silindi','Geri al',()=>{ if(!S.basvurular.some(b=>b.id===id)) S.basvurular.splice(Math.min(i,S.basvurular.length),0,old); persist(); render(); toast('↺ Başvuru geri getirildi'); }); }
 function onaylaBasvuru(id){
+  if(!need('basvuru')||!need('uye')) return;
   const b=S.basvurular.find(x=>x.id===id);
   const eksik=EVRAKLAR.filter(([k])=>!b.evraklar[k]).map(([,t])=>t);
   if(eksik.length&&!confirm('Eksik evrak var: '+eksik.join(', ')+'\nYine de üyeliğe alınsın mı?'))return;
@@ -1195,7 +1392,15 @@ function onaylaBasvuru(id){
   S.members.push({id:mid,ad:b.ad,defterNo:Math.max(0,...S.members.map(m=>m.defterNo||0))+1,kayitTarihi:TODAY,uyelikTuru:b.uyelikTuru,gorev:b.gorev,durum:'AKTİF',ykKararTarihi:TODAY,dogumYili:null,notlar:b.notlar,ucretsiz:false,email:b.email,telefon:b.telefon});
   S.payments.push({id:nid('p'),uyeId:mid,yil:THIS_YEAR,tip:'AIDAT',tutar:S.ayarlar.aidat[THIS_YEAR]||0,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Yeni üye'});
   S.payments.push({id:nid('p'),uyeId:mid,yil:THIS_YEAR,tip:'GİRİŞ',tutar:S.ayarlar.girisOdentisi||0,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Giriş ödentisi'});
-  b.durum='ONAYLANDI'; persist(); render(); toast('✓ '+b.ad+' aktif üyeliğe alındı');
+  b.durum='ONAYLANDI';
+  // YK kararı kaydı: karar numarası başvuruda yazılıysa o, değilse sıradaki numara.
+  let kararMsg='';
+  if(can('karar')&&confirm(`${b.ad} için YK Kararları listesine "Üyelik Kabulü" kaydı da eklensin mi?`)){
+    const no=parseInt(b.ykKararNo)||Math.max(0,...S.kararlar.map(x=>+x.no||0))+1;
+    S.kararlar.push({id:nid('k'),no,tarih:TODAY,konu:'Üyelik Kabulü',uyeAdi:b.ad,uyelikTuru:b.uyelikTuru,durum:'AKTİF',not:'Başvurudan otomatik oluşturuldu'});
+    kararMsg=` · YK kararı ${no} eklendi`;
+  }
+  persist(); render(); toast('✓ '+b.ad+' aktif üyeliğe alındı'+kararMsg);
 }
 
 /* ================================================================
@@ -1212,7 +1417,7 @@ function pageKararlar(){
     <span class="count">${list.length} karar</span>
   </div><div class="card-b np tbl-wrap">
   ${list.length?`<table><thead><tr><th>No</th><th>Tarih</th><th>Konu</th><th>İlgili Üye / Şirket</th><th>Tür</th><th>Statü</th><th>Not</th>${can('karar')?'<th></th>':''}</tr></thead><tbody>
-  ${list.map(k=>`<tr><td class="num"><b>${k.no??'—'}</b></td><td>${dfmt(k.tarih)}</td><td>${esc(k.konu||'—')}${HZ.relChip('karar',k.id)}</td><td>${esc(k.uyeAdi||'—')}</td>
+  ${list.map(k=>`<tr><td class="num"><b>${esc(k.no??'—')}</b></td><td>${dfmt(k.tarih)}</td><td>${esc(k.konu||'—')}${HZ.relChip('karar',k.id)}</td><td>${esc(k.uyeAdi||'—')}</td>
   <td>${esc(k.uyelikTuru||'—')}</td><td>${k.durum?`<span class="tag ${k.durum==='AKTİF'?'t-green':(k.durum==='PASİF'?'t-gray':'t-amber')}">${esc(k.durum)}</span>`:'—'}</td>
   <td style="max-width:230px">${esc(k.not||'')}</td>${can('karar')?`<td><button class="btn sm ghost" onclick="editKarar('${k.id}')">Düzenle</button></td>`:''}</tr>`).join('')}
   </tbody></table>`:'<div class="empty">Karar bulunamadı.</div>'}</div></div>`;
@@ -1234,8 +1439,11 @@ function editKarar(id){
   `<button class="btn primary" onclick="saveKarar('${id||''}')">Kaydet</button>`);
 }
 function saveKarar(id){
+  if(!need('karar')) return;
   const data={no:val('k_no')?+val('k_no'):null,tarih:val('k_tarih')||null,konu:val('k_konu'),uyeAdi:val('k_uye'),uyelikTuru:val('k_tur'),durum:val('k_durum'),not:val('k_not')};
-  if(id) Object.assign(S.kararlar.find(x=>x.id===id),data); else S.kararlar.push({id:nid('k'),...data});
+  if(id){ const cur=S.kararlar.find(x=>x.id===id); if(!cur) return goneToast();
+    Object.assign(cur,pickChanged(data,{no:'k_no',tarih:'k_tarih',konu:'k_konu',uyeAdi:'k_uye',uyelikTuru:'k_tur',durum:'k_durum',not:'k_not'})); }
+  else S.kararlar.push({id:nid('k'),...data});
   persist(); closeModal(); render(); toast('Karar kaydedildi');
 }
 
@@ -1271,7 +1479,7 @@ function pageRaporlar(){
    ANALİZ & GRAFİKLER
 ================================================================ */
 function analizData(){
-  const aidat=p=>((p.tip||'AIDAT').toUpperCase()==='AIDAT'||(p.tip||'').toUpperCase()==='AİDAT');
+  const aidat=isAidatTip;
   const yrs=years().sort();
   const yil=THIS_YEAR;
   const aylik=Array(12).fill(0);
@@ -1387,26 +1595,7 @@ async function analizAI(){
     box.innerHTML='<div class="card"><div class="card-b"><p style="color:var(--red)">AI yorumu alınamadı: '+esc(e.message||String(e))+'</p><p class="muted">Ayarlar → Yapay Zekâ bölümünden sağlayıcı/anahtar kontrol edin.</p></div></div>';
   }
 }
-async function aiCallText(prompt){
-  const a=S.ayarlar.ai;
-  if(a.provider==='claude'){
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':a.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:a.model||'claude-sonnet-4-6',max_tokens:1200,messages:[{role:'user',content:prompt}]})});
-    const j=await r.json(); if(j.error) throw new Error(j.error.message||'Claude hatası');
-    return (j.content||[]).map(c=>c.text||'').join('').trim();
-  }
-  if(a.provider==='gemini'){
-    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+(a.model||'gemini-1.5-flash')+':generateContent?key='+a.apiKey,
-      {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
-    const j=await r.json(); if(j.error) throw new Error(j.error.message||'Gemini hatası');
-    return (j.candidates&&j.candidates[0]&&j.candidates[0].content.parts[0].text||'').trim();
-  }
-  const url=(a.provider==='custom'&&a.endpoint)?a.endpoint:'https://api.openai.com/v1/chat/completions';
-  const r=await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+a.apiKey,'content-type':'application/json'},
-    body:JSON.stringify({model:a.model||'gpt-4o-mini',max_tokens:1200,messages:[{role:'user',content:prompt}]})});
-  const j=await r.json(); if(j.error) throw new Error(j.error.message||'AI hatası');
-  return (j.choices&&j.choices[0]&&j.choices[0].message.content||'').trim();
-}
+const aiCallText=prompt=>aiRequest(prompt,{maxTokens:1200});
 function exportAnalizPdf(){ window.print(); }
 
 /* ================================================================
@@ -2629,11 +2818,7 @@ const modalOpen=()=>!!document.getElementById('modalRoot').innerHTML;
 const statusTag=s=>`<span class="tag ${STATUS_TAG[s]||'t-gray'}">${STATUS_LABEL[s]||'Yapılacak'}</span>`;
 const lateOf=t=>!isDone(t)&&t.dueDate&&t.dueDate<today();
 const todayOf=t=>!isDone(t)&&t.dueDate===today();
-function toastAct(msg,label,fn){
-  const t=document.getElementById('toast'); t.textContent=msg;
-  const b=document.createElement('button'); b.textContent=label; b.onclick=()=>{ t.classList.remove('show'); fn(); };
-  t.appendChild(b); t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),7000);
-}
+const toastAct=(msg,label,fn)=>toastAction(msg,label,fn);
 function dl(text,name,type){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); }
 async function copyText(text,okMsg){
   try{ await navigator.clipboard.writeText(text); toast(okMsg||'📋 Panoya kopyalandı'); }
@@ -2692,9 +2877,9 @@ async function remoteHafiza(){
   return r.data&&r.data.data?r.data.data.hafiza:null;
 }
 // persist() tüm durumu yazmadan önce çağırır: yalnızca "hafiza" alanını buluttaki son hâlle birleştirir.
-async function prepareOut(out){
+async function prepareOut(out,known){
   ensureBase();
-  const remote=await remoteHafiza();
+  const remote=known!==undefined?known:await remoteHafiza();
   const sent=out.hafiza||null;
   if(remote||sent) out.hafiza=C.mergeH(base,sent||base,remote||base);
   return sent;
@@ -2714,15 +2899,14 @@ function save(auto){
   const p=cloudQueue(async()=>{
     queued=null;
     const sent=clone(H());
-    window._lastSaveAt=Date.now();
-    const {data,error}=await window._sb.from('app_state').select('data').eq('id','main').maybeSingle();
-    if(error) throw error;
-    if(!data||!data.data){ persist(); return; }
-    ensureBase();
-    const merged=C.mergeH(base,sent,data.data.hafiza||base);
-    window._lastSaveAt=Date.now();
-    const res=await window._sb.from('app_state').upsert({id:'main',data:{...data.data,hafiza:merged},updated_at:nowISO()});
-    if(res.error) throw res.error;
+    let merged=null, empty=false;
+    await cloudCommit(remote=>{
+      if(!remote){ empty=true; return null; }
+      ensureBase();
+      merged=C.mergeH(base,sent,remote.hafiza||base);
+      return {...remote,hafiza:merged};
+    });
+    if(empty){ persist(); return; }
     synced(sent,merged);
     if(JSON.stringify(S.hafiza)===JSON.stringify(merged)){ sync.dirty=false; clearPending(); }
   }).then(()=>{ sync.saving--; const wasFailed=sync.failed; sync.failed=false; sync.savedAt=Date.now(); updSync(); if(wasFailed) toast('✓ Bağlantı geldi, bekleyen değişiklikler kaydedildi'); if(sync.dirty){ if(++sync.chain<4) save(true); else { sync.dirty=false; sync.chain=0; } } else sync.chain=0; return true; },
@@ -3927,8 +4111,15 @@ function modal(title, body, footer, wide){
       <div class="modal-b">${body}</div>
       ${footer?`<div class="modal-f"><button class="btn" onclick="closeModal()">Vazgeç</button>${footer}</div>`:''}
     </div></div>`;
+  snapForm();
 }
 function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+/* Pencere açıldığındaki form değerleri saklanır; kaydederken yalnızca kullanıcının değiştirdiği alanlar yazılır.
+   Böylece pencere açıkken başka bir kullanıcının aynı kayıtta değiştirdiği alanlar eski değerle ezilmez. */
+function snapForm(){ const o={}; document.querySelectorAll('#modalRoot input,#modalRoot select,#modalRoot textarea').forEach(el=>{ if(el.id) o[el.id]=el.type==='checkbox'?el.checked:el.value; }); window._formSnap=o; }
+function formChanged(id){ const el=document.getElementById(id); if(!el||!window._formSnap||!(id in window._formSnap)) return true; return (el.type==='checkbox'?el.checked:el.value)!==window._formSnap[id]; }
+function pickChanged(data,map){ const out={}; for(const [k,ids] of Object.entries(map)) if([].concat(ids).some(formChanged)) out[k]=data[k]; return out; }
+function goneToast(){ toast('⚠ Bu kayıt bu arada başka bir kullanıcı tarafından silinmiş'); closeModal(); render(); }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 
 /* ================================================================
@@ -3936,6 +4127,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 ================================================================ */
 let ayarTab='genel';
 function setAyar(path,val){
+  if(path!=='ai.apiKey'&&!need('ayar')) return;
   const ks=path.split('.'); let o=S.ayarlar;
   for(let i=0;i<ks.length-1;i++) o=o[ks[i]];
   o[ks[ks.length-1]]=val; persist();
@@ -3957,7 +4149,7 @@ function pageAyarlar(){
     <div class="tbl-wrap"><table><thead><tr><th>Yıl</th><th>Tutar (₺)</th><th></th></tr></thead><tbody>
       ${Object.keys(A.aidat).sort((a,b)=>b-a).map(y=>`<tr><td><b>${y}</b></td>
         <td style="max-width:180px"><input type="number" value="${A.aidat[y]}" onchange="setAyar('aidat.${y}',+this.value||0)"></td>
-        <td><button class="btn sm ghost danger" onclick="delete S.ayarlar.aidat['${y}'];persist();render()">Sil</button></td></tr>`).join('')}
+        <td><button class="btn sm ghost danger" onclick="if(confirm('${y} yılı aidat tarifesi silinsin mi? (Ödeme kayıtları değişmez.)')){delete S.ayarlar.aidat['${y}'];persist();render()}">Sil</button></td></tr>`).join('')}
     </tbody></table></div>
     <div style="margin-top:10px"><button class="btn sm" onclick="const y=prompt('Yıl?',${THIS_YEAR+1});if(y){S.ayarlar.aidat[y]=S.ayarlar.aidat[${THIS_YEAR}]||0;persist();render()}">+ Yıl Ekle</button></div>`;
   }
@@ -3969,7 +4161,7 @@ function pageAyarlar(){
       <div class="ctl"><select onchange="setAyar('ai.provider',this.value);render()">${P.map(([v,t])=>`<option value="${v}" ${A.ai.provider===v?'selected':''}>${t}</option>`).join('')}</select></div></div>
     ${needKey?`<div class="setrow"><div><div class="sl">API Anahtarı</div><div class="sd">⚠ Anahtar yalnızca bu tarayıcıda saklanır; yine de paylaşılan bilgisayarlarda girmeyiniz.</div></div>
       <div class="ctl" style="min-width:340px"><input type="password" value="${esc(A.ai.apiKey)}" placeholder="sk-… / AIza…" onchange="setAyar('ai.apiKey',this.value)"></div></div>`:''}
-    <div class="setrow"><div><div class="sl">Model</div><div class="sd">Boş bırakılırsa sağlayıcının varsayılanı kullanılır (Claude: claude-sonnet-4-6, OpenAI: gpt-4o-mini, Gemini: gemini-1.5-flash).</div></div>
+    <div class="setrow"><div><div class="sl">Model</div><div class="sd">Boş bırakılırsa sağlayıcının varsayılanı kullanılır (Claude: claude-sonnet-4-6, OpenAI: gpt-4o-mini, Gemini: gemini-2.0-flash).</div></div>
       <div class="ctl"><input value="${esc(A.ai.model)}" placeholder="varsayılan" onchange="setAyar('ai.model',this.value)"></div></div>
     ${needEp?`<div class="setrow"><div><div class="sl">Endpoint</div><div class="sd">OpenAI-uyumlu /v1/chat/completions adresi (ör. yerel Ollama, OpenRouter).</div></div>
       <div class="ctl" style="min-width:340px"><input value="${esc(A.ai.endpoint)}" placeholder="https://…/v1/chat/completions" onchange="setAyar('ai.endpoint',this.value)"></div></div>`:''}
@@ -4035,17 +4227,40 @@ function pageAyarlar(){
     <div class="code" id="gs2">function doPost(e){
   const d=JSON.parse(e.postData.contents);
   const ss=SpreadsheetApp.getActive();
-  const w=(name,head,rows)=>{ let s=ss.getSheetByName(name)||ss.insertSheet(name);
-    s.clearContents(); s.appendRow(head);
-    if(rows.length) s.getRange(2,1,rows.length,head.length).setValues(rows); };
-  w('Uyeler',   ['ad','uyelikTuru','gorev','durum','defterNo','email','telefon'],
-    d.members.map(m=>[m.ad,m.uyelikTuru,m.gorev,m.durum,m.defterNo||'',m.email||'',m.telefon||'']));
-  w('Odemeler', ['ad','yil','tip','tutar','durum','odenen','odemeTarihi'],
-    d.payments.map(p=>[p.ad,p.yil,p.tip||'AİDAT',p.tutar,p.durum,p.odenenTutar||0,p.odemeTarihi||'']));
-  w('Basvurular',['ad','email','telefon','meslek','durum','tarih'],
-    d.basvurular.map(b=>[b.ad,b.email||'',b.telefon||'',b.meslek||'',b.durum,b.tarih||'']));
-  return ContentService.createTextOutput(JSON.stringify({ok:true}))
-         .setMimeType(ContentService.MimeType.JSON);
+  const sade=t=>String(t||'').trim().toLowerCase();
+  // 1) Otomatik güncelleme: yıl sayfalarında (ör. "2026") Aidat Durumu ve Ödeme Tarihi hücreleri
+  if(d.mod==='durum'){
+    let n=0;
+    (d.odemeler||[]).forEach(o=>{
+      const sh=ss.getSheetByName(String(o.yil)); if(!sh) return;
+      const v=sh.getDataRange().getValues(); if(!v.length) return;
+      const h=v[0].map(sade);
+      const ad=h.findIndex(x=>x==='ad soyad'||x==='isim'||x==='adı - soyadı'||x==='ad');
+      const du=h.findIndex(x=>x==='aidat durumu'||x==='durum');
+      const tr=h.findIndex(x=>x==='ödeme tarihi');
+      if(ad===-1||du===-1) return;
+      for(let i=1;i!==v.length;i++){
+        if(sade(v[i][ad])!==sade(o.ad)) continue;
+        sh.getRange(i+1,du+1).setValue(o.durum);
+        if(tr!==-1&&o.tarih) sh.getRange(i+1,tr+1).setValue(o.tarih);
+        n++; break;
+      }
+    });
+    return ContentService.createTextOutput(JSON.stringify({ok:true,guncellenen:n})).setMimeType(ContentService.MimeType.JSON);
+  }
+  // 2) "Sheets'e Gönder": tüm listeleri ayrı sayfalara yazar (başlıklar panelden gelir)
+  const yaz=(ad,satirlar)=>{
+    if(!satirlar||!satirlar.length) return;
+    const sh=ss.getSheetByName(ad)||ss.insertSheet(ad);
+    const bas=Object.keys(satirlar[0]);
+    sh.clearContents();
+    sh.getRange(1,1,1,bas.length).setValues([bas]);
+    sh.getRange(2,1,satirlar.length,bas.length).setValues(satirlar.map(r=>bas.map(k=>r[k]==null?'':r[k])));
+  };
+  yaz('Uyeler',d.uyeler||d.members);
+  yaz('Odemeler',d.odemeler||d.payments);
+  yaz('Basvurular',d.basvurular);
+  return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
 }</div>
     <button class="btn sm" style="margin-top:6px" onclick="copyCode('gs2')">📋 Kopyala</button>`;
   }
@@ -4161,7 +4376,8 @@ async function aiTest(){
 /* ================================================================
    EXCEL / JSON YEDEKLEME
 ================================================================ */
-function dlBlob(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); }
+// Bağlantı sayfaya eklenip tıklanır: bazı tarayıcılar sayfada olmayan bağlantıyla indirme başlatmaz.
+function dlBlob(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); }
 function wb(){ return XLSX.utils.book_new(); }
 function shAppend(book,name,rows){ XLSX.utils.book_append_sheet(book,XLSX.utils.json_to_sheet(rows),name.slice(0,31)); }
 function exportMembersXlsx(){
@@ -4189,8 +4405,8 @@ function exportFullXlsx(){
     const rows=S.payments.filter(p=>p.yil===y).map(p=>{const m=member(p.uyeId)||{};return {'Ad Soyad':m.ad||'?','Tip':p.tip||'AİDAT','Aidat Tutarı':p.tutar,'Aidat Durumu':p.durum,'Ödenen':p.odenenTutar||0,'Ödeme Tarihi':p.odemeTarihi||''};});
     if(rows.length) shAppend(book,String(y),rows);
   }
-  if(S.basvurular.length) shAppend(book,'BAŞVURULAR',S.basvurular.map(b=>({'Ad Soyad':b.ad,'E-posta':b.email||'','Telefon':b.telefon||'','Meslek':b.meslek||'','Durum':b.durum,'Tarih':b.tarih||''})));
-  shAppend(book,'YK KARARLARI',S.kararlar.map(k=>({'Karar No':k.no||'','Tarih':k.tarih||'','Konu':k.konu||'','Durum':k.durum||''})));
+  if(S.basvurular.length) shAppend(book,'BAŞVURULAR',S.basvurular.map(b=>({'Ad Soyad':b.ad,'E-posta':b.email||'','Telefon':b.telefon||'','Meslek':b.gorev||'','Üyelik Türü':b.uyelikTuru||'','Durum':b.durum,'Tarih':b.basvuruTarihi||''})));
+  shAppend(book,'YK KARARLARI',S.kararlar.map(k=>({'Karar No':k.no||'','Tarih':k.tarih||'','Konu':k.konu||'','İlgili Üye / Şirket':k.uyeAdi||'','Üyelik Türü':k.uyelikTuru||'','Durum':k.durum||'','Not':k.not||''})));
   XLSX.writeFile(book,'FOYDER_Tam_Yedek.xlsx'); toast('⬇ Tam Excel yedeği indirildi');
 }
 function downloadTemplate(){
@@ -4200,7 +4416,7 @@ function downloadTemplate(){
   XLSX.writeFile(book,'FOYDER_Sablon.xlsx');
 }
 function importXlsx(file){
-  if(!file) return;
+  if(!file||!need('ayar')) return;
   const rd=new FileReader();
   rd.onload=e=>{
     try{
@@ -4214,19 +4430,18 @@ function importXlsx(file){
           for(const r of rows){
             const ad=String(r['Ad Soyad']||r['İsim']||r['ad']||'').trim(); if(!ad) continue;
             let m=findM(ad);
-            if(m){ Object.assign(m,{uyelikTuru:r['Üyelik Türü']||m.uyelikTuru,gorev:r['Meslek/Görev']||r['Görevi']||m.gorev,durum:r['Durum']||m.durum,email:r['E-posta']||m.email,telefon:String(r['Telefon']||m.telefon||'')}); uU++; }
-            else { S.members.push({id:nid('m'),ad,uyelikTuru:r['Üyelik Türü']||'Gerçek Üye',gorev:r['Meslek/Görev']||r['Görevi']||'',durum:r['Durum']||'AKTİF',defterNo:r['Defter No']||null,ykKararTarihi:r['YK Karar Tarihi']||'',kayitTarihi:TODAY,email:r['E-posta']||'',telefon:String(r['Telefon']||''),notlar:'',ucretsiz:false}); nU++; }
+            if(m){ Object.assign(m,{uyelikTuru:r['Üyelik Türü']||m.uyelikTuru,gorev:r['Meslek/Görev']||r['Görevi']||m.gorev,durum:normUyeDurum(r['Durum'],m.durum),email:r['E-posta']||m.email,telefon:String(r['Telefon']||m.telefon||'')}); uU++; }
+            else { S.members.push({id:nid('m'),ad,uyelikTuru:r['Üyelik Türü']||'Gerçek Üye',gorev:r['Meslek/Görev']||r['Görevi']||'',durum:normUyeDurum(r['Durum']),defterNo:parseInt(r['Defter No'])||null,ykKararTarihi:parseTarih(r['YK Karar Tarihi']),kayitTarihi:TODAY,email:r['E-posta']||'',telefon:String(r['Telefon']||''),notlar:'',ucretsiz:false}); nU++; }
           }
         } else if(yil>2000&&yil<2100){
           for(const r of rows){
             const ad=String(r['Ad Soyad']||r['İsim']||r['ad']||'').trim(); if(!ad) continue;
             let m=findM(ad);
             if(!m){ m={id:nid('m'),ad,uyelikTuru:'Gerçek Üye',gorev:'',durum:'AKTİF',kayitTarihi:TODAY,email:'',telefon:'',notlar:'',ucretsiz:false}; S.members.push(m); nU++; }
-            const durRaw=String(r['Aidat Durumu']||r['Durum']||'').toUpperCase();
-            const durum=durRaw.includes('ÖDENDİ')||durRaw==='ODENDI'?'ÖDENDİ':durRaw.includes('MUAF')?'MUAF':durRaw.includes('KISM')?'KISMİ':'ÖDENMEDİ';
-            const tutar=+r['Aidat Tutarı']||+r['Tutar']||S.ayarlar.aidat[yil]||0;
-            if(!S.payments.some(p=>p.uyeId===m.id&&p.yil===yil&&(p.tip||'AİDAT')==='AİDAT')){
-              S.payments.push({id:nid('p'),uyeId:m.id,yil,tip:'AİDAT',tutar,durum,odenenTutar:durum==='ÖDENDİ'?tutar:(+r['Ödenen']||0),odemeTarihi:r['Ödeme Tarihi']?String(r['Ödeme Tarihi']):null,not:''}); nP++;
+            const durum=normDurum(r['Aidat Durumu']||r['Durum']);
+            const tutar=parseTutar(r['Aidat Tutarı'])??parseTutar(r['Tutar'])??S.ayarlar.aidat[yil]??0;
+            if(!S.payments.some(p=>p.uyeId===m.id&&Number(p.yil)===yil&&isAidatTip(p))){
+              S.payments.push({id:nid('p'),uyeId:m.id,yil,tip:'AIDAT',tutar,durum,odenenTutar:durum==='ÖDENDİ'?tutar:(parseTutar(r['Ödenen'])||0),odemeTarihi:parseTarih(r['Ödeme Tarihi']),not:''}); nP++;
             }
           }
         }
@@ -4236,27 +4451,40 @@ function importXlsx(file){
   };
   rd.readAsArrayBuffer(file);
 }
-function exportJson(){
-  dlBlob(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}),'FOYDER_Yedek_'+TODAY+'.json');
-  toast('⬇ JSON yedeği indirildi');
+// Yedek dosyasına yapay zekâ anahtarı yazılmaz (dosya paylaşılırsa anahtar sızmasın).
+function exportJson(silent){
+  dlBlob(new Blob([JSON.stringify(stripForCloud(S),null,1)],{type:'application/json'}),'FOYDER_Yedek_'+TODAY+(silent?'_islem-oncesi':'')+'.json');
+  try{ localStorage.setItem('foyder:sonYedek',new Date().toISOString()); }catch(e){}
+  if(!silent) toast('⬇ JSON yedeği indirildi');
 }
 function importJson(file){
-  if(!file) return;
+  if(!file||!need('ayar')) return;
   const rd=new FileReader();
-  rd.onload=e=>{ try{
-      const d=JSON.parse(e.target.result);
-      if(!d.members||!d.payments) throw 0;
-      if(!d.hafiza&&S&&S.hafiza) d.hafiza=S.hafiza; // eski yedeklerde bu bölüm yok; mevcut görevler korunur
-      S=d; const def=defaultState();
-      S.ayarlar={...def.ayarlar,...S.ayarlar}; S.ayarlar.ai={...def.ayarlar.ai,...(S.ayarlar.ai||{})}; S.ayarlar.sheets={...def.ayarlar.sheets,...(S.ayarlar.sheets||{})};
-      persist(); render(); toast('✓ Yedek geri yüklendi');
-    }catch(_){ toast('⚠ Geçersiz yedek dosyası'); } };
+  rd.onload=e=>{ let d;
+    try{ d=JSON.parse(e.target.result); if(!d||!Array.isArray(d.members)||!Array.isArray(d.payments)) throw 0; }
+    catch(_){ toast('⚠ Geçersiz yedek dosyası'); return; }
+    if(!confirm(`Yedek geri yüklensin mi?\n\nYedekte ${d.members.length} üye, ${d.payments.length} ödeme kaydı, ${(d.kararlar||[]).length} YK kararı var. Mevcut verilerin yerini alacak.\n\nGüvenlik için mevcut verilerin yedeği önce bilgisayarınıza indirilecek.`)) return;
+    exportJson(true);
+    if(!d.hafiza&&S&&S.hafiza) d.hafiza=S.hafiza; // eski yedeklerde bu bölüm yok; mevcut görevler korunur
+    const key=S.ayarlar&&S.ayarlar.ai?S.ayarlar.ai.apiKey:'';
+    S=d; const def=defaultState();
+    S.ayarlar={...def.ayarlar,...S.ayarlar}; S.ayarlar.ai={...def.ayarlar.ai,...(S.ayarlar.ai||{}),apiKey:key}; S.ayarlar.sheets={...def.ayarlar.sheets,...(S.ayarlar.sheets||{})};
+    S.basvurular=S.basvurular||[]; S.kararlar=S.kararlar||[]; S.chat=S.chat||[]; S.seq={m:0,p:0,b:0,k:0,...(S.seq||{})};
+    window._allowWipe=true;
+    persist(); render(); toast('✓ Yedek geri yüklendi');
+  };
   rd.readAsText(file);
 }
 function resetData(){
-  if(!confirm('TÜM veriler silinip başlangıç verisine dönülecek. Emin misiniz?')) return;
-  if(!confirm('Son onay: bu işlem geri alınamaz. Devam edilsin mi?')) return;
-  S=defaultState(); persist(); ayarTab='genel'; go('dashboard'); toast('Veriler sıfırlandı');
+  if(!need('ayar')) return;
+  if(!confirm('TÜM üye, aidat, başvuru ve karar kayıtları silinip başlangıç verisine dönülecek. Emin misiniz?')) return;
+  const yaz=prompt('Son onay: bu işlem tüm kullanıcılar için verileri siler. Devam etmek için SIFIRLA yazın.\n(Mevcut verilerin yedeği önce bilgisayarınıza indirilecek.)','');
+  if((yaz||'').trim().toLocaleUpperCase('tr')!=='SIFIRLA'){ toast('Sıfırlama iptal edildi'); return; }
+  exportJson(true);
+  const key=S.ayarlar&&S.ayarlar.ai?S.ayarlar.ai.apiKey:'';
+  S={...defaultState(),hafiza:S.hafiza}; S.ayarlar.ai.apiKey=key;
+  window._allowWipe=true;
+  persist(); ayarTab='genel'; go('dashboard'); toast('Veriler sıfırlandı — önceki hâlin yedeği indirildi');
 }
 
 /* ================================================================
@@ -4321,22 +4549,34 @@ async function authSignOut(){
   try{ await window._sb.auth.signOut(); }catch(e){}
   location.reload();
 }
+// 'ok': veri yüklendi · 'empty': bulutta henüz satır yok · 'error': okunamadı (bu durumda asla yazılmaz)
 async function cloudLoad(){
   try{
     const {data,error}=await window._sb.from('app_state').select('data').eq('id','main').maybeSingle();
     if(error) throw error;
     if(data&&data.data){
+      setBase(stripForCloud(data.data));
       S=data.data;
       const d=defaultState();
       S.ayarlar={...d.ayarlar,...(S.ayarlar||{})};
       S.ayarlar.ai={...d.ayarlar.ai,...(S.ayarlar.ai||{})};
       S.ayarlar.sheets={...d.ayarlar.sheets,...(S.ayarlar.sheets||{})};
       S.chat=S.chat||[]; S.basvurular=S.basvurular||[];
+      ['members','payments','kararlar'].forEach(k=>{ if(!Array.isArray(S[k])) S[k]=[]; });
+      S.seq={m:0,p:0,b:0,k:0,...(S.seq||{})};
       restoreAiKey();
-      return true;
+      return 'ok';
     }
-  }catch(e){ console.error('cloudLoad',e); toast('⚠ Bulut verisi okunamadı — app_state tablosunu ve RLS izinlerini kontrol edin'); }
-  return false;
+    return 'empty';
+  }catch(e){ console.error('cloudLoad',e); return 'error'; }
+}
+function showLoadError(){
+  let w=document.getElementById('loadErrWrap');
+  if(!w){ w=document.createElement('div'); w.id='loadErrWrap'; w.className='auth-wrap';
+    w.innerHTML='<div class="auth-card" style="text-align:center"><div class="logo" style="margin:0 auto 16px">F</div><h1>Veriler yüklenemedi</h1><div class="sub" style="margin-top:10px">Bulut veritabanına şu anda ulaşılamıyor. İnternet bağlantınızı kontrol edip yeniden deneyin.<br><b>Hiçbir kaydınız değiştirilmedi.</b></div><button class="auth-btn" onclick="this.disabled=true;boot()">⟳ Yeniden dene</button><div class="auth-sw"><a href="#" onclick="authSignOut();return false">Oturumu kapat</a></div></div>';
+    document.body.appendChild(w); }
+  w.classList.remove('auth-hide');
+  const b=w.querySelector('button'); if(b) b.disabled=false;
 }
 async function checkApproval(){
   try{
@@ -4349,7 +4589,7 @@ function ensureSyncBanner(){
   if(document.getElementById('syncBanner')) return;
   const d=document.createElement('div'); d.id='syncBanner';
   d.style.cssText='display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#0E1A33;color:#fff;padding:10px 16px;align-items:center;justify-content:center;gap:14px;font-size:13.5px;box-shadow:0 2px 12px rgba(0,0,0,.25)';
-  d.innerHTML='⚠ Veriler başka bir kullanıcı tarafından güncellendi. Kaydetmeden önce sayfayı yenileyin. <button onclick="location.reload()" style="background:#C2992E;border:0;color:#fff;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600">Yenile</button>';
+  d.innerHTML='⚠ Başka bir kullanıcının değişiklikleri otomatik alınamadı. Kaydetmeden önce sayfayı yenileyin. <button onclick="location.reload()" style="background:#C2992E;border:0;color:#fff;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600">Yenile</button>';
   document.body.appendChild(d);
 }
 function watchCloud(){
@@ -4358,7 +4598,7 @@ function watchCloud(){
     window._rtCh=window._sb.channel('app_state_ch')
       .on('postgres_changes',{event:'*',schema:'public',table:'app_state',filter:'id=eq.main'},()=>{
         if(Date.now()-(window._lastSaveAt||0)<4000) return; // kendi kaydimiz, yoksay
-        const b=document.getElementById('syncBanner'); if(b) b.style.display='flex';
+        clearTimeout(window._pullT); window._pullT=setTimeout(pullRemote,600);
       }).subscribe();
   }catch(e){ console.warn('realtime yok',e); }
 }
@@ -4367,8 +4607,11 @@ async function boot(){
   const approved=await checkApproval();
   if(!approved){ document.getElementById('pendWrap').classList.remove('auth-hide'); return; }
   document.getElementById('pendWrap').classList.add('auth-hide');
-  const fromCloud=await cloudLoad();
-  if(!fromCloud){ await loadState(); persist(); }
+  const loaded=await cloudLoad();
+  // Okuma hatasında boş başlangıç verisi buluta YAZILMAZ; kullanıcı yeniden dener.
+  if(loaded==='error'){ showLoadError(); return; }
+  document.getElementById('loadErrWrap')?.classList.add('auth-hide');
+  if(loaded==='empty'){ await loadState(); persist(); }
   render();
   ensureSyncBanner(); watchCloud();
   toast('👋 Hoş geldiniz, '+(window._sbUser?.user_metadata?.name||window._sbUser?.email||''));

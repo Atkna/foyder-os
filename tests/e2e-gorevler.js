@@ -43,7 +43,10 @@ function serve() {
     const srv = http.createServer((req, res) => {
       const file = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '') || 'index.html');
       if (!file.startsWith(ROOT) || !fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
-      res.writeHead(200, { 'content-type': file.endsWith('.html') ? 'text/html; charset=utf-8' : 'text/plain' }); fs.createReadStream(file).pipe(res);
+      res.writeHead(200, { 'content-type': file.endsWith('.html') ? 'text/html; charset=utf-8' : 'text/plain' });
+      // Testte Supabase sahte dosyayla değiştirildiği için bütünlük karması kaldırılır (gerçek karma ayrı testte denetlenir).
+      if (file.endsWith('index.html')) res.end(fs.readFileSync(file, 'utf8').replace(/ integrity="sha384-[^"]+" crossorigin="anonymous"/, ''));
+      else fs.createReadStream(file).pipe(res);
     });
     srv.listen(0, '127.0.0.1', () => resolve(srv));
   });
