@@ -435,12 +435,31 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 6000 }).then
       await page.evaluate(r => { if (r === 'aidat') { fA.yil = THIS_YEAR; fA.tip = 'AIDAT'; } go(r); }, r);
       const k = await page.evaluate(et => { const t = document.querySelector('#main table.kart-tablo'); if (!t) return null; const tr = t.querySelector('tbody tr'); const td = [...tr.children].find(x => x.dataset.label === et);
         return { thead: getComputedStyle(t.querySelector('thead')).display, tr: getComputedStyle(tr).display, w: tr.getBoundingClientRect().width, once: getComputedStyle(td, '::before').content }; }, etiket);
-      ok(k && k.thead === 'none' && k.tr === 'block' && k.w > 240 && k.once.includes(etiket), `telefon: ${r} tablosu kart görünümünde (${JSON.stringify(k)})`);
+      ok(k && k.thead === 'none' && k.tr === 'grid' && k.w > 300 && k.once.includes(etiket), `telefon: ${r} tablosu kart görünümünde (${JSON.stringify(k)})`);
       await page.screenshot({ path: path.join(OUT, `telefon-${r}-kart.png`) });
     }
+    // Telefonda gezinme: alt çubuk ve açılır menü
+    ok(await page.isVisible('#altbar') && !(await page.isVisible('.sidebar .nav button >> nth=0').then(v => v && page.evaluate(() => document.querySelector('.sidebar').getBoundingClientRect().right > 0))), 'telefon: alt gezinme çubuğu görünüyor, yan menü kapalı');
+    await page.click('#altbar button:has-text("Üyeler")');
+    ok(await page.evaluate(() => route) === 'uyeler' && await page.locator('#altbar button.on').innerText().then(t => t.includes('Üyeler')), 'telefon: alt çubuktan Üyeler açıldı');
+    await page.click('#altbar [data-menu-ac]'); await sleep(350);
+    ok(await page.evaluate(() => document.body.classList.contains('menu-acik') && document.querySelector('.sidebar').getBoundingClientRect().left >= 0), 'telefon: "Menü" yan menüyü açtı');
+    await page.click('.sidebar .nav button:has-text("YK Kararları")'); await sleep(350);
+    ok(await page.evaluate(() => route === 'kararlar' && !document.body.classList.contains('menu-acik')), 'telefon: menüden sayfa seçilince menü kapandı');
+    await page.evaluate(() => editMember('M001')); await sleep(200);
+    const pf = await page.evaluate(() => { const f = document.querySelector('.modal-f').getBoundingClientRect(); return { alt: Math.round(f.bottom), ekran: innerHeight, dugme: Math.round(document.querySelector('.modal-f .btn').getBoundingClientRect().height) }; });
+    ok(pf.alt <= pf.ekran && pf.alt >= pf.ekran - 2 && pf.dugme >= 44, `telefon: pencere alttan açılıyor, düğmeler ekranın altında ve büyük (${JSON.stringify(pf)})`);
+    await page.evaluate(() => closeModal());
     await page.evaluate(() => openMember('M004')); await sleep(150);
     ok(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, 'telefon: üye kartı (ödeme geçmişi ve değişiklik geçmişi) taşmıyor');
     await page.screenshot({ path: path.join(OUT, 'telefon-uye-karti.png') });
+    errors.push(...page.errors); await ctx.close();
+  }
+
+  /* 21b) Masaüstünde telefon öğeleri görünmüyor */
+  {
+    const { ctx, page } = await open(browser, URL);
+    ok(!(await page.isVisible('#altbar')) && !(await page.isVisible('.mobil-logo')) && await page.evaluate(() => document.querySelector('.sidebar').getBoundingClientRect().width) === 248, 'masaüstü: alt çubuk ve telefon logosu gizli, yan menü eskisi gibi');
     errors.push(...page.errors); await ctx.close();
   }
 

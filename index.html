@@ -2,7 +2,8 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230E1A33%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 text-anchor=%22middle%22 fill=%22%23C2992E%22 font-family=%22Georgia%22 font-weight=%22bold%22>F</text></svg>">
 <title>FOYDER OS · Üye ve Aidat Yönetim Sistemi</title>
 <!-- SheetJS 0.20.3 (0.18.5'teki bilinen güvenlik açıkları giderildi). Resmî dağıtım npm'de olmadığı için npm kopyası @e965/xlsx kullanılır;
@@ -104,7 +105,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
 .t-violet{background:var(--violet-soft);color:var(--violet)}
 
 .grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:15px}
-@media(max-width:1150px){.grid2{grid-template-columns:1fr}}
+@media(max-width:1150px){.grid2{grid-template-columns:minmax(0,1fr)}.grid2>*{min-width:0}} /* tek sütunda içerik sütunu genişletip sayfayı taşırmasın */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:15px;overflow:hidden}
 .card-h{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line);gap:10px}
 .card-h h3{font-size:13.5px;font-weight:700}
@@ -268,20 +269,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)!important;box-s
 .esles-h{display:flex!important;gap:8px;align-items:center;justify-content:flex-start;margin-top:12px;font-size:12.5px;color:var(--muted);text-align:left}
 .esles-h input{width:auto!important;flex:none;margin:0}
 @media(max-width:640px){.esles-s{grid-template-columns:1fr}}
-/* Telefonda üye ve aidat tabloları kart görünümüne döner: her satır bir kart, her hücre "etiket: değer" satırı. */
-@media(max-width:640px){
-  table.kart-tablo thead{display:none}
-  table.kart-tablo,table.kart-tablo tbody,table.kart-tablo tr,table.kart-tablo td{display:block;width:100%}
-  table.kart-tablo tbody{padding:4px 10px 10px}
-  table.kart-tablo tr{border:1px solid var(--line);border-radius:12px;margin:8px 0;padding:8px 12px;background:var(--panel);box-shadow:0 1px 2px rgba(14,26,51,.04)}
-  table.kart-tablo td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:5px 0;border:0;text-align:right;min-height:28px}
-  table.kart-tablo td::before{content:attr(data-label);color:var(--muted);font-size:11.5px;font-weight:600;text-align:left;flex:none}
-  table.kart-tablo td.kt-bas{justify-content:flex-start;text-align:left;border-bottom:1px solid #F0F2F6;padding-bottom:8px;margin-bottom:2px}
-  table.kart-tablo td.kt-bas::before,table.kart-tablo td.kt-islem::before{display:none}
-  table.kart-tablo td.kt-islem{justify-content:flex-end;flex-wrap:wrap;padding-top:8px}
-  table.kart-tablo td.kt-islem:empty{display:none}
-  table.kart-tablo td.num{text-align:right}
-}
+/* Telefonda tabloların kart görünümü: aşağıdaki "TELEFON DÜZENİ" bloğunda (760 px ve altı). */
 </style>
 </head>
 <body>
@@ -298,6 +286,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)!important;box-s
 </aside>
 
 <header class="topnav">
+  <button class="mobil-logo" data-menu-ac onclick="menuAc(true)" aria-label="Menüyü aç">F</button>
   <div class="crumb" id="crumb">Dashboard</div>
   <div class="cmdbar" id="cmdbar">
     <svg class="spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.7L19.6 10l-5.7 1.9L12 17.6l-1.9-5.7L4.4 10l5.7-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
@@ -311,6 +300,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)!important;box-s
 </header>
 
 <main class="main" id="main"><div class="skel">Yükleniyor…</div></main>
+<!-- Telefonda alt gezinme çubuğu ve menü perdesi (masaüstünde gizli) -->
+<nav class="altbar" id="altbar" aria-label="Ana sayfalar"></nav>
+<div class="menu-perde" onclick="menuAc(false)"></div>
 <div id="modalRoot"></div>
 
 <!-- ============ GİRİŞ EKRANI ============ -->
@@ -1251,7 +1243,18 @@ function renderNav(){
   document.getElementById('crumb').textContent=PAGES.find(p=>p[0]===route)?.[1]||'';
   const sh=S.ayarlar.sheets;
   document.getElementById('syncDot').classList.toggle('off',!(sh.csvUyeler||sh.csvOdemeler||sh.yilCsv||sh.webhook));
+  // Telefonda alt çubuk: en sık kullanılan dört sayfa + bütün sayfaları açan "Menü".
+  const alt=document.getElementById('altbar');
+  if(alt){
+    const ALT=[['dashboard','Genel Bakış'],['uyeler','Üyeler'],['aidat','Aidat'],['gorevler','Görevler']];
+    alt.innerHTML=ALT.map(([id,t])=>{ const pill=id==='gorevler'?HZ.badge():0;
+      return `<button class="${route===id?'on':''}" onclick="go('${id}')" ${route===id?'aria-current="page"':''}><span class="ic">${ICONS[id]}${pill?`<span class="pill">${pill}</span>`:''}</span><span>${t}</span></button>`; }).join('')
+      +`<button class="${ALT.some(a=>a[0]===route)?'':'on'}" data-menu-ac onclick="menuAc(true)" aria-label="Bütün sayfalar"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>${eksik?`<span class="pill">${eksik}</span>`:''}</span><span>Menü</span></button>`;
+  }
 }
+// Telefonda yan menüyü açar/kapatır (yalnızca görünüm).
+function menuAc(ac){ document.body.classList.toggle('menu-acik',!!ac); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.body.classList.contains('menu-acik')) menuAc(false); });
 // Yöneticiye 30 günden uzun süredir JSON yedeği alınmadıysa hatırlatır (yalnızca bu tarayıcıda izlenir).
 function yedekHatirlatma(){
   if(!can('ayar')) return '';
@@ -1260,7 +1263,7 @@ function yedekHatirlatma(){
   if(gun!==null&&gun<30) return '';
   return `<div class="banner blue" style="align-items:center;flex-wrap:wrap"><span>💾 ${gun===null?'Bu tarayıcıdan henüz JSON yedeği alınmadı.':`Son JSON yedeği ${gun} gün önce alındı.`} Düzenli yedek, yanlışlıkla silinen kayıtları geri getirmenin en güvenli yoludur.</span> <button class="btn sm" onclick="exportJson()">⬇ Şimdi yedek al</button></div>`;
 }
-function go(r){ route=r; render(); window.scrollTo(0,0); }
+function go(r){ route=r; menuAc(false); render(); window.scrollTo(0,0); }
 
 /* ================================================================
    DASHBOARD
@@ -1879,26 +1882,29 @@ function analizData(){
 }
 const AYLAR=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
 function fmtK(n){ n=+n||0; return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?Math.round(n/1e3)+'K':String(n); }
+// Telefonda grafik, ekran genişliğinde bir koordinat sistemiyle çizilir; böylece yazılar küçülmeden okunur (yalnızca görünüm).
+function grafikOlcu(n){ const tel=!!(window.matchMedia&&matchMedia('(max-width:760px)').matches);
+  return tel?{tel,W:Math.max(260,Math.min(640,innerWidth-56)),H:200,fsL:12.5,fsV:12.5,deger:n<=8}:{tel,W:640,H:220,fsL:10.5,fsV:9.5,deger:true}; }
 function barChartSVG(labels,values,opts){
-  opts=opts||{}; const W=opts.w||640,H=opts.h||220,pad=34,gap=(W-pad*2)/values.length,bw=gap*0.62;
+  opts=opts||{}; const G=grafikOlcu(values.length); const W=opts.w||G.W,H=opts.h||G.H,pad=G.tel?24:34,gap=(W-pad*2)/values.length,bw=gap*0.62;
   const max=Math.max(1,...values);
   const bars=values.map((v,i)=>{
     const h=(H-pad*1.6)*(v/max), x=pad+i*gap+(gap-bw)/2, y=H-pad-h;
     return '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(0,h).toFixed(1)+'" rx="4" fill="url(#barg)"/>'+
-      '<text x="'+(x+bw/2).toFixed(1)+'" y="'+(H-pad+14)+'" text-anchor="middle" font-size="10.5" fill="var(--faint)">'+labels[i]+'</text>'+
-      (v>0?'<text x="'+(x+bw/2).toFixed(1)+'" y="'+(y-5).toFixed(1)+'" text-anchor="middle" font-size="9.5" fill="var(--muted)" font-weight="600">'+(opts.money?fmtK(v):v)+'</text>':'');
+      '<text x="'+(x+bw/2).toFixed(1)+'" y="'+(H-pad+14)+'" text-anchor="middle" font-size="'+G.fsL+'" fill="var(--faint)">'+(G.deger||i%2===0?labels[i]:'')+'</text>'+
+      (v>0&&G.deger?'<text x="'+(x+bw/2).toFixed(1)+'" y="'+(y-5).toFixed(1)+'" text-anchor="middle" font-size="'+G.fsV+'" fill="var(--muted)" font-weight="600">'+(opts.money?fmtK(v):v)+'</text>':'');
   }).join('');
   return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:100%"><defs><linearGradient id="barg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0E1A33"/><stop offset="1" stop-color="#2A3A5C"/></linearGradient></defs><line x1="'+pad+'" y1="'+(H-pad)+'" x2="'+(W-pad)+'" y2="'+(H-pad)+'" stroke="var(--line)"/>'+bars+'</svg>';
 }
 function lineChartSVG(labels,values,opts){
-  opts=opts||{}; const W=opts.w||640,H=opts.h||220,pad=36;
+  opts=opts||{}; const G=grafikOlcu(values.length); const W=opts.w||G.W,H=opts.h||G.H,pad=G.tel?26:36;
   const max=Math.max(1,...values);
   const px=i=>pad+(W-pad*2)*(values.length<2?0.5:i/(values.length-1));
   const py=v=>H-pad-(H-pad*1.6)*(v/(max||1));
   const pts=values.map((v,i)=>px(i).toFixed(1)+','+py(v).toFixed(1)).join(' ');
   const area=pad+','+(H-pad)+' '+pts+' '+px(values.length-1).toFixed(1)+','+(H-pad);
-  const dots=values.map((v,i)=>'<circle cx="'+px(i).toFixed(1)+'" cy="'+py(v).toFixed(1)+'" r="3.5" fill="var(--gold)"/><text x="'+px(i).toFixed(1)+'" y="'+(py(v)-9).toFixed(1)+'" text-anchor="middle" font-size="9.5" fill="var(--muted)" font-weight="600">'+v+'</text>').join('');
-  const labs=labels.map((l,i)=>'<text x="'+px(i).toFixed(1)+'" y="'+(H-pad+14)+'" text-anchor="middle" font-size="10" fill="var(--faint)">'+l+'</text>').join('');
+  const dots=values.map((v,i)=>'<circle cx="'+px(i).toFixed(1)+'" cy="'+py(v).toFixed(1)+'" r="3.5" fill="var(--gold)"/><text x="'+px(i).toFixed(1)+'" y="'+(py(v)-9).toFixed(1)+'" text-anchor="middle" font-size="'+G.fsV+'" fill="var(--muted)" font-weight="600">'+v+'</text>').join('');
+  const labs=labels.map((l,i)=>'<text x="'+px(i).toFixed(1)+'" y="'+(H-pad+14)+'" text-anchor="middle" font-size="'+(G.tel?G.fsL:10)+'" fill="var(--faint)">'+l+'</text>').join('');
   return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:100%"><defs><linearGradient id="lineg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(194,153,46,.28)"/><stop offset="1" stop-color="rgba(194,153,46,0)"/></linearGradient></defs><polygon points="'+area+'" fill="url(#lineg)"/><polyline points="'+pts+'" fill="none" stroke="var(--gold)" stroke-width="2.2" stroke-linejoin="round"/>'+dots+labs+'</svg>';
 }
 function pieSVG(data){
@@ -2260,6 +2266,235 @@ kbd{font-family:inherit;font-size:11.5px;font-weight:700;background:#F2F4F8;bord
   .hz-sync span{display:none}
   #modalRoot .modal-f{gap:6px;padding:12px 14px}
   #modalRoot .modal-f .btn{padding:6px 9px;font-size:11.5px}
+}
+</style>
+<style id="mobil-stil">
+/* ================================================================
+   TELEFON DÜZENİ (760 px ve altı). Masaüstü ve tablet (761 px+) bu bloktan etkilenmez.
+   Kararlar ve nedenleri: docs/mobil-tasarim.md
+================================================================ */
+.mobil-logo,.altbar,.menu-perde{display:none}
+.filtre-serit{display:contents}
+@media(max-width:760px){
+  :root{--sb:0px;--tb:58px;--alt:62px;--kenar:max(14px,env(safe-area-inset-left))}
+  body{font-size:14.5px}
+  .muted{font-size:13px}
+
+  /* --- Yan menü: telefonda soldan açılan panel (masaüstündeki menünün yazılı hâli) --- */
+  .sidebar{width:min(300px,86vw);transform:translateX(-104%);transition:transform .24s cubic-bezier(.2,.8,.2,1);z-index:95;box-shadow:none}
+  body.menu-acik .sidebar{transform:none;box-shadow:12px 0 40px rgba(0,0,0,.35)}
+  body.menu-acik{overflow:hidden}
+  .menu-perde{position:fixed;inset:0;background:rgba(10,14,26,.5);z-index:90;opacity:0;pointer-events:none;transition:opacity .2s;display:block}
+  body.menu-acik .menu-perde{opacity:1;pointer-events:auto}
+  .brand{justify-content:flex-start;padding:calc(18px + env(safe-area-inset-top)) 20px 12px}
+  .brand h1,.brand p{display:block}.brand h1{font-size:16px}.brand p{font-size:12px}
+  .nav-label{display:block;font-size:12px;padding:14px 10px 6px}
+  .nav button{justify-content:flex-start;min-height:46px;font-size:15px;padding:10px 12px}
+  .nav .t{display:inline}.nav .pill{display:inline-block;font-size:12px}
+  .side-foot{display:block;padding:12px 16px calc(14px + env(safe-area-inset-bottom))}
+  .role-chip .rl{font-size:13.5px}.role-tag{font-size:12px}
+  .side-foot .btn{min-height:44px;font-size:14px}
+
+  /* --- Üst çubuk: logo (menü) + komut çubuğu + senkron --- */
+  .topnav{left:0;height:calc(var(--tb) + env(safe-area-inset-top));padding:env(safe-area-inset-top) var(--kenar) 0;gap:10px;background:rgba(255,255,255,.94)}
+  .mobil-logo{display:flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;border-radius:11px;border:0;background:linear-gradient(135deg,var(--gold),#8A6A1C);color:#fff;font-weight:800;font-size:16px;box-shadow:0 2px 8px rgba(194,153,46,.35)}
+  .cmdbar{max-width:none;margin:0;min-width:0}
+  .cmdbar input{height:44px;font-size:16px;padding:9px 12px 9px 38px;border-radius:12px}
+  .top-actions{gap:2px}
+  .top-actions .btn{min-height:44px;min-width:44px;justify-content:center;font-size:17px;padding:0}
+  .sync-dot{display:none}
+
+  /* --- Alt gezinme çubuğu --- */
+  .altbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:60;height:calc(var(--alt) + env(safe-area-inset-bottom));padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);background:linear-gradient(180deg,var(--ink2),var(--ink));border-top:1px solid rgba(255,255,255,.06);box-shadow:0 -6px 24px rgba(10,14,26,.18)}
+  .altbar button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:none;border:0;color:#8D99B0;font-size:12px;font-weight:600;letter-spacing:.1px;min-width:0}
+  .altbar button span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 2px}
+  .altbar button.on{color:var(--gold-2)}
+  .altbar button.on::before{content:'';position:absolute;top:0;left:28%;right:28%;height:3px;border-radius:0 0 3px 3px;background:var(--gold)}
+  .altbar .ic{position:relative;width:23px;height:23px}
+  .altbar .ic svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .altbar .pill{position:absolute;top:-5px;right:-11px;background:var(--red);color:#fff;font-size:12px;font-weight:700;border-radius:99px;padding:0 5px;min-width:18px;line-height:18px;text-align:center;box-shadow:0 0 0 2px var(--ink)}
+
+  /* --- Sayfa iskeleti --- */
+  .main{margin-left:0;padding:calc(var(--tb) + env(safe-area-inset-top) + 16px) var(--kenar) calc(var(--alt) + env(safe-area-inset-bottom) + 28px)}
+  .pagehead{margin-bottom:14px;gap:12px;align-items:stretch}
+  .pagehead>div:first-child{flex:1 1 100%;min-width:0}
+  .pagehead h2{font-size:22px;line-height:1.25}
+  .pagehead .sub{font-size:13.5px;line-height:1.45}
+  .pagehead .actions{flex:1 1 100%;gap:8px}
+  .pagehead .actions .btn{flex:1 1 auto;justify-content:center}
+  .pagehead .btn[onclick="window.print()"],.pagehead .btn[onclick="HZ.help()"]{display:none}
+  .card{border-radius:14px;margin-bottom:12px}
+  .card:hover{box-shadow:var(--sh)}
+  .card-h{padding:13px 14px;flex-wrap:wrap}
+  .card-h h3{font-size:15px}
+  .card-b{padding:14px}
+  .banner{font-size:13.5px;padding:12px 14px}
+  .role-note{font-size:13px}
+
+  /* --- Dokunma alanları ve form alanları --- */
+  .btn,.btn.sm{min-height:44px;min-width:44px;justify-content:center;padding:10px 15px;font-size:14px;border-radius:11px}
+  .btn.sm{padding:9px 13px;font-size:13.5px}
+  .btn:hover{transform:none}
+  input,select,textarea{font-size:16px;border-radius:11px}
+  input:not([type=checkbox]):not([type=radio]):not([type=range]),select{min-height:44px}
+  input[type=checkbox],input[type=radio]{width:22px;height:22px;min-height:0}
+  .x{min-width:44px;min-height:44px;font-size:22px}
+  .tabs button,.hz-tabs button{min-height:46px;font-size:14.5px}
+  .suggest button{min-height:44px;font-size:14px;padding:9px 15px}
+  .switch{width:50px;height:30px}.switch i:after{width:24px;height:24px}.switch input:checked+i:after{left:23px}
+  .chk{min-height:44px;font-size:14px}
+  details>summary{min-height:44px;display:flex;align-items:center}
+
+  /* --- En küçük yazı 12 px --- */
+  .tag{font-size:12px;padding:4px 10px}
+  .avatar{width:36px;height:36px;font-size:12.5px}
+  .name-cell .sb,.kpi .d,.bar-col .yl,.bar-col .vv,.detail-grid .dl,.msg .mod,.msg .act,.gecmis-l,.setrow .sd,.frm label,.code,.esles-n{font-size:12px}
+  .frm label{font-size:13px}
+  /* Sayfa kodunda satır içi verilmiş küçük yazılar ve sabit boyutlu grafiklerdeki küçük etiketler */
+  #main [style*="font-size:10"],#main [style*="font-size:11"],#modalRoot [style*="font-size:10"],#modalRoot [style*="font-size:11"]{font-size:12px!important}
+  .donut-wrap svg text[font-size="9"],.donut-wrap svg text[font-size="9.5"],.donut-wrap svg text[font-size="10"],.donut-wrap svg text[font-size="11"]{font-size:12px}
+  .detail-grid .dv{font-size:15px}
+  th{font-size:12px}
+  .count{font-size:13px}
+  .setrow .sl{font-size:14.5px}
+  .gecmis summary{font-size:13px}
+  .empty{padding:32px 16px;font-size:14px}
+  .msg{font-size:14.5px;max-width:88%}
+  .toast{left:12px;right:12px;bottom:calc(var(--alt) + env(safe-area-inset-bottom) + 12px);max-width:none;font-size:14px;padding:14px 16px}
+  .toast button{min-height:36px}
+
+  /* --- Özet kartları: iki sütun, simge etiketin yanında --- */
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px;margin-bottom:14px}
+  .kpi{padding:12px 13px;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:9px}
+  .kpi:hover{transform:none}
+  .kpi .ico{width:28px;height:28px;margin:0;font-size:14px;border-radius:8px}
+  .kpi .l{font-size:12.5px;line-height:1.3;min-width:0}
+  .kpi .v,.kpi .d{grid-column:1/-1}
+  .kpi .v{font-size:21px!important;margin-top:6px}
+  .kpi>.l:first-child,.kpi>.v:first-child{grid-column:1/-1}
+  .kpi{position:relative}
+  .kpi .l:has(.ipucu){padding-right:22px}
+  .kpi .ipucu{position:absolute;top:4px;right:4px;display:flex;align-items:center;justify-content:center;width:36px;height:36px;margin:0;padding:0;font-size:15px}
+
+  /* --- Filtreler: arama tam genişlik, seçim kutuları tek satırlık kaydırmalı şerit --- */
+  .filters{padding:12px 14px;gap:10px}
+  .filters>input,.filters>input[type=search]{flex:1 1 100%;min-width:0!important;width:100%}
+  .filtre-serit{display:flex;gap:8px;flex:1 1 100%;min-width:0;overflow-x:auto;scrollbar-width:none;margin:0 -14px;padding:0 14px}
+  .filtre-serit::-webkit-scrollbar{display:none}
+  .filters select,.filtre-serit select{width:auto;min-width:0!important;max-width:none;flex:none;font-size:15px;padding:9px 32px 9px 12px}
+  .filters .count{margin-left:auto}
+  /* Arama kutusu en üstte, kayıt sayısı yanında; şeritler ve diğerleri alt satırlarda */
+  .filters:has(>input[type=search]){display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+  .filters:has(>input[type=search])>*{grid-column:1/-1}
+  .filters:has(>input[type=search])>input[type=search]{grid-column:1;grid-row:1}
+  .filters:has(>input[type=search])>.count{grid-column:2;grid-row:1;margin:0;white-space:nowrap}
+  .filters:has(>input[type=search])>.count:empty{display:none}
+
+  /* --- Yana kaydırılan satırlar: sağda devamı varsa kenar soluklaşır --- */
+  .tabs,.hz-tabs,.hz-seg,.filtre-serit,.hz-kpis{scroll-snap-type:x proximity}
+  .sag-var{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent)}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{white-space:nowrap;flex:none;padding:10px 14px}
+
+  /* --- Listeler: kart görünümü (iki sütunlu etiket/değer) --- */
+  table.kart-tablo thead{display:none}
+  table.kart-tablo,table.kart-tablo tbody{display:block;width:100%}
+  table.kart-tablo tbody{padding:4px 12px 12px}
+  table.kart-tablo tr{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;row-gap:8px;border:1px solid var(--line);border-radius:13px;margin:10px 0;padding:12px 14px;background:var(--panel);box-shadow:0 1px 2px rgba(14,26,51,.04)}
+  table.kart-tablo tr:hover{background:var(--panel)}
+  table.kart-tablo td{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:0;border:0;text-align:left;min-width:0;font-size:14px;overflow-wrap:anywhere}
+  table.kart-tablo td::before{content:attr(data-label);color:var(--faint);font-size:12px;font-weight:600;letter-spacing:.2px}
+  table.kart-tablo td.num{text-align:left;align-items:flex-start}
+  table.kart-tablo td.kt-bas{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:flex-start;border-bottom:1px solid #F0F2F6;padding:0 0 10px;margin-bottom:2px;font-weight:650;font-size:15px}
+  table.kart-tablo td.kt-bas::before,table.kart-tablo td.kt-islem::before,table.kart-tablo td.kt-tek::before,table.kart-tablo td[data-label=""]::before,table.kart-tablo td:not([data-label])::before{display:none}
+  table.kart-tablo td.kt-tek{grid-column:1/-1}
+  table.kart-tablo td.kt-islem{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:8px;padding-top:4px}
+  table.kart-tablo td.kt-islem:empty{display:none}
+  table.kart-tablo td.kt-islem .btn{flex:1 1 auto;justify-content:center}
+  table.kart-tablo td.kt-islem .btn.ghost:only-child{flex:none;margin-left:auto}
+  /* Üye kartında "No" köşede küçük bir rozet olur */
+  table.kart-tablo td:empty{display:none}
+  table.kart-oto td.kt-bas[data-label="No"]::before{display:inline;content:'No';margin-right:6px;font-size:13px;color:var(--faint)}
+  table.kart-tablo:not(.kart-oto) td[data-label="No"]:first-child{position:absolute;top:12px;right:14px;flex-direction:row;gap:4px;font-size:12.5px;color:var(--faint);font-weight:650}
+  table.kart-tablo:not(.kart-oto) td[data-label="No"]:first-child::before{content:'No';font-size:12px}
+  table.kart-tablo:not(.kart-oto) td[data-label="No"]:first-child+td.kt-bas{padding-right:56px}
+  .name-cell{gap:12px}
+  .name-cell .nm{font-size:15px}
+
+  /* --- Açılır pencereler: alttan açılan sayfa --- */
+  .overlay{padding:0;align-items:flex-end;overflow:hidden;backdrop-filter:none}
+  .modal,.modal.wide{max-width:none;border-radius:20px 20px 0 0;max-height:calc(100dvh - 18px - env(safe-area-inset-top));display:flex;flex-direction:column;animation:sheet .24s cubic-bezier(.2,.8,.2,1)}
+  @keyframes sheet{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+  .modal-h{position:relative;padding:20px 12px 10px 18px;flex:none}
+  .modal-h::before{content:'';position:absolute;top:7px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:99px;background:#D5DAE3}
+  .modal-h h3{font-size:17px;min-width:0}
+  .modal-h .btn{min-width:44px;font-size:18px}
+  .modal-b{padding:16px 18px 20px;max-height:none;flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  .modal-f,#modalRoot .modal-f{flex:none;display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px calc(12px + env(safe-area-inset-bottom));border-radius:0}
+  .modal-f .btn,#modalRoot .modal-f .btn{flex:1 1 calc(50% - 4px);justify-content:center;min-height:46px;padding:10px 12px;font-size:14px}
+  .detail-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
+  .frm{gap:14px}
+
+  /* --- Sayfalara özel --- */
+  .grid2{gap:0}
+  .bars{gap:10px;height:150px}
+  .donut-wrap{justify-content:center}
+  .donut-legend div{font-size:13.5px}
+  .setrow{gap:10px;padding:14px 0}
+  .setrow .ctl,.ayar-body .setrow .ctl{min-width:0!important;width:100%;flex:1 1 100%}
+  .ayar-body{padding:4px 14px 18px}
+  .ayar-tabs{padding:0 6px}
+  .chatlog{max-height:none;min-height:120px}
+  .card-b>div[style*="display:flex;gap:8px"]{flex-wrap:wrap}
+  #chatInput{flex:1 1 100%}
+  .card-b>div[style*="display:flex;gap:8px"] .btn{flex:1 1 auto;justify-content:center}
+  .esles-s{grid-template-columns:1fr}
+
+  /* --- Toplantılar ve Görevler --- */
+  .hz-kpis{display:flex;overflow-x:auto;scrollbar-width:none;gap:8px;margin:0 calc(-1 * var(--kenar)) 14px;padding:0 var(--kenar) 2px}
+  .hz-kpis::-webkit-scrollbar{display:none}
+  .hz-kpis .kpi{flex:none;min-width:112px;display:block;padding:11px 14px}
+  .hz-kpis .kpi .l{font-size:12.5px;white-space:nowrap;overflow:visible}
+  .hz-kpis .kpi .v{margin-top:2px}
+  .hz-tabs{padding:0 4px;scrollbar-width:none}
+  .hz-tabs button{padding:12px 13px 10px;scroll-snap-align:start}
+  .hz-tabs button b{font-size:12px}
+  .hz-filters{gap:10px}
+  .hz-filters>input[type=search]{flex-basis:100%}
+  .hz-seg{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;flex:1 1 100%;max-width:100%}
+  .hz-seg::-webkit-scrollbar{display:none}
+  .hz-seg button{min-height:42px;font-size:14px;padding:8px 14px;flex:none}
+  .hz-filters .btn{flex:1 1 100%}
+  .hz-group{font-size:12px;padding:14px 14px 8px}
+  .hz-task{padding:12px 14px;gap:12px}
+  /* Toplu seçim ve alt adım kutuları: 32 px dokunma alanı, içinde 22 px'lik görünür kutu */
+  .hz-task .hz-sel,.hz-ck-row input[type=checkbox]{-webkit-appearance:none;appearance:none;width:32px;height:32px;margin:-2px -4px 0 -6px;border:5px solid transparent;border-radius:10px;background:var(--panel) padding-box;box-shadow:inset 0 0 0 1.6px #AEB8C8;opacity:1;flex:none;cursor:pointer}
+  .hz-task .hz-sel:checked{box-shadow:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat padding-box,var(--blue) padding-box}
+  .hz-ck-row input[type=checkbox]:checked{box-shadow:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat padding-box,var(--green) padding-box}
+  .hz-done-btn{width:32px;height:32px;font-size:15px;margin-top:-3px}
+  .hz-task-title{font-size:15px}
+  .hz-meta{font-size:13px;gap:6px 10px}
+  .hz-card .hz-meta,.hz-col-h b,.hz-chip,.hz-note,.hz-cm .h,.hz-cm .h button,.hz-col-empty,.hz-day .n,.hz-tr .f,.hz-tr .d,.hz-sublabel,.hz-cm .h b,.hz-hist,.hz-ctx,.hz-dash small,.hz-week h4 small,.hz-cal .wd,.hz-sync{font-size:12px}
+  details.hz-det summary{font-size:13px}
+  .hz-col-h{font-size:14px}
+  .hz-card{padding:12px 13px}
+  .hz-bulk{top:calc(var(--tb) + env(safe-area-inset-top) + 6px);margin:8px 10px}
+  .hz-bulk .btn{min-height:40px;font-size:13px}
+  .hz-bulk select,.hz-bulk input{min-height:40px;font-size:15px}
+  .hz-ck-row button{min-width:40px;min-height:40px;font-size:16px}
+  kbd{font-size:12px}
+
+  /* --- Giriş ekranı --- */
+  .auth-wrap{padding:16px;align-items:flex-start;padding-top:max(10vh,24px);overflow-y:auto}
+  .auth-card{padding:30px 22px;border-radius:20px}
+  .auth-card label{font-size:13px}
+  .auth-card .sub,.auth-sw{font-size:13.5px}
+  .auth-btn{min-height:48px;font-size:15.5px}
+}
+@media(max-width:380px){
+  .kpi .v{font-size:19px!important}
+  .altbar button{font-size:12px;letter-spacing:-.2px}
 }
 </style>
 <!-- hafiza/task-engine.js ve hafiza/reminders.js değiştirilmeden gömülüdür; güncellemek için: node tools/hafiza-gom.js -->
@@ -4881,6 +5116,44 @@ function render(){
   document.getElementById('main').innerHTML=(P[route]||pageDashboard)();
   const cl=document.getElementById('chatlog'); if(cl) cl.scrollTop=cl.scrollHeight;
 }
+/* ---------- Telefon yerleşimi yardımcısı (yalnızca görünüm; veriye, kayda ve yetkiye dokunmaz) ----------
+   Sayfa ya da pencere her çizildiğinde:
+   • filtre satırındaki yan yana seçim kutularını tek bir şeride alır (masaüstünde şerit görünmez: display:contents),
+   • 4+ sütunlu tablolara hücre etiketlerini başlıktan ekler (telefonda kart görünümü için),
+   • yana kaydırılan satırlarda (sekmeler, şeritler) sağda devamı varsa kenarı soluklaştırır ve seçili öğeyi görünür alana getirir. */
+const TELEFON=window.matchMedia?matchMedia('(max-width:760px)'):{matches:false,addEventListener(){}};
+function mobilDuzenle(kok){
+  if(!kok) return;
+  kok.querySelectorAll('.filters').forEach(f=>{
+    let grup=[];
+    const sar=()=>{ if(grup.length>1){ const s=document.createElement('div'); s.className='filtre-serit'; grup[0].before(s); grup.forEach(x=>s.appendChild(x)); } grup=[]; };
+    [...f.children].forEach(el=>{ if(el.tagName==='SELECT') grup.push(el); else sar(); }); sar();
+  });
+  kok.querySelectorAll('table').forEach(t=>{
+    if(t.closest('#mkPrint,#hzPrint,.hz-cal')) return;
+    const th=[...t.querySelectorAll(':scope>thead th')].map(x=>x.textContent.trim());
+    if(!t.classList.contains('kart-tablo')){ if(th.length<4) return; t.classList.add('kart-tablo','kart-oto'); }
+    t.querySelectorAll(':scope>tbody>tr:not([data-k])').forEach(tr=>{ tr.dataset.k='1';
+      [...tr.children].forEach((td,i)=>{ if(td.colSpan>1){ td.classList.add('kt-tek'); return; }
+        if(!td.dataset.label&&th[i]) td.dataset.label=th[i];
+        if(t.classList.contains('kart-oto')){ if(i===0) td.classList.add('kt-bas'); else if(!th[i]&&td.querySelector('button')) td.classList.add('kt-islem'); } }); });
+  });
+  kok.querySelectorAll('.tabs,.hz-tabs,.hz-seg,.filtre-serit,.hz-kpis,.ayar-tabs').forEach(el=>{
+    if(!el.dataset.kay){ el.dataset.kay='1'; el.addEventListener('scroll',()=>kenarGuncelle(el),{passive:true}); }
+    const on=el.querySelector('.on,.active'); if(on&&TELEFON.matches&&el.scrollWidth>el.clientWidth){ const r=on.offsetLeft+on.offsetWidth-el.clientWidth; if(on.offsetLeft<el.scrollLeft||r>el.scrollLeft) el.scrollLeft=Math.max(0,on.offsetLeft-24); }
+    kenarGuncelle(el);
+  });
+}
+function kenarGuncelle(el){ el.classList.toggle('sag-var',el.scrollLeft+el.clientWidth<el.scrollWidth-4); }
+(()=>{ let bekle=0;
+  const planla=()=>{ if(bekle) return; bekle=requestAnimationFrame(()=>{ bekle=0; mobilDuzenle(document.getElementById('main')); mobilDuzenle(document.getElementById('modalRoot')); }); };
+  ['main','modalRoot'].forEach(id=>{ const el=document.getElementById(id); if(el&&window.MutationObserver) new MutationObserver(planla).observe(el,{childList:true,subtree:true}); });
+  // Komut çubuğunun örnek metni telefonda kısalır (uzun hâli kesiliyordu).
+  const ci=document.getElementById('cmdInput'), uzun=ci&&ci.placeholder;
+  const ph=()=>{ if(ci) ci.placeholder=TELEFON.matches?'Yapay zekâya yazın…':uzun; planla(); };
+  ph(); TELEFON.addEventListener?TELEFON.addEventListener('change',ph):TELEFON.addListener&&TELEFON.addListener(ph);
+  window.addEventListener('resize',planla,{passive:true});
+})();
 /* ================================================================
    SUPABASE AUTH + BULUT VERİ
 ================================================================ */
