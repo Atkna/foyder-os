@@ -1,7 +1,7 @@
 // Tarayıcı testleri için bellek içi sahte Supabase: yalnızca panelin kullandığı çağrılar.
 // window.__seed başlangıç verisi (yenilemelerde sessionStorage'daki son hâl kullanılır), window.__role kullanıcı rolü,
 // window.__fail=true okuma+yazma hatası, window.__failRead=true yalnızca okuma hatası taklidi,
-// window.__beforeWrite(row) yazmadan hemen önce "başka bir kullanıcının" kaydını taklit eder.
+// window.__oturumYok=true giriş ekranını gösterir, window.__beforeWrite(row) yazmadan hemen önce "başka bir kullanıcının" kaydını taklit eder.
 (function(){
   const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
   // Sayfa yenilenince de aynı "bulut" verisi kalsın (gerçek veritabanı gibi).
@@ -41,7 +41,7 @@
   }
   window.supabase={ createClient(){ return {
     from:q,
-    auth:{ async getSession(){ return {data:{session:{user:{id:window.__uid||'u-test',email:'deneme@ornek.org',user_metadata:{name:window.__uname||'Deneme Kullanıcı'}}}}}; }, async signOut(){} },
+    auth:{ async getSession(){ if(window.__oturumYok) return {data:{session:null}}; return {data:{session:{user:{id:window.__uid||'u-test',email:'deneme@ornek.org',user_metadata:{name:window.__uname||'Deneme Kullanıcı'}}}}}; }, async signOut(){} },
     channel(){ const c={on(){return c;},subscribe(){return c;}}; return c; }
   }; } };
 })();
