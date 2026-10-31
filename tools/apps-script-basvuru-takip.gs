@@ -1,6 +1,6 @@
 /**
  * FOYDER Üyelik Başvuru Takip Sistemi
- * Sürüm: 1.1.0
+ * Sürüm: 1.1.1
  *
  * Güvenlik özeti:
  * - Mail göndermez, silmez veya arşivlemez.
@@ -18,7 +18,7 @@
  */
 
 const FOYDER_AUTO = {
-  VERSION: '1.1.0',
+  VERSION: '1.1.1',
   FLOW_SHEET: 'Panel Akışı',
   FLOW_INTERVAL_MIN: 30,
   FLOW_LOOKBACK_DAYS: 400,
@@ -661,8 +661,10 @@ function describeThread_(thread) {
           m.getAttachments({ includeInlineImages: false }).forEach(a => nameParts.push(a.getName()));
         }
       }
-    } else if (from) {
+    } else if (from && !isAutomatedSender_(from)) {
       emails.add(from);
+    } else {
+      kind = 'sistem';   // teslim edilemedi bildirimi gibi otomatik mailler cevap sayılmaz
     }
     return { msg: m, id: m.getId(), date: m.getDate(), fromSelf, from, kind, subject: m.getSubject() };
   });
@@ -727,7 +729,7 @@ function buildFlowRow_(app, threads) {
   const hosgeldin = all.find(m => m.kind === 'hosgeldin');
   const diger = all.filter(m => m.kind === 'diger');
   const bizdenSon = diger.length ? diger[diger.length - 1] : null;
-  const gelen = all.filter(m => !m.fromSelf);
+  const gelen = all.filter(m => !m.fromSelf && m.kind === 'gelen');
   const adaySon = gelen.length ? gelen[gelen.length - 1] : null;
 
   let asama = 'YK bekliyor';
@@ -784,4 +786,8 @@ function allEmails_(value) {
 function fmtDate_(date) {
   if (!(date instanceof Date) || isNaN(date.getTime()) || date.getTime() === 0) return '';
   return Utilities.formatDate(date, 'Europe/Istanbul', 'yyyy-MM-dd HH:mm');
+}
+
+function isAutomatedSender_(email) {
+  return /^(mailer-daemon|postmaster|no-?reply|noreply|bounce)/i.test(String(email || ''));
 }

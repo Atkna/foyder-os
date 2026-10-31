@@ -1776,6 +1776,8 @@ function basvuruAkisiIsle(objs){
       onay:v('Onay Maili'),onayAdres:v('Onay Adresi'),onayLink:v('Onay Yazışması'),bizdenSon:v('Bizden Son Mail'),bizdenKonu:v('Bizden Son Konu'),
       adaySon:v('Aday Son Mail'),adayKonu:v('Aday Son Konu'),adayMesaj:v('Aday Son Mesaj'),adayEk:+v('Aday Ek Sayısı')||0,
       hosgeldin:v('Hoş Geldiniz Maili'),asama:v('Süreç Aşaması'),guncelleme:v('Güncelleme')};
+    // Teslim edilemedi bildirimleri adayın cevabı sayılmaz (eski otomasyon sürümü bunları da yazabiliyordu).
+    if(/delivery status notification|undeliver|mail delivery|teslim edilemedi/i.test(oto.adayKonu)){ oto.adaySon=''; oto.adayKonu=''; oto.adayMesaj=''; oto.adayEk=0; }
     let b=basvuruBul(S.basvurular,{kayitNo:oto.kayitNo,email:v('E-posta'),ad});
     if(!b){
       b={id:nid('b'),ad:ad.trim(),email:v('E-posta'),telefon:v('Telefon'),gorev:v('Meslek'),kurum:v('Kurum'),
