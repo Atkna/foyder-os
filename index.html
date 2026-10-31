@@ -102,6 +102,50 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
 .t-green{background:var(--green-soft);color:var(--green)} .t-amber{background:var(--amber-soft);color:var(--amber)}
 .t-red{background:var(--red-soft);color:var(--red)} .t-blue{background:var(--blue-soft);color:var(--blue)}
 .t-gold{background:var(--gold-soft);color:var(--gold)} .t-gray{background:#EEF1F5;color:var(--muted)}
+/* ============ BAŞVURU SÜRECİ ============ */
+.bs-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.bs-stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:13px 15px;display:flex;flex-direction:column;gap:3px;text-align:left;box-shadow:var(--sh);color:var(--text)}
+.bs-stat:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.bs-stat[aria-pressed="true"]{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+.bs-stat .n{font-size:26px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.bs-stat .l{font-size:12px;color:var(--muted)}
+.bs-stat.all .n{color:var(--ink3)} .bs-stat.ok .n{color:var(--green)} .bs-stat.wait .n{color:var(--amber)} .bs-stat.idle .n{color:var(--faint)}
+.bs-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);margin:2px 0 18px}
+.bs-legend span{display:inline-flex;align-items:center;gap:6px}
+.bs-group{margin-bottom:22px}
+.bs-ghead{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 14px;border-bottom:1px solid var(--line2);padding-bottom:7px;margin-bottom:10px}
+.bs-ghead h3{font-size:15px;font-weight:700;color:var(--ink3)}
+.bs-gmeta{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bs-rows{display:flex;flex-direction:column;gap:9px}
+.bs-row{--st:var(--faint);background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--st);border-radius:12px;padding:13px 15px;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);grid-template-areas:"who side" "act side";gap:8px 22px;align-items:start;box-shadow:var(--sh)}
+.bs-who{grid-area:who} .bs-side{grid-area:side} .bs-act{grid-area:act}
+.bs-row[data-s="ok"]{--st:var(--green)} .bs-row[data-s="wait"]{--st:var(--amber)} .bs-row[data-s="red"]{--st:var(--red)}
+.bs-who{min-width:0;display:flex;flex-direction:column;gap:2px}
+.bs-nm{font-weight:700;font-size:14.5px}
+.bs-org{font-size:12.5px;color:var(--muted)}
+.bs-note{font-size:13px;line-height:1.5;margin-top:5px;overflow-wrap:anywhere}
+.bs-elnot{color:var(--muted);font-style:italic}
+.bs-act{display:flex;flex-wrap:wrap;gap:6px}
+.bs-act a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.bs-side{min-width:0;display:flex;flex-direction:column;gap:10px}
+.bs-pill{align-self:flex-start;font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:999px}
+.bs-pill.ok{background:var(--green-soft);color:var(--green)} .bs-pill.wait{background:var(--amber-soft);color:var(--amber)}
+.bs-pill.ship{background:var(--blue-soft);color:var(--blue)} .bs-pill.stop{background:var(--red-soft);color:var(--red)}
+.bs-pill.idle{background:#EEF1F5;color:var(--muted)}
+.bs-steps{list-style:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+.bs-steps li{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;color:var(--muted);text-align:center;position:relative}
+.bs-steps li::before{content:"";position:absolute;top:7px;left:-50%;width:100%;height:2px;background:var(--line2)}
+.bs-steps li:first-child::before{display:none}
+.bs-steps li.done::before{background:var(--green)}
+.bs-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line2);background:var(--panel);position:relative;z-index:1;display:inline-block;flex:none}
+.done>.bs-dot,.bs-dot.done{background:var(--green);border-color:var(--green)}
+.now>.bs-dot,.bs-dot.now{background:var(--amber-soft);border-color:var(--amber)}
+.ship>.bs-dot,.bs-dot.ship{background:var(--blue-soft);border-color:var(--blue)}
+.bad>.bs-dot,.bs-dot.bad{background:var(--red-soft);border-color:var(--red)}
+.bs-d{font-size:10px;color:var(--text);opacity:.75;font-variant-numeric:tabular-nums}
+.bs-oto dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 14px;font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:6px}
+.bs-oto dt{color:var(--muted)} .bs-oto dd{overflow-wrap:anywhere}
+@media (max-width:760px){.bs-row{grid-template-columns:minmax(0,1fr);grid-template-areas:"who" "side" "act"} .bs-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .t-violet{background:var(--violet-soft);color:var(--violet)}
 
 .grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:15px}
@@ -480,6 +524,53 @@ function mergeState(b,l,r){
     else { const v=mergeValue(b[k],l[k],r[k]); if(v!==undefined) out[k]=v; }
   }
   return out;
+}
+/* ---------- Üyelik başvuru süreci (Başvurular sayfası) ----------
+   Gmail otomasyonu "Panel Akışı" sayfasına onay, cevap ve hoş geldiniz maillerini yazar;
+   panel bunları b.oto içinde tutar. Elle girilen alanlar (YK kararı, belge durumu) b üzerinde kalır. */
+const _gun=(a,c)=>{ const x=Date.parse(String(a||'').slice(0,10)), y=Date.parse(String(c||'').slice(0,10)); return isFinite(x)&&isFinite(y)?Math.round((y-x)/864e5):null; };
+function basvuruAsama(b,today,evrakTam){
+  const o=b.oto||{};
+  const red=b.durum==='REDDEDİLDİ';
+  const hos=o.hosgeldin||b.hosgeldinElle||'';
+  const onay=o.onay||b.onayElle||'';
+  const belgeGeldi=b.belgeDurumu==='geldi'||!!evrakTam;
+  const yolda=b.belgeDurumu==='yolda';
+  const cevap=!!(onay&&o.adaySon&&o.adaySon>onay);
+  const onlineEksik=o.onlineEvrak==='Eksik';
+  const eski=!onay&&!hos&&!b.oto&&b.durum==='ONAYLANDI';     // otomasyondan önceki elle kayıtlar
+  let grup,pill;
+  if(red){ grup='red'; pill=['Reddedildi','stop']; }
+  else if(hos){ grup='ok'; pill=['Üye oldu','ok']; }
+  else if(belgeGeldi&&(onay||b.durum==='ONAYLANDI')){ grup='ok'; pill=['Belgeler geldi','ok']; }
+  else if(eski){ grup='ok'; pill=['Onaylandı','ok']; }
+  else if(onay){ grup='wait'; pill=yolda?['Belge yolda','ship']:cevap?['Cevap verdi, belge yok','wait']:['Dönüş yok','stop']; }
+  else { grup='idle'; pill=onlineEksik?['Evrak eksik','stop']:['YK bekliyor','idle']; }
+  const steps=[
+    {t:'Başvuru',d:b.basvuruTarihi||'',s:onlineEksik&&!onay?'bad':'done'},
+    {t:'YK',d:b.ykKararTarihi||'',s:onay||hos||eski||b.ykKararNo?'done':red?'bad':'now'},
+    {t:'Onay',d:onay,s:onay||hos||eski?'done':''},
+    {t:'Belge',d:b.belgeTarihi||'',s:hos||belgeGeldi||eski?'done':yolda?'ship':onay?(cevap?'now':'bad'):''},
+    {t:'Hoş geldin',d:hos,s:hos?'done':(belgeGeldi&&onay)?'now':''}
+  ];
+  return {grup,pill,steps,onay,hos,cevap,eski,gunOnay:onay?_gun(onay,today):null,gunBasvuru:_gun(b.basvuruTarihi,today)};
+}
+// Onay mailinin gittiği güne göre gruplar (aynı gün gidenler aynı YK kararından çıkmıştır); onayı olmayanlar "YK bekleyenler".
+function basvuruGruplari(list,today,evrakTamFn){
+  const g={};
+  list.forEach(b=>{ const a=basvuruAsama(b,today,evrakTamFn?evrakTamFn(b):false);
+    const key=a.grup==='red'?'~red':a.eski?'~eski':a.onay?'o'+String(a.onay).slice(0,10):'~bekleyen';
+    (g[key]=g[key]||{key,onay:a.onay?String(a.onay).slice(0,10):'',items:[]}).items.push({b,a}); });
+  const sira=k=>k==='~bekleyen'?0:k.startsWith('o')?1:k==='~eski'?2:3;
+  Object.values(g).forEach(x=>x.items.sort((p,q)=>(p.a.grup==='ok')-(q.a.grup==='ok')));   // aksiyon bekleyenler üstte, tamamlananlar altta
+  return Object.values(g).sort((x,y)=>sira(x.key)-sira(y.key)||String(y.onay).localeCompare(String(x.onay)));
+}
+// Panel Akışı satırını mevcut başvuruya bağlar: önce Kayıt No, sonra e-posta, sonra ad.
+function basvuruBul(list,r){
+  const no=String(r.kayitNo||'').trim(), em=String(r.email||'').trim().toLowerCase(), ad=trNorm(r.ad);
+  return (no&&list.find(b=>(b.oto&&b.oto.kayitNo===no)||b.kayitNo===no))
+    ||(em&&list.find(b=>String(b.email||'').trim().toLowerCase()===em))
+    ||(ad&&list.find(b=>trNorm(b.ad)===ad))||null;
 }
 </script>
 <script>
@@ -1171,10 +1262,7 @@ async function sheetsPull(manual){
     }
     const sonuc=eslesmeIsle(satirlar);
     if(sh.csvBasvurular){
-      const objs=csvToObjects(await fetchCsv(sh.csvBasvurular));
-      objs.forEach(r=>{ const ad=cval(r,['Ad Soyad','Ad','ad','ad soyad','İsim']); if(!ad) return;
-        if(S.basvurular.some(b=>trNorm(b.ad)===trNorm(ad))||S.members.some(m=>trNorm(m.ad)===trNorm(ad))) return;
-        S.basvurular.push({id:nid('b'),ad:ad.trim(),email:cval(r,['E-posta','email','Email','E-Posta']),telefon:cval(r,['Telefon','telefon']),gorev:cval(r,['Meslek','meslek','Görev']),uyelikTuru:cval(r,['Üyelik Türü'])||'Gerçek Üye',basvuruTarihi:parseTarih(cval(r,['Tarih','tarih']))||TODAY,durum:'YENİ',komiteDurumu:'',ykKararNo:'',referans1:r['Referans 1']||'',referans2:r['Referans 2']||'',evraklar:{},notlar:'E-posta/Form aktarımı'}); nB++; });
+      nB=basvuruAkisiIsle(csvToObjects(await fetchCsv(sh.csvBasvurular))).yeni;
     }
     persist(); render();
     document.getElementById('syncDot').classList.remove('off');
@@ -1670,24 +1758,149 @@ function yilBorcuOlustur(){
 /* ================================================================
    BAŞVURULAR + E-POSTA AYRIŞTIRMA
 ================================================================ */
+let fB={f:'all',eski:false};
+let _basvuruSon=0,_bcCalisiyor=false,_bcZamanlayici=null;
+const BS_TUR={'gercek kisi uye':'Gerçek Üye','kurumsal uye':'Kurumsal Üye','akademisyen kamu calisani':'Akademisyen','akademisyen':'Akademisyen','kamu calisani':'Kamu Çalışanı'};
+// Panel Akışı CSV satırlarını başvurulara işler. Elle girilen alanlara (YK kararı, belge durumu, notlar) dokunmaz.
+function basvuruAkisiIsle(objs){
+  let yeni=0,guncel=0;
+  (objs||[]).forEach(r=>{
+    const ad=cval(r,['Ad Soyad','Ad','ad','ad soyad','İsim']); if(!ad) return;
+    const akis=r['Kayıt No']!==undefined&&r['Süreç Aşaması']!==undefined;
+    if(!akis){ // eski biçim: yalnızca yeni adayları ekler
+      if(S.basvurular.some(b=>trNorm(b.ad)===trNorm(ad))||S.members.some(m=>trNorm(m.ad)===trNorm(ad))) return;
+      S.basvurular.push({id:nid('b'),ad:ad.trim(),email:cval(r,['E-posta','email','Email','E-Posta']),telefon:cval(r,['Telefon','telefon']),gorev:cval(r,['Meslek','meslek','Görev']),uyelikTuru:cval(r,['Üyelik Türü'])||'Gerçek Üye',basvuruTarihi:parseTarih(cval(r,['Tarih','tarih']))||TODAY,durum:'YENİ',komiteDurumu:'',ykKararNo:'',referans1:r['Referans 1']||'',referans2:r['Referans 2']||'',evraklar:{},notlar:'E-posta/Form aktarımı'}); yeni++; return;
+    }
+    const v=k=>String(r[k]||'').trim();
+    const oto={kayitNo:v('Kayıt No'),basvuruLink:v('Başvuru Maili'),onlineEvrak:v('Online Evrak'),kontrolNotu:v('Kontrol Notu'),ekipDurumu:v('Ekip Durumu'),
+      onay:v('Onay Maili'),onayAdres:v('Onay Adresi'),onayLink:v('Onay Yazışması'),bizdenSon:v('Bizden Son Mail'),bizdenKonu:v('Bizden Son Konu'),
+      adaySon:v('Aday Son Mail'),adayKonu:v('Aday Son Konu'),adayMesaj:v('Aday Son Mesaj'),adayEk:+v('Aday Ek Sayısı')||0,
+      hosgeldin:v('Hoş Geldiniz Maili'),asama:v('Süreç Aşaması'),guncelleme:v('Güncelleme')};
+    // Teslim edilemedi bildirimleri adayın cevabı sayılmaz (eski otomasyon sürümü bunları da yazabiliyordu).
+    if(/delivery status notification|undeliver|mail delivery|teslim edilemedi/i.test(oto.adayKonu)){ oto.adaySon=''; oto.adayKonu=''; oto.adayMesaj=''; oto.adayEk=0; }
+    let b=basvuruBul(S.basvurular,{kayitNo:oto.kayitNo,email:v('E-posta'),ad});
+    if(!b){
+      b={id:nid('b'),ad:ad.trim(),email:v('E-posta'),telefon:v('Telefon'),gorev:v('Meslek'),kurum:v('Kurum'),
+        uyelikTuru:BS_TUR[trNorm(v('Üyelik Türü'))]||'Gerçek Üye',basvuruTarihi:parseTarih(v('Başvuru Tarihi').slice(0,10))||TODAY,
+        durum:oto.onay||oto.hosgeldin?'ONAYLANDI':'YK BEKLİYOR',komiteDurumu:'',ykKararNo:'',referans1:v('1. Referans'),referans2:v('2. Referans'),
+        evraklar:{},notlar:'',kayitNo:oto.kayitNo};
+      S.basvurular.push(b); yeni++;
+    }
+    const once=JSON.stringify([b.oto||null,b.durum]);
+    if(!b.oto){ // ilk bağlantı: eski sürümün "bugün" diye yazdığı başvuru tarihi ve ham üyelik türü düzeltilir
+      const t=parseTarih(v('Başvuru Tarihi').slice(0,10)); if(t) b.basvuruTarihi=t;
+      const tur=BS_TUR[trNorm(b.uyelikTuru)]; if(tur) b.uyelikTuru=tur;
+      if(b.notlar==='E-posta/Form aktarımı') b.notlar='';
+    }
+    b.oto=oto; if(!b.kayitNo) b.kayitNo=oto.kayitNo;
+    [['email','E-posta'],['telefon','Telefon'],['kurum','Kurum'],['gorev','Meslek'],['referans1','1. Referans'],['referans2','2. Referans']].forEach(([k,c])=>{ if(!b[k]&&v(c)) b[k]=v(c); });
+    if((oto.onay||oto.hosgeldin)&&['YENİ','KOMİTEDE','YK BEKLİYOR'].includes(b.durum)) b.durum='ONAYLANDI';
+    if(trNorm(oto.ekipDurumu).includes('redd')) b.durum='REDDEDİLDİ';
+    if(JSON.stringify([b.oto,b.durum])!==once) guncel++;
+  });
+  return {yeni,guncel};
+}
+// Yalnızca başvuru akışını çeker (sayfa açıkken 10 dakikada bir kendiliğinden çalışır).
+async function basvuruCek(manual){
+  const url=S.ayarlar.sheets&&S.ayarlar.sheets.csvBasvurular;
+  if(!url){ if(manual) toast('Başvuru akışı bağlantısı yok — Ayarlar → Entegrasyonlar → Başvurular CSV bağlantısı'); return; }
+  if(_bcCalisiyor) return; _bcCalisiyor=true;
+  try{
+    const s=basvuruAkisiIsle(csvToObjects(await fetchCsv(url)));
+    if((s.yeni||s.guncel)&&can('basvuru')) persist();
+    if(manual) toast(`✓ Başvurular güncellendi: ${s.yeni} yeni, ${s.guncel} değişiklik`);
+  }catch(e){ console.warn(e); if(manual) toast('⚠ Başvuru akışı çekilemedi. CSV yayın bağlantısını kontrol edin.'); }
+  finally{ _bcCalisiyor=false; _basvuruSon=Date.now(); if(route==='basvurular'&&!document.getElementById('modalRoot')?.innerHTML) render(); }
+}
+function basvuruOtoZamanla(){
+  if(!(S.ayarlar.sheets&&S.ayarlar.sheets.csvBasvurular)) return;
+  if(Date.now()-_basvuruSon>10*60e3&&!_bcCalisiyor) setTimeout(()=>basvuruCek(false),60);
+  if(!_bcZamanlayici) _bcZamanlayici=setInterval(()=>{ if(route==='basvurular'&&document.visibilityState==='visible') basvuruCek(false); },10*60e3);
+}
+const bsEvrakTam=b=>EVRAKLAR.every(([k])=>b.evraklar&&b.evraklar[k]);
+const bsKisa=(t,n)=>{ t=String(t||''); return t.length>n?t.slice(0,n-1)+'…':t; };
+function bsNot(b,a){
+  const o=b.oto||{}, p=[];
+  if(a.grup==='red') p.push('Başvuru reddedildi.');
+  else if(a.hos) p.push(`Hoş geldiniz maili ${dfmt(String(a.hos).slice(0,10))} tarihinde gitti.`);
+  else if(a.eski) p.push('Otomasyondan önce onaylanmış kayıt.');
+  else if(b.belgeDurumu==='geldi'||bsEvrakTam(b)) p.push(`Belgeler ulaştı${b.belgeTarihi?' ('+dfmt(b.belgeTarihi)+')':''}. Hoş geldiniz maili bekleniyor.`);
+  else if(a.onay){
+    if(b.belgeDurumu==='yolda') p.push(`Belgeler yolda${b.belgeTarihi?' ('+dfmt(b.belgeTarihi)+' itibarıyla)':''}.`);
+    if(a.cevap) p.push(`<b>${dfmt(o.adaySon.slice(0,10))}</b> tarihinde yazdı${o.adayEk?` (${o.adayEk} ek)`:''}: “${esc(bsKisa(o.adayMesaj||o.adayKonu,170))}”`);
+    else p.push(`<b>Onay mailinden bu yana dönüş yok</b> (${a.gunOnay} gün).`);
+    if(o.bizdenSon&&o.bizdenSon>a.onay) p.push(`Bizden son mail ${dfmt(o.bizdenSon.slice(0,10))}: ${esc(bsKisa(o.bizdenKonu,70))}.`);
+  } else {
+    p.push(`Başvuru ${dfmt(b.basvuruTarihi)}${a.gunBasvuru!=null?` (${a.gunBasvuru} gün önce)`:''}.`);
+    if(o.kontrolNotu&&o.kontrolNotu!=='Kontrol tamamlandı') p.push(esc(o.kontrolNotu)+'.');
+    else if(o.onlineEvrak==='Tam') p.push('Online evrakı tam.');
+    if(o.bizdenSon) p.push(`Bizden son mail ${dfmt(o.bizdenSon.slice(0,10))}: ${esc(bsKisa(o.bizdenKonu,70))}.`);
+    if(o.adaySon) p.push(`Adaydan son mail ${dfmt(o.adaySon.slice(0,10))}.`);
+  }
+  if(b.notlar&&!/^(E-posta\/Form aktarımı|Gmail otomasyonundan|Asistan ile eklendi)$/.test(b.notlar)) p.push(`<span class="bs-elnot">Not: ${esc(bsKisa(b.notlar,160))}</span>`);
+  return p.join(' ');
+}
+function bsSatir(b,a){
+  const o=b.oto||{}, uyeVar=S.members.some(m=>trNorm(m.ad)===trNorm(b.ad));
+  const link=o.onayLink||o.basvuruLink;
+  return `<article class="bs-row" data-s="${a.grup}">
+    <div class="bs-who">
+      <div class="bs-nm">${esc(b.ad)}</div>
+      <div class="bs-org">${esc([b.kurum,b.gorev].filter(Boolean).join(' · ')||b.email||'')}</div>
+      <div class="bs-note">${bsNot(b,a)}</div>
+    </div>
+    <div class="bs-act"><button class="btn sm ghost" onclick="editBasvuru('${b.id}')">Aç</button>${link?`<a class="btn sm ghost" href="${esc(link)}" target="_blank" rel="noopener">Yazışma ↗</a>`:''}${can('basvuru')&&!uyeVar&&a.grup!=='red'?`<button class="btn sm" onclick="onaylaBasvuru('${b.id}')">✓ Üyeliğe Al</button>`:''}</div>
+    <div class="bs-side">
+      <span class="bs-pill ${a.pill[1]}">${a.pill[0]}</span>
+      <ol class="bs-steps">${a.steps.map(s=>`<li class="${s.s}"><span class="bs-dot"></span>${s.t}${s.d?`<span class="bs-d">${esc(dfmt(String(s.d).slice(0,10)).slice(0,5))}</span>`:''}</li>`).join('')}</ol>
+    </div>
+  </article>`;
+}
+// Aynı gün onay maili gidenlerin hepsine YK karar no ve tarihini tek seferde yazar.
+function bsGrupKarar(key){
+  if(!need('basvuru')) return;
+  const g=basvuruGruplari(S.basvurular,TODAY,bsEvrakTam).find(x=>x.key===key); if(!g) return;
+  const ilk=g.items.map(x=>x.b).find(b=>b.ykKararNo||b.ykKararTarihi)||{};
+  const no=prompt(`Onay maili ${dfmt(g.onay)} tarihinde giden ${g.items.length} kişi için YK karar numarası (ör. 5):`,ilk.ykKararNo||''); if(no===null) return;
+  const tr=prompt('YK karar tarihi (GG.AA.YYYY):',ilk.ykKararTarihi?dfmt(ilk.ykKararTarihi):''); if(tr===null) return;
+  const t=tr.trim()?parseTarih(tr.trim()):'';
+  if(tr.trim()&&!t){ toast('Tarih okunamadı; GG.AA.YYYY biçiminde yazın'); return; }
+  g.items.forEach(({b})=>{ b.ykKararNo=no.trim(); b.ykKararTarihi=t||''; });
+  persist(); render(); toast(`✓ ${g.items.length} kişiye YK kararı yazıldı`);
+}
 function pageBasvurular(){
-  const list=[...S.basvurular].sort((a,b)=>String(b.basvuruTarihi||'').localeCompare(String(a.basvuruTarihi||'')));
-  const stB=d=>({'YENİ':'t-blue','KOMİTEDE':'t-amber','YK BEKLİYOR':'t-gold','ONAYLANDI':'t-green','REDDEDİLDİ':'t-red'}[d]||'t-gray');
+  basvuruOtoZamanla();
+  const gruplar=basvuruGruplari(S.basvurular,TODAY,bsEvrakTam);
+  const eskiMi=g=>g.key==='~eski'||(g.key.startsWith('o')&&g.items.every(x=>x.a.grup==='ok')&&_gun(g.onay,TODAY)>120);
+  const gizli=gruplar.filter(eskiMi), gorunen=fB.eski?gruplar:gruplar.filter(g=>!eskiMi(g));
+  const items=gorunen.flatMap(g=>g.items);
+  const say=k=>items.filter(x=>x.a.grup===k).length;
+  const stat=(k,n,l,cls)=>`<button class="bs-stat ${cls}" aria-pressed="${fB.f===k}" onclick="fB.f=(fB.f==='${k}'&&'${k}'!=='all')?'all':'${k}';render()"><span class="n">${n}</span><span class="l">${l}</span></button>`;
+  const son=S.basvurular.map(b=>b.oto&&b.oto.guncelleme||'').sort().pop();
+  const baslik=g=>{
+    if(g.key==='~bekleyen') return ['YK kararı bekleyenler','Onay maili gitmedi'];
+    if(g.key==='~eski') return ['Otomasyondan önceki onaylı kayıtlar',''];
+    if(g.key==='~red') return ['Reddedilenler',''];
+    const nos=[...new Set(g.items.map(x=>x.b.ykKararNo).filter(Boolean))], yk=g.items.map(x=>x.b.ykKararTarihi).find(Boolean);
+    const gun=_gun(g.onay,TODAY);
+    return [nos.length===1?`${esc(nos[0])} sayılı YK kararı`:'Onay maili gidenler',[yk?'Karar '+dfmt(yk):'','Onay maili '+dfmt(g.onay),gun!=null?gun+' gün önce':''].filter(Boolean).join(' · ')];
+  };
+  const blok=g=>{ const rows=g.items.filter(x=>fB.f==='all'||x.a.grup===fB.f); if(!rows.length) return '';
+    const [h,m]=baslik(g);
+    const kararBtn=g.key.startsWith('o')&&can('basvuru')?` <button class="btn sm ghost" onclick="bsGrupKarar('${g.key}')">✎ YK kararı</button>`:'';
+    return `<section class="bs-group"><div class="bs-ghead"><h3>${h}</h3><span class="bs-gmeta">${m}${kararBtn}</span></div><div class="bs-rows">${rows.map(x=>bsSatir(x.b,x.a)).join('')}</div></section>`; };
+  const url=S.ayarlar.sheets&&S.ayarlar.sheets.csvBasvurular;
   return `
-  <div class="pagehead"><div><h2>Üyelik Başvuruları</h2><div class="sub">Aday üye süreçleri · evrak, komite ve YK takibi</div></div>
-  <div class="actions">${can('basvuru')?`<button class="btn gold" onclick="emailParseModal()">✉ E-postadan Aktar</button><button class="btn primary" onclick="editBasvuru()">+ Yeni Başvuru</button>`:''}</div></div>
+  <div class="pagehead"><div><h2>Üyelik Başvuruları</h2><div class="sub">Başvuru → YK → onay maili → belge → hoş geldiniz${son?` · Gmail kontrolü ${esc(dfmt(son.slice(0,10)))} ${esc(son.slice(11,16))}`:''}</div></div>
+  <div class="actions">${url?`<button class="btn" onclick="basvuruCek(true)" ${_bcCalisiyor?'disabled':''}>⟳ ${_bcCalisiyor?'Güncelleniyor…':'Gmail\'den güncelle'}</button>`:''}${can('basvuru')?`<button class="btn gold" onclick="emailParseModal()">✉ E-postadan Aktar</button><button class="btn primary" onclick="editBasvuru()">+ Yeni Başvuru</button>`:''}</div></div>
   ${can('basvuru')?'':'<div class="role-note">🔒 Mevcut rolünüz başvuruları yalnızca görüntüleyebilir.</div>'}
-  <div class="card"><div class="card-b np tbl-wrap">
-  ${list.length?`<table><thead><tr><th>Aday</th><th>Tür</th><th>Başvuru</th><th>Evrak</th><th>Komite</th><th>Durum</th><th></th></tr></thead><tbody>
-  ${list.map(b=>{const eksik=EVRAKLAR.filter(([k])=>!b.evraklar[k]);
-    return `<tr><td><div class="name-cell"><span class="avatar" style="background:var(--violet-soft);color:var(--violet)">${initials(b.ad)}</span><div><div class="nm">${esc(b.ad)}</div><div class="sb">${esc(b.gorev||b.email||'')}</div></div></div></td>
-    <td>${esc(b.uyelikTuru)}</td><td>${dfmt(b.basvuruTarihi)}</td>
-    <td>${eksik.length?`<span class="tag t-amber">${eksik.length} eksik</span>`:'<span class="tag t-green">Tamam</span>'}</td>
-    <td>${esc(b.komiteDurumu||'—')}</td><td><span class="tag ${stB(b.durum)}">${esc(b.durum)}</span></td>
-    <td>${can('basvuru')?`<button class="btn sm ghost" onclick="editBasvuru('${b.id}')">Aç</button>${b.durum!=='ONAYLANDI'?` <button class="btn sm" onclick="onaylaBasvuru('${b.id}')">✓ Üyeliğe Al</button>`:''}`:''}</td></tr>`;}).join('')}
-  </tbody></table>`:`<div class="empty">Henüz başvuru yok.${can('basvuru')?' Bir başvuru e-postası geldiğinde "✉ E-postadan Aktar" ile içeriği yapıştırın; bilgiler otomatik forma dönüşür.':''}</div>`}
-  </div></div>
-  <div class="banner blue">⚙ Tam otomasyon: Gmail'e gelen başvuruların bir Google Sheet'e otomatik yazılmasını ve oradan panele akmasını Ayarlar → Entegrasyonlar'daki hazır Apps Script koduyla kurabilirsiniz.</div>`;
+  ${S.basvurular.length?`
+  <div class="bs-summary">${stat('all',items.length,'Toplam başvuru','all')}${stat('ok',say('ok'),'Süreci tamamlandı','ok')}${stat('wait',say('wait'),'Onay gitti, belge bekleniyor','wait')}${stat('idle',say('idle'),'Onay maili gitmedi','idle')}</div>
+  <div class="bs-legend"><span><i class="bs-dot done"></i>Tamamlandı</span><span><i class="bs-dot now"></i>Bekleniyor</span><span><i class="bs-dot ship"></i>Yolda</span><span><i class="bs-dot bad"></i>Eksik / dönüş yok</span><span><i class="bs-dot"></i>Henüz değil</span></div>
+  ${gorunen.map(blok).join('')||'<div class="empty">Bu filtrede başvuru yok.</div>'}
+  ${gizli.length?`<button class="btn ghost sm" style="margin:4px 0 14px" onclick="fB.eski=!fB.eski;render()">${fB.eski?'Eski tamamlanan grupları gizle':`Eski tamamlanan grupları göster (${gizli.reduce((n,g)=>n+g.items.length,0)} kişi)`}</button>`:''}`
+  :`<div class="card"><div class="card-b"><div class="empty">Henüz başvuru yok.${can('basvuru')?' Bir başvuru e-postası geldiğinde "✉ E-postadan Aktar" ile içeriği yapıştırın; bilgiler otomatik forma dönüşür.':''}</div></div></div>`}
+  ${url?'':`<div class="banner blue">⚙ Tam otomasyon: Gmail'deki başvuruların, onay maillerinin, aday cevaplarının ve hoş geldiniz maillerinin buraya kendiliğinden gelmesi için "FOYDER Üyelik Başvuru" tablosundaki <b>Panel Akışı</b> sayfasını CSV olarak yayınlayıp bağlantısını Ayarlar → Entegrasyonlar → <b>Başvurular CSV bağlantısı</b> alanına yapıştırın.</div>`}`;
 }
 function emailParseModal(){
   modal('✉ E-postadan Başvuru Aktar',`
@@ -1724,7 +1937,17 @@ function editBasvuru(id,prefill){
     <div><label>Başvuru Tarihi</label><input id="b_tarih" type="date" value="${b.basvuruTarihi||''}"></div>
     <div><label>Süreç Durumu</label><select id="b_durum">${['YENİ','KOMİTEDE','YK BEKLİYOR','ONAYLANDI','REDDEDİLDİ'].map(d=>`<option ${b.durum===d?'selected':''}>${d}</option>`).join('')}</select></div>
     <div><label>Komite Değerlendirmesi</label><select id="b_komite"><option value="">—</option>${['İncelemede','Olumlu','Olumsuz','Ek bilgi istendi'].map(d=>`<option ${b.komiteDurumu===d?'selected':''}>${d}</option>`).join('')}</select></div>
-    <div><label>YK Karar No</label><input id="b_yk" value="${esc(b.ykKararNo||'')}"></div>
+    <div><label>YK Karar No</label><input id="b_yk" value="${esc(b.ykKararNo||'')}" placeholder="ör. 5"></div>
+    <div><label>YK Karar Tarihi</label><input id="b_yktarih" type="date" value="${esc(b.ykKararTarihi||'')}"></div>
+    <div><label>Islak İmzalı Belgeler</label><select id="b_belge">${[['','Bekleniyor'],['yolda','Yolda (posta / kargo)'],['geldi','Ulaştı']].map(([k,t])=>`<option value="${k}" ${(b.belgeDurumu||'')===k?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div><label>Belge Tarihi</label><input id="b_belgetarih" type="date" value="${esc(b.belgeTarihi||'')}"></div>
+    ${b.oto?`<div class="full bs-oto"><label>Gmail'den otomatik gelen bilgiler</label><dl>
+      <dt>Onay maili</dt><dd>${b.oto.onay?esc(dfmt(b.oto.onay.slice(0,10)))+(b.oto.onayAdres?' → '+esc(b.oto.onayAdres):''):'Gönderilmedi'}</dd>
+      <dt>Adaydan son mail</dt><dd>${b.oto.adaySon?esc(dfmt(b.oto.adaySon.slice(0,10)))+' · '+esc(b.oto.adayKonu||'')+(b.oto.adayMesaj?`<br><span class="muted">“${esc(b.oto.adayMesaj)}”</span>`:''):'Yok'}</dd>
+      <dt>Bizden son mail</dt><dd>${b.oto.bizdenSon?esc(dfmt(b.oto.bizdenSon.slice(0,10)))+' · '+esc(b.oto.bizdenKonu||''):'Yok'}</dd>
+      <dt>Hoş geldiniz maili</dt><dd>${b.oto.hosgeldin?esc(dfmt(b.oto.hosgeldin.slice(0,10))):'Gönderilmedi'}</dd>
+      <dt>Online evrak</dt><dd>${esc(b.oto.onlineEvrak||'—')}${b.oto.kontrolNotu&&b.oto.kontrolNotu!=='Kontrol tamamlandı'?' · '+esc(b.oto.kontrolNotu):''}</dd>
+    </dl><div class="muted">Son kontrol: ${esc(b.oto.guncelleme||'—')}. Bu alanlar her güncellemede Gmail'e göre yenilenir.</div></div>`:''}
     <div><label>1. Referans</label><input id="b_ref1" value="${esc(b.referans1||'')}"></div>
     <div><label>2. Referans</label><input id="b_ref2" value="${esc(b.referans2||'')}"></div>
     <div class="full"><label>Evrak Kontrol Listesi</label>
@@ -1738,10 +1961,10 @@ function saveBasvuru(id){
   const ad=val('b_ad').trim(); if(!ad){ toast('Ad Soyad zorunludur'); return; }
   const evraklar={}; EVRAKLAR.forEach(([k])=>evraklar[k]=document.getElementById('ev_'+k).checked);
   const data={ad,uyelikTuru:val('b_tur'),gorev:val('b_gorev'),email:val('b_email'),telefon:val('b_tel'),
-    basvuruTarihi:val('b_tarih')||null,durum:val('b_durum'),komiteDurumu:val('b_komite'),ykKararNo:val('b_yk'),
+    basvuruTarihi:val('b_tarih')||null,durum:val('b_durum'),komiteDurumu:val('b_komite'),ykKararNo:val('b_yk'),ykKararTarihi:val('b_yktarih')||'',belgeDurumu:val('b_belge'),belgeTarihi:val('b_belgetarih')||'',
     referans1:val('b_ref1'),referans2:val('b_ref2'),evraklar,notlar:val('b_not')};
   if(id){ const cur=S.basvurular.find(x=>x.id===id); if(!cur) return goneToast();
-    Object.assign(cur,pickChanged(data,{ad:'b_ad',uyelikTuru:'b_tur',gorev:'b_gorev',email:'b_email',telefon:'b_tel',basvuruTarihi:'b_tarih',durum:'b_durum',komiteDurumu:'b_komite',ykKararNo:'b_yk',referans1:'b_ref1',referans2:'b_ref2',evraklar:EVRAKLAR.map(([k])=>'ev_'+k),notlar:'b_not'})); }
+    Object.assign(cur,pickChanged(data,{ad:'b_ad',uyelikTuru:'b_tur',gorev:'b_gorev',email:'b_email',telefon:'b_tel',basvuruTarihi:'b_tarih',durum:'b_durum',komiteDurumu:'b_komite',ykKararNo:'b_yk',ykKararTarihi:'b_yktarih',belgeDurumu:'b_belge',belgeTarihi:'b_belgetarih',referans1:'b_ref1',referans2:'b_ref2',evraklar:EVRAKLAR.map(([k])=>'ev_'+k),notlar:'b_not'})); }
   else S.basvurular.push({id:nid('b'),...data});
   persist(); closeModal(); render(); toast('Başvuru kaydedildi');
 }
@@ -4786,7 +5009,7 @@ function pageAyarlar(){
       <div class="ctl" style="min-width:340px"><input value="${esc(sh.csvUyeler)}" placeholder="https://docs.google.com/…/pub?output=csv" onchange="setAyar('sheets.csvUyeler',this.value);renderNav()"></div></div>
     <div class="setrow"><div><div class="sl">Ödemeler CSV bağlantısı</div><div class="sd">Sütunlar: ad, yil, tutar, durum, odemeTarihi.</div></div>
       <div class="ctl" style="min-width:340px"><input value="${esc(sh.csvOdemeler)}" onchange="setAyar('sheets.csvOdemeler',this.value);renderNav()"></div></div>
-    <div class="setrow"><div><div class="sl">Başvurular CSV bağlantısı</div><div class="sd">Gmail otomasyonunun yazdığı sayfa: ad, email, telefon, meslek, tarih.</div></div>
+    <div class="setrow"><div><div class="sl">Başvurular CSV bağlantısı</div><div class="sd">"FOYDER Üyelik Başvuru" tablosundaki <b>Panel Akışı</b> sayfası (Dosya → Paylaş → Web'de yayınla → Panel Akışı → CSV). Başvurular, onay mailleri, aday cevapları ve hoş geldiniz mailleri Başvurular sayfasına buradan gelir; sayfa açıkken 10 dakikada bir yenilenir.</div></div>
       <div class="ctl" style="min-width:340px"><input value="${esc(sh.csvBasvurular)}" onchange="setAyar('sheets.csvBasvurular',this.value);renderNav()"></div></div>
     <div class="setrow"><div><div class="sl">Apps Script Webhook (gönderim)</div><div class="sd">"Sheets'e Gönder" düğmesinin POST adresi. Aşağıdaki 2 no.lu kodu dağıtınca oluşan /exec bağlantısı.</div></div>
       <div class="ctl" style="min-width:340px"><input value="${esc(sh.webhook)}" placeholder="https://script.google.com/macros/s/…/exec" onchange="setAyar('sheets.webhook',this.value);renderNav()"></div></div>
