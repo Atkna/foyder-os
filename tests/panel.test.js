@@ -11,7 +11,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const block = html.match(/<script id="foyder-core">\n([\s\S]*?)<\/script>/);
 assert.ok(block, 'index.html içinde foyder-core bloğu bulunamadı');
 const ctx = {};
-vm.runInNewContext(block[1] + '\n;Object.assign(this,{trNorm,toISOdate,odenenTutari,isAidatTip,tipKey,normDurum,normUyeDurum,parseTutar,parseTarih,mergeValue,mergeById,mergeState,tutarYaziyla,uyeEslestir,adBenzer,gecmisEkle,gecmisBirlestir,alanFarki,GECMIS_SINIRI});', ctx);
+vm.runInNewContext(block[1] + '\n;Object.assign(this,{trNorm,toISOdate,odenenTutari,isAidatTip,tipKey,normDurum,normUyeDurum,parseTutar,parseTarih,mergeValue,mergeById,mergeState,tutarYaziyla,uyeEslestir,adBenzer,gecmisEkle,gecmisBirlestir,alanFarki,GECMIS_SINIRI,basvuruAsama,basvuruGruplari,basvuruBul});', ctx);
 const C = ctx;
 const plain = v => JSON.parse(JSON.stringify(v));
 
@@ -193,4 +193,48 @@ test('bu turdaki sadeleştirme ve sürüm sabitleme kaynakta yerinde', () => {
   assert.doesNotMatch(html, /HAS_STORE|window\.storage/, 'Vercel\'de çalışmayan depolama yolu kaldırılmalı');
   assert.doesNotMatch(html, /Kaydolun|authMode|signUp\(/, 'girişte kayıt bağlantısı olmamalı');
   assert.doesNotMatch(html, /rol:'admin'/, 'kullanılmayan ayarlar.rol alanı kaldırılmalı');
+});
+
+test('başvuru süreci: onay, cevap, belge ve hoş geldiniz adımları doğru okunur', () => {
+  const T = '2026-10-31';
+  const a = (b, tam) => C.basvuruAsama(b, T, tam);
+  const tamam = a({ durum: 'ONAYLANDI', oto: { onay: '2026-08-07 10:36', hosgeldin: '2026-09-05 21:15' } });
+  assert.equal(tamam.grup, 'ok'); assert.equal(tamam.pill[0], 'Üye oldu');
+  assert.deepEqual(plain(tamam.steps.map(s => s.s)), ['done', 'done', 'done', 'done', 'done']);
+  const cevapli = a({ durum: 'ONAYLANDI', oto: { onay: '2026-08-07 12:05', adaySon: '2026-08-10 13:56' } });
+  assert.equal(cevapli.grup, 'wait'); assert.equal(cevapli.cevap, true); assert.equal(cevapli.steps[3].s, 'now');
+  assert.equal(cevapli.gunOnay, 85);
+  const sessiz = a({ durum: 'ONAYLANDI', oto: { onay: '2026-08-07 10:30', adaySon: '2026-07-01 09:00' } });
+  assert.equal(sessiz.cevap, false, 'onaydan önceki mail cevap sayılmaz'); assert.equal(sessiz.pill[0], 'Dönüş yok');
+  assert.equal(a({ durum: 'ONAYLANDI', belgeDurumu: 'yolda', oto: { onay: '2026-10-15 13:17' } }).steps[3].s, 'ship');
+  const geldi = a({ durum: 'ONAYLANDI', oto: { onay: '2026-10-15 13:17' } }, true);
+  assert.equal(geldi.grup, 'ok'); assert.equal(geldi.steps[4].s, 'now', 'belgeler gelince sıradaki adım hoş geldiniz');
+  const bekleyen = a({ durum: 'YK BEKLİYOR', oto: { onlineEvrak: 'Eksik' } });
+  assert.equal(bekleyen.grup, 'idle'); assert.equal(bekleyen.pill[0], 'Evrak eksik'); assert.equal(bekleyen.steps[1].s, 'now');
+  assert.equal(a({ durum: 'ONAYLANDI' }).eski, true, 'otomasyondan önceki onaylı kayıt');
+  assert.equal(a({ durum: 'REDDEDİLDİ', oto: { onay: '2026-08-07' } }).grup, 'red');
+});
+
+test('başvurular onay maili gününe göre gruplanır, bekleyenler en üstte', () => {
+  const L = [
+    { id: 1, durum: 'ONAYLANDI', oto: { onay: '2026-08-07 10:36' } },
+    { id: 2, durum: 'ONAYLANDI', oto: { onay: '2026-08-07 12:05' } },
+    { id: 3, durum: 'ONAYLANDI', oto: { onay: '2026-10-15 13:17' } },
+    { id: 4, durum: 'YK BEKLİYOR' },
+    { id: 5, durum: 'ONAYLANDI' }
+  ];
+  const g = C.basvuruGruplari(L, '2026-10-31');
+  assert.deepEqual(plain(g.map(x => x.key)), ['~bekleyen', 'o2026-10-15', 'o2026-08-07', '~eski']);
+  assert.deepEqual(plain(g[2].items.map(x => x.b.id)), [1, 2]);
+});
+
+test('Panel Akışı satırı mevcut başvuruya kayıt no, e-posta veya adla bağlanır', () => {
+  const L = [
+    { id: 'a', ad: 'MERT CEYLAN', email: 'x@y.com', oto: { kayitNo: 'FY-1' } },
+    { id: 'b', ad: 'Şenay Türk', email: 'topcu.senay@gmail.com' }
+  ];
+  assert.equal(C.basvuruBul(L, { kayitNo: 'FY-1', ad: 'Başka' }).id, 'a');
+  assert.equal(C.basvuruBul(L, { email: 'TOPCU.SENAY@gmail.com ', ad: '' }).id, 'b');
+  assert.equal(C.basvuruBul(L, { ad: 'Mert Ceylan' }).id, 'a');
+  assert.equal(C.basvuruBul(L, { ad: 'Yeni Kişi', email: 'yeni@z.com' }), null);
 });
