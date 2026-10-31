@@ -15,9 +15,9 @@ const bugun = new Date(); const gunOnce = n => { const d = new Date(bugun - n * 
 const seed = {
   members: [{ id: 'M001', ad: 'Deniz Örnek', durum: 'AKTİF', uyelikTuru: 'Gerçek Üye', gorev: 'Avukat', defterNo: 1, ykKararTarihi: gunOnce(100), kayitTarihi: gunOnce(100), email: '', telefon: '', ucretsiz: false, notlar: '' }],
   payments: [], kararlar: [],
-  basvurular: [{ id: 'B001', ad: 'Elle Girilen Aday', email: 'elle@ornek.org', telefon: '', gorev: 'Mühendis', uyelikTuru: 'Gerçek Üye', basvuruTarihi: gunOnce(3), durum: 'YENİ', komiteDurumu: '', ykKararNo: '', referans1: '', referans2: '', evraklar: {}, notlar: 'Telefonla görüşüldü' }],
+  basvurular: [{ id: 'B000', ad: 'KAAN DENEME', email: 'kaan@ornek.org', telefon: '', gorev: 'Danışman', uyelikTuru: 'Gerçek Kişi Üye', basvuruTarihi: gunOnce(0), durum: 'YENİ', komiteDurumu: '', ykKararNo: '', referans1: '', referans2: '', evraklar: {}, notlar: 'E-posta/Form aktarımı' }, { id: 'B001', ad: 'Elle Girilen Aday', email: 'elle@ornek.org', telefon: '', gorev: 'Mühendis', uyelikTuru: 'Gerçek Üye', basvuruTarihi: gunOnce(3), durum: 'YENİ', komiteDurumu: '', ykKararNo: '', referans1: '', referans2: '', evraklar: {}, notlar: 'Telefonla görüşüldü' }],
   ayarlar: { rol: 'admin', dernekAdi: 'Deneme Derneği', iban: '', aidat: {}, girisOdentisi: 1000, ai: { provider: 'claude', model: '', apiKey: '', endpoint: '', onayla: true }, sheets: { csvUyeler: '', csvOdemeler: '', csvBasvurular: 'https://docs.google.com/akis/pub?output=csv', yilCsv: '', webhook: '', autoPull: false, autoPush: false } },
-  seq: { m: 1, p: 0, b: 1, k: 0 }
+  seq: { m: 1, p: 0, b: 2, k: 0 }
 };
 const H = ['Kayıt No', 'Başvuru Tarihi', 'Ekip Durumu', 'Ad Soyad', 'E-posta', 'Üyelik Türü', 'Üye Olma Amacı', 'Kurum', 'Meslek', '1. Referans', '2. Referans', 'Online Evrak', 'Kontrol Notu', 'Başvuru Maili', 'Onay Maili', 'Onay Adresi', 'Onay Yazışması', 'Bizden Son Mail', 'Bizden Son Konu', 'Aday Son Mail', 'Aday Son Konu', 'Aday Son Mesaj', 'Aday Ek Sayısı', 'Hoş Geldiniz Maili', 'Süreç Aşaması', 'Güncelleme'];
 const satir = o => H.map(h => `"${String(o[h] ?? '').replace(/"/g, '""')}"`).join(',');
@@ -54,7 +54,8 @@ async function open(browser, url, viewport, mobile = false) {
   const page = await ctx.newPage();
   page.errors = [];
   page.on('pageerror', e => page.errors.push(e.message));
-  page.on('dialog', d => d.accept());
+  page.cevaplar = [];
+  page.on('dialog', d => d.accept(page.cevaplar.shift()));
   await page.goto(url);
   await page.waitForFunction(() => typeof S !== 'undefined' && document.querySelector('#content, main, .main'));
   await page.evaluate(() => go('basvurular'));
@@ -73,11 +74,13 @@ async function open(browser, url, viewport, mobile = false) {
     adet: S.basvurular.length,
     deniz: S.basvurular.find(b => b.ad === 'Deniz Örnek'),
     elle: S.basvurular.find(b => b.id === 'B001'),
+    kaan: S.basvurular.find(b => b.id === 'B000'), bugun: TODAY,
     gruplar: [...document.querySelectorAll('.bs-group h3')].map(h => h.textContent),
     sayilar: [...document.querySelectorAll('.bs-stat .n')].map(n => n.textContent),
     pills: [...document.querySelectorAll('.bs-row')].map(r => r.querySelector('.bs-nm').textContent + ':' + r.querySelector('.bs-pill').textContent)
   }));
-  ok(st.adet === 7, `CSV'deki 6 kişi eklendi, elle girilen başvuru korundu (${st.adet})`);
+  ok(st.adet === 7, `CSV'deki kişiler eklendi, eski sürümün eklediği kayıt tekrar açılmadı, elle girilen başvuru korundu (${st.adet})`);
+  ok(st.kaan && st.kaan.basvuruTarihi !== st.bugun && st.kaan.uyelikTuru === 'Gerçek Üye' && st.kaan.oto, 'eski sürümün "bugün" tarihiyle eklediği kayıt düzeldi');
   ok(st.deniz && st.deniz.durum === 'ONAYLANDI' && st.deniz.oto.hosgeldin, 'zaten üye olan kişi de süreç kaydıyla geldi');
   ok(st.elle && st.elle.notlar === 'Telefonla görüşüldü' && st.elle.durum === 'YENİ', 'elle girilen başvuruya dokunulmadı');
   ok(JSON.stringify(st.gruplar) === JSON.stringify(['YK kararı bekleyenler', 'Onay maili gidenler', 'Onay maili gidenler']), 'gruplar: bekleyenler, sonra onay günleri (yeniden eskiye) ' + JSON.stringify(st.gruplar));
@@ -95,6 +98,13 @@ async function open(browser, url, viewport, mobile = false) {
   ok(ece === 'Belge yolda', 'elle girilen "belge yolda" bilgisi Gmail güncellemesinden sonra da kalıyor');
   const ikinci = await page.evaluate(() => S.basvurular.length);
   ok(ikinci === 7, 'ikinci çekmede mükerrer kayıt oluşmadı');
+
+  // Grup için YK kararı tek seferde
+  page.cevaplar.push('5', '05.10.2026');
+  await page.evaluate(() => { const k = basvuruGruplari(S.basvurular, TODAY, bsEvrakTam).find(g => g.items.some(x => x.b.ad === 'Ece Örnekoğlu')).key; bsGrupKarar(k); });
+  await page.waitForTimeout(200);
+  const yk = await page.evaluate(() => ({ b: S.basvurular.find(x => x.ad === 'Ece Örnekoğlu'), h: [...document.querySelectorAll('.bs-group h3')].map(h => h.textContent) }));
+  ok(yk.b.ykKararNo === '5' && yk.b.ykKararTarihi === '2026-10-05' && yk.h.includes('5 sayılı YK kararı'), 'grup başlığından YK kararı girilince başlık "5 sayılı YK kararı" oluyor');
 
   // Filtre
   await page.click('.bs-stat.idle');
