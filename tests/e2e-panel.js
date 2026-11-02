@@ -253,6 +253,20 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 6000 }).then
   await page.evaluate(() => sheetsPush());
   ok((await page.textContent('#toast')).includes('gönderildi'), 'Sheets başarılı olunca bildiriliyor');
 
+  /* 16b) Otomatik Excel yazımı: yalnızca değişen aidat gönderiliyor, Sheets'ten gelen değişiklik geri gönderilmiyor */
+  const gonderilen = [];
+  await page.unroute(/script\.google\.com/);
+  await page.route(/script\.google\.com/, r => { gonderilen.push(JSON.parse(r.request().postData() || '{}')); r.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ ok: true, guncellenen: 1, bulunamayan: [] }) }); });
+  await page.evaluate(() => { S.ayarlar.sheets.autoPush = true; quickPaid('P0003'); });
+  await sleep(3500);
+  const durumlar = gonderilen.filter(g => g.mod === 'durum');
+  ok(durumlar.length === 1 && durumlar[0].odemeler.length === 1 && durumlar[0].odemeler[0].ad === 'Deneme Üye Üç' && durumlar[0].odemeler[0].durum === 'ÖDENDİ' && durumlar[0].odemeler[0].defterNo === 3, `otomatik Excel yazımı: yalnızca değişen kayıt gönderildi (${JSON.stringify(durumlar.map(d => d.odemeler.length))})`);
+  ok((await page.textContent('#toast')).includes('Excel güncellendi'), 'otomatik Excel yazımı: sonuç bildirildi');
+  gonderilen.length = 0;
+  await page.evaluate(() => { persist(); }); await sleep(3200);
+  ok(!gonderilen.some(g => g.mod === 'durum'), 'otomatik Excel yazımı: değişiklik yokken bir şey gönderilmedi');
+  await page.evaluate(() => { S.ayarlar.sheets.autoPush = false; });
+
   /* 17) Sıfırlama "SIFIRLA" yazılmadan yapılmıyor; geri yüklemede önce yedek iniyor */
   const sayi = (await S(page)).members.length;
   page.plan.push(true, 'hayır');

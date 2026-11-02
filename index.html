@@ -693,9 +693,14 @@ function alanBicim(k,v){
   return String(v);
 }
 function gecmisYaz(rec,metin,tur){ if(rec&&metin) gecmisEkle(rec,{at:new Date().toISOString(),by:benimAdim(),text:metin},GECMIS_SINIRI[tur]||20); }
-function farkYaz(rec,once,tur,onEk){ const t=alanFarki(once,rec,tur==='odeme'?ODEME_ALAN:UYE_ALAN,alanBicim); if(t.length) gecmisYaz(rec,(onEk?onEk+': ':'')+t.join(' · '),tur); }
+function farkYaz(rec,once,tur,onEk){ const t=alanFarki(once,rec,tur==='odeme'?ODEME_ALAN:UYE_ALAN,alanBicim); if(t.length) gecmisYaz(rec,(onEk?onEk+': ':'')+t.join(' · '),tur);
+  if(tur==='odeme'&&rec&&once&&(once.durum!==rec.durum||(once.odemeTarihi||'')!==(rec.odemeTarihi||''))) excelKuyrugaAl(rec,onEk); }
+/* Panelde değişen aidat durumları Excel'e (Apps Script webhook) yalnızca değişen kayıt olarak gönderilir.
+   Excel'den gelen değişiklikler (Google Sheets senkronu) geri gönderilmez. */
+const _excelKuyruk=new Set();
+function excelKuyrugaAl(rec,onEk){ if(!rec||!rec.id||/^Google Sheets/.test(onEk||'')) return; _excelKuyruk.add(rec.id); }
 const kopya=o=>JSON.parse(JSON.stringify(o||{}));
-const gecmisEkleYeni=(rec,metin,tur)=>{ gecmisYaz(rec,metin,tur); return rec; };
+const gecmisEkleYeni=(rec,metin,tur)=>{ gecmisYaz(rec,metin,tur); if(tur==='odeme'&&['ÖDENDİ','KISMİ'].includes(rec.durum)) excelKuyrugaAl(rec); return rec; };
 function gecmisHTML(rec){
   const g=Array.isArray(rec&&rec.gecmis)?[...rec.gecmis].reverse():[];
   return `<details class="gecmis"><summary>🕘 Değişiklik geçmişi (${g.length})</summary>${g.length?`<div class="gecmis-l">${g.map(x=>`<div><b>${esc(x.by||'—')}</b> · ${esc(x.at?new Date(x.at).toLocaleString('tr-TR',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'')}<br>${esc(x.text)}</div>`).join('')}</div>`:'<div class="muted" style="padding:6px 0">Henüz kayıtlı değişiklik yok.</div>'}</details>`;
@@ -730,12 +735,20 @@ let _pushTimer=null;
 function schedulePushDurum(){
   const sh=S&&S.ayarlar&&S.ayarlar.sheets; if(!sh||!sh.webhook||!sh.autoPush) return;
   clearTimeout(_pushTimer);
+  if(!_excelKuyruk.size) return;
   _pushTimer=setTimeout(async()=>{
+    const ids=[..._excelKuyruk];
+    const odemeler=ids.map(id=>S.payments.find(p=>p.id===id)).filter(p=>p&&isAidatTip(p)&&member(p.uyeId))
+      .map(p=>({yil:Number(p.yil),ad:member(p.uyeId).ad,defterNo:member(p.uyeId).defterNo||'',durum:p.durum,tarih:p.odemeTarihi||''}));
+    ids.forEach(id=>_excelKuyruk.delete(id));
+    if(!odemeler.length) return;
     try{
-      const odemeler=S.payments.filter(p=>isAidatTip(p)&&member(p.uyeId)).map(p=>({yil:Number(p.yil),ad:member(p.uyeId).ad,durum:p.durum,tarih:p.odemeTarihi||''}));
-      await fetch(sh.webhook,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',body:JSON.stringify({mod:'durum',odemeler})});
-    }catch(e){ console.warn('autoPush',e); }
-  },4000);
+      const r=await fetch(sh.webhook,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',body:JSON.stringify({mod:'durum',odemeler})});
+      const t=await r.text(); let j=null; try{ j=JSON.parse(t); }catch(e){}
+      if(j&&j.ok) toast(`✓ Excel güncellendi (${j.guncellenen||0} kayıt)${j.bulunamayan&&j.bulunamayan.length?' · Excel\'de bulunamadı: '+j.bulunamayan.join(', '):''}`);
+      else if(!/^ok$/i.test(t.trim())) throw new Error(t.slice(0,120));
+    }catch(e){ console.warn('autoPush',e); ids.forEach(id=>_excelKuyruk.add(id)); toast('⚠ Excel\'e yazılamadı — değişiklik bir sonraki kayıtta tekrar denenecek'); }
+  },2500);
 }
 function restoreAiKey(){
   try{
@@ -5048,7 +5061,7 @@ function pageAyarlar(){
       <div class="ctl" style="min-width:340px"><input value="${esc(sh.webhook)}" placeholder="https://script.google.com/macros/s/…/exec" onchange="setAyar('sheets.webhook',this.value);renderNav()"></div></div>
     <div class="setrow"><div><div class="sl">Açılışta otomatik çek</div><div class="sd">Panel her açıldığında CSV bağlantılarından yeni kayıtları alır.</div></div>
       <div class="ctl" style="min-width:auto"><label class="switch"><input type="checkbox" ${sh.autoPull?'checked':''} onchange="setAyar('sheets.autoPull',this.checked)"><i></i></label></div></div>
-    <div class="setrow"><div><div class="sl">Değişiklikleri Sheets'e otomatik yaz</div><div class="sd">Panelde veya AI ile bir ödeme "ÖDENDİ" yapıldığında, webhook üzerinden ilgili yıl sayfasındaki Aidat Durumu ve Ödeme Tarihi hücreleri aynı formatta güncellenir. Webhook kurulumu gerektirir.</div></div>
+    <div class="setrow"><div><div class="sl">Değişiklikleri Sheets'e otomatik yaz</div><div class="sd">Panelde veya asistanla bir aidatın durumu değiştiğinde yalnızca o kayıt webhook ile Excel'e gönderilir; üye listesindeki Aidat Durumu ve Ödeme Tarihi hücreleri aynı renkle güncellenir. Excel'den gelen değişiklikler geri gönderilmez. Webhook kurulumu gerektirir.</div></div>
       <div class="ctl" style="min-width:auto"><label class="switch"><input type="checkbox" ${sh.autoPush?'checked':''} onchange="setAyar('sheets.autoPush',this.checked)"><i></i></label></div></div>
     <div class="actions" style="margin:14px 0 6px">
       <button class="btn primary" onclick="sheetsPull(true)">⟳ Şimdi Çek</button>
@@ -5080,44 +5093,157 @@ function pageAyarlar(){
   }));
 }</div>
     <button class="btn sm" style="margin-top:6px" onclick="copyCode('gs1')">📋 Kopyala</button>
-    <p class="muted" style="margin-top:16px"><b>2) Panel → Sheet webhook: "Sheets'e Gönder" düğmesi için.</b> Apps Script'e yapıştırıp Dağıt → Web uygulaması (erişim: bağlantıya sahip herkes) deyin; çıkan /exec adresini yukarıdaki alana yazın.</p>
-    <div class="code" id="gs2">function doPost(e){
-  const d=JSON.parse(e.postData.contents);
-  const ss=SpreadsheetApp.getActive();
-  const sade=t=>String(t||'').trim().toLowerCase();
-  // 1) Otomatik güncelleme: yıl sayfalarında (ör. "2026") Aidat Durumu ve Ödeme Tarihi hücreleri
-  if(d.mod==='durum'){
-    let n=0;
-    (d.odemeler||[]).forEach(o=>{
-      const sh=ss.getSheetByName(String(o.yil)); if(!sh) return;
-      const v=sh.getDataRange().getValues(); if(!v.length) return;
-      const h=v[0].map(sade);
-      const ad=h.findIndex(x=>x==='ad soyad'||x==='isim'||x==='adı - soyadı'||x==='ad');
-      const du=h.findIndex(x=>x==='aidat durumu'||x==='durum');
-      const tr=h.findIndex(x=>x==='ödeme tarihi');
-      if(ad===-1||du===-1) return;
-      for(let i=1;i!==v.length;i++){
-        if(sade(v[i][ad])!==sade(o.ad)) continue;
-        sh.getRange(i+1,du+1).setValue(o.durum);
-        if(tr!==-1&&o.tarih) sh.getRange(i+1,tr+1).setValue(o.tarih);
-        n++; break;
-      }
-    });
-    return ContentService.createTextOutput(JSON.stringify({ok:true,guncellenen:n})).setMimeType(ContentService.MimeType.JSON);
+    <p class="muted" style="margin-top:16px"><b>2) Panel → Excel aidat yazıcı (webhook).</b> Panelde bir aidatın durumu değişince yalnızca o kayıt Excel'e yazılır (Aidat Durumu ve Ödeme Tarihi). Üye tablosuna bağlı Apps Script projesine yapıştırıp Dağıt → Web uygulaması (erişim: bağlantıya sahip herkes) deyin; çıkan /exec adresini yukarıdaki alana yazın. Var olan dağıtımı güncellerken Dağıtımları yönet → Düzenle → Yeni sürüm seçin, adres değişmez.</p>
+    <div class="code" id="gs2">/**
+ * FOYDER OS → Excel aidat yazıcı (webhook)
+ * Sürüm: 2.0.0
+ *
+ * Ne yapar:
+ * - Panelde bir aidatın durumu değişince panel yalnızca o kaydı buraya gönderir.
+ * - Bu kod, kaydı panelin okuduğu sayfada (2026 için "ÜYE LİSTESİ") bulur ve
+ *   yalnızca "Aidat Durumu" ile "Ödeme Tarihi" hücrelerini yazar.
+ *
+ * Güvenlik:
+ * - Satır silmez, sayfa eklemez, başka hücreye dokunmaz.
+ * - Formül içeren hücrenin üzerine yazmaz.
+ * - "Ödenmedi" geldiğinde boş hücreye bir şey yazmaz; yalnızca yanlış duran
+ *   "ÖDENDİ"/"KISMİ" değerini temizler (Excel'de boş = ödenmedi).
+ * - Kişi önce defter numarasıyla, yoksa ad soyadla (Türkçe harf farkı gözetmeden) bulunur.
+ *
+ * Kurulum: Bu dosya "ÜYE AİDAT REFERANS LİSTELERİ" tablosuna bağlı projeye yapıştırılır,
+ * Dağıt → Dağıtımları yönet → Düzenle → Yeni sürüm → Dağıt (adres değişmez).
+ */
+
+var AYAR = {
+  // Yıl → sayfa kimliği (gid). Panelin "Yıl Sayfaları" ayarındaki bağlantıyla aynı sayfa.
+  SAYFA_GID: { 2026: 128020835 },
+  AD: ['Ad Soyad', 'İsim', 'ADI - SOYADI', 'Üye Adı Soyadı / Kurum', 'Ad'],
+  DURUM: ['Aidat Durumu', 'Durum', 'ÖDEME BİLGİSİ'],
+  TARIH: ['Ödeme Tarihi'],
+  NO: ['Defter No', 'Defter Numarası', 'Üye No', 'Üye Numarası'],
+  TARIH_BICIMI: 'dd.MM.yyyy'
+};
+
+function doPost(e) {
+  var d;
+  try { d = JSON.parse(e.postData.contents); } catch (err) { return json_({ ok: false, hata: 'hatalı istek' }); }
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Salt okunur deneme: hangi sayfaya ve hangi sütunlara yazılacağını söyler.
+  if (d.mod === 'test') {
+    var y = Number(d.yil) || new Date().getFullYear();
+    var t = sayfaBul_(ss, y);
+    if (!t) return json_({ ok: false, hata: y + ' için sayfa bulunamadı' });
+    return json_({ ok: true, sayfa: t.sh.getName(), baslikSatiri: t.basSatir + 1, satir: t.vals.length - t.basSatir - 1,
+      kolonlar: { ad: t.ad &gt;= 0, durum: t.dur &gt;= 0, tarih: t.tar &gt;= 0, no: t.no &gt;= 0 } });
   }
-  // 2) "Sheets'e Gönder": tüm listeleri ayrı sayfalara yazar (başlıklar panelden gelir)
-  const yaz=(ad,satirlar)=>{
-    if(!satirlar||!satirlar.length) return;
-    const sh=ss.getSheetByName(ad)||ss.insertSheet(ad);
-    const bas=Object.keys(satirlar[0]);
-    sh.clearContents();
-    sh.getRange(1,1,1,bas.length).setValues([bas]);
-    sh.getRange(2,1,satirlar.length,bas.length).setValues(satirlar.map(r=>bas.map(k=>r[k]==null?'':r[k])));
-  };
-  yaz('Uyeler',d.uyeler||d.members);
-  yaz('Odemeler',d.odemeler||d.payments);
-  yaz('Basvurular',d.basvurular);
-  return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
+
+  if (d.mod !== 'durum') return json_({ ok: false, hata: 'Bu webhook yalnızca aidat durumunu yazar.' });
+
+  var kilit = LockService.getScriptLock();
+  kilit.waitLock(20000);
+  try {
+    var onbellek = {}, n = 0, bulunamayan = [], atlanan = [];
+    (d.odemeler || []).forEach(function (o) {
+      var yil = Number(o.yil);
+      if (!(yil in onbellek)) onbellek[yil] = sayfaBul_(ss, yil);
+      var t = onbellek[yil];
+      if (!t || t.dur &lt; 0 || (t.ad &lt; 0 &amp;&amp; t.no &lt; 0)) { bulunamayan.push(o.ad + ' (' + yil + ' sayfası yok)'); return; }
+      var i = satirBul_(t, o);
+      if (i &lt; 0) { bulunamayan.push(o.ad); return; }
+      var r = i + 1;
+      var hDur = t.sh.getRange(r, t.dur + 1);
+      if (hDur.getFormula()) { atlanan.push(o.ad + ' (formül)'); return; }
+      var mevcut = sade_(t.vals[i][t.dur]);
+      var yeni = sade_(o.durum);
+      var degisti = false;
+
+      if (yeni === 'ODENMEDI') {
+        if (mevcut === 'ODENDI' || mevcut === 'KISMI') {
+          hDur.clearContent(); bicimKopyala_(t, t.dur, '', hDur); t.vals[i][t.dur] = '';
+          if (t.tar &gt;= 0 &amp;&amp; !t.sh.getRange(r, t.tar + 1).getFormula()) { t.sh.getRange(r, t.tar + 1).clearContent(); t.vals[i][t.tar] = ''; }
+          degisti = true;
+        }
+      } else if (yeni &amp;&amp; mevcut !== yeni) {
+        var yazi = { ODENDI: 'ÖDENDİ', KISMI: 'KISMİ', MUAF: 'MUAF' }[yeni] || String(o.durum);
+        hDur.setValue(yazi); bicimKopyala_(t, t.dur, yeni, hDur); t.vals[i][t.dur] = yazi;
+        degisti = true;
+      }
+
+      if (yeni !== 'ODENMEDI' &amp;&amp; t.tar &gt;= 0 &amp;&amp; o.tarih) {
+        var hTar = t.sh.getRange(r, t.tar + 1);
+        var tarih = tarihOku_(o.tarih);
+        if (tarih &amp;&amp; !hTar.getFormula() &amp;&amp; (degisti || !String(t.vals[i][t.tar]).trim())) {
+          hTar.setValue(tarih).setNumberFormat(AYAR.TARIH_BICIMI); t.vals[i][t.tar] = tarih; degisti = true;
+        }
+      }
+      if (degisti) n++;
+    });
+    return json_({ ok: true, guncellenen: n, bulunamayan: bulunamayan, atlanan: atlanan });
+  } finally {
+    kilit.releaseLock();
+  }
+}
+
+function sayfaBul_(ss, yil) {
+  var sh = null, gid = AYAR.SAYFA_GID[yil];
+  if (gid != null) ss.getSheets().forEach(function (s) { if (s.getSheetId() === gid) sh = s; });
+  if (!sh) sh = ss.getSheetByName(String(yil));
+  if (!sh) return null;
+  var vals = sh.getDataRange().getValues();
+  for (var b = 0; b &lt; Math.min(6, vals.length); b++) {
+    var bas = vals[b].map(function (x) { return String(x).trim(); });
+    var ad = kolon_(bas, AYAR.AD), dur = kolon_(bas, AYAR.DURUM);
+    if (dur &gt;= 0 &amp;&amp; ad &gt;= 0) return { sh: sh, vals: vals, basSatir: b, ad: ad, dur: dur, tar: kolon_(bas, AYAR.TARIH), no: kolon_(bas, AYAR.NO) };
+  }
+  return null;
+}
+
+function satirBul_(t, o) {
+  var no = String(o.defterNo || '').replace(/\\D/g, '');
+  if (no &amp;&amp; t.no &gt;= 0) {
+    for (var i = t.basSatir + 1; i &lt; t.vals.length; i++) if (String(t.vals[i][t.no]).replace(/\\D/g, '') === no) return i;
+  }
+  var hedef = norm_(o.ad), bulunan = -1;
+  for (var j = t.basSatir + 1; j &lt; t.vals.length; j++) {
+    if (norm_(t.vals[j][t.ad]) === hedef) { if (bulunan &gt;= 0) return -1; bulunan = j; } // aynı adla iki satır: yazma
+  }
+  return bulunan;
+}
+
+// Yeni hücreye, aynı sütunda aynı değeri taşıyan başka bir hücrenin biçimini (renk, yazı) uygular.
+function bicimKopyala_(t, kol, deger, hedef) {
+  for (var i = t.basSatir + 1; i &lt; t.vals.length; i++) {
+    if (i + 1 === hedef.getRow()) continue;
+    if (sade_(t.vals[i][kol]) === deger) { t.sh.getRange(i + 1, kol + 1).copyTo(hedef, { formatOnly: true }); return; }
+  }
+}
+
+function kolon_(bas, adlar) {
+  for (var i = 0; i &lt; adlar.length; i++) {
+    for (var k = 0; k &lt; bas.length; k++) if (bas[k].toLowerCase() === adlar[i].toLowerCase()) return k;
+  }
+  return -1;
+}
+
+function tarihOku_(s) {
+  var m = String(s).match(/^(\\d{4})-(\\d{2})-(\\d{2})/);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+}
+
+function sade_(s) {
+  return norm_(s).toUpperCase().replace(/\\s+/g, '');
+}
+
+function norm_(s) {
+  s = String(s || '').toLowerCase();
+  var map = { 'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u', 'â': 'a', 'î': 'i', 'û': 'u' };
+  s = s.replace(/[çğıöşüâîû]/g, function (c) { return map[c]; });
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\\s+/g, ' ').trim();
+}
+
+function json_(o) {
+  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }</div>
     <button class="btn sm" style="margin-top:6px" onclick="copyCode('gs2')">📋 Kopyala</button>`;
   }
