@@ -228,6 +228,22 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 6000 }).then
   const sb = st.basvurular.find(b => b.ad === 'Sheets Aday');
   ok(sb && sb.email === 'sheets@ornek.org' && sb.gorev === 'Mühendis' && sb.basvuruTarihi === `${Y}-10-05`, 'Sheets: Gmail kodunun yazdığı küçük harfli başvuru sayfası okundu');
 
+  /* 15b) Excel'de Aidat Durumu boş, panelde ödendi: sessizce korunmuyor, sorulup Excel'e göre düzeltiliyor */
+  await page.unroute(/docs\.google\.com\/yil/);
+  await page.route(/docs\.google\.com\/yil/, r => r.fulfill({ contentType: 'text/csv', body: `Sıra,Ad Soyad,Aidat Tutarı,Aidat Durumu,Ödeme Tarihi\n1,Deneme Üye İki,6.500,,\n2,Deneme Üye Dört,6.500,,\n3,Deneme Üye Üç,6.500,,\n` }));
+  await page.evaluate(() => { S.ayarlar.sheets.csvBasvurular = ''; return sheetsPull(true); });
+  await page.waitForSelector('#cel_1', { timeout: 3000 }).catch(() => {});
+  const celAd = await page.evaluate(() => (window._celiski || []).map(x => member(S.payments.find(p => p.id === x.pid).uyeId).ad));
+  ok(celAd.length === 2 && celAd.includes('Deneme Üye İki') && celAd.includes('Deneme Üye Dört'), `Sheets: Excel'de boş ama panelde ödendi olan 2 aidat soruldu (${celAd.join(', ')})`);
+  await page.evaluate(() => { const i = window._celiski.findIndex(x => member(S.payments.find(p => p.id === x.pid).uyeId).ad === 'Deneme Üye Dört'); document.getElementById('cel_' + i).checked = false; celiskiUygula(); });
+  st = await S(page);
+  const c2 = st.payments.find(p => p.uyeId === 'M002' && Number(p.yil) === Y), c4 = st.payments.find(p => p.uyeId === 'M004' && Number(p.yil) === Y);
+  ok(c2.durum === 'ÖDENMEDİ' && c2.odenenTutar === 0 && !c2.odemeTarihi && (c2.gecmis || []).some(g => g.text.includes("Excel'de boş")), 'Sheets: işaretli kayıt Excel\'e göre ÖDENMEDİ yapıldı ve geçmişe yazıldı');
+  ok(c4.durum === 'ÖDENDİ', 'Sheets: işareti kaldırılan kayıt panelde ödendi olarak kaldı');
+  await page.evaluate(() => sheetsPull(true)); await sleep(900);
+  ok(await page.evaluate(() => !document.getElementById('cel_0')), 'Sheets: panelde bırakılan kayıt sonraki senkronda tekrar sorulmadı');
+  await page.evaluate(() => typeof closeModal === 'function' && closeModal());
+
   /* 16) Sheets'e gönderim sonucu doğru bildiriliyor */
   let cevapOk = false;
   await page.route(/script\.google\.com/, r => r.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(cevapOk ? { ok: true } : { error: 'TypeError: d.members is undefined' }) }));

@@ -1192,6 +1192,7 @@ function eslesmeUygula(){
   });
   window._esles=null; persist(); closeModal(); render();
   toast(`✓ ${n} satır uygulandı${atla?`, ${atla} satır atlandı`:''}`);
+  celiskiGoster(true);
 }
 function eslesmeKararUnut(){ if(!need('ayar')) return; S.ayarlar.eslesmeKararlari={}; persist(); render(); toast('Hatırlanan eşleştirme seçimleri silindi'); }
 function eslesmeSonuc(sonuc,kaynak,manual){
@@ -1199,6 +1200,31 @@ function eslesmeSonuc(sonuc,kaynak,manual){
   if(manual) setTimeout(()=>eslesmeSor(sonuc.bekleyen,kaynak),400);
   else { window._eslesBekleyen={sonuc,kaynak}; setTimeout(()=>toastAction(`⚠ ${sonuc.bekleyen.length} satır için eşleştirme seçimi bekleniyor`,'Seçimleri göster',()=>eslesmeSor(sonuc.bekleyen,kaynak)),2200); }
   return `, ${sonuc.bekleyen.length} satır seçiminizi bekliyor`;
+}
+/* Excel'de boş, panelde "ödendi" görünen aidatlar: Excel'e göre düzeltme onayı */
+let _sheetsCeliski=[];
+function celiskiGoster(manual){
+  const l=_sheetsCeliski.filter((x,i,a)=>a.findIndex(y=>y.pid===x.pid)===i&&S.payments.find(p=>p.id===x.pid));
+  _sheetsCeliski=[];
+  if(!l.length) return;
+  window._celiski=l;
+  const ac=()=>{ const s=l.map((x,i)=>{ const p=S.payments.find(y=>y.id===x.pid), m=member(p.uyeId)||{};
+      return `<label class="esles-s" style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="cel_${i}" checked style="margin-top:4px"><div><b>${esc(m.ad||'?')}</b> · ${esc(p.yil)} aidatı<div class="muted esles-n">Panelde: ${esc(p.durum)}${p.odemeTarihi?' ('+esc(dfmt(p.odemeTarihi))+')':''} · Excel'de: boş</div></div></label>`; }).join('');
+    modal('Excel ile panel uyuşmuyor',`<p style="margin:0 0 10px">Aşağıdaki <b>${l.length} aidat</b> panelde ödenmiş görünüyor ama Excel'de Aidat Durumu boş. İşaretli olanlar Excel'e göre <b>ÖDENMEDİ</b> yapılacak. Ödemeyi panelden girdiğiniz ve Excel'e henüz yazılmamış kayıtların işaretini kaldırın; onlar panelde kalır ve bir daha sorulmaz (Excel'e değer girilince takip yeniden başlar).</p><div class="esles-l">${s}</div>`,
+      `<button class="btn primary" onclick="celiskiUygula()">Uygula</button>`,true); };
+  if(manual) setTimeout(ac,500);
+  else setTimeout(()=>toastAction(`⚠ ${l.length} aidat Excel'de boş ama panelde ödendi görünüyor`,'İncele',ac),2600);
+}
+function celiskiUygula(){
+  const l=window._celiski; if(!l){ closeModal(); return; }
+  if(!need('aidat')) return;
+  const birak=S.ayarlar.celiskiBirak=S.ayarlar.celiskiBirak||{};
+  let n=0,k=0;
+  l.forEach((x,i)=>{ const p=S.payments.find(y=>y.id===x.pid); if(!p) return;
+    if(document.getElementById('cel_'+i)?.checked){ const once=kopya(p); p.durum='ÖDENMEDİ'; p.odenenTutar=0; p.odemeTarihi=null; farkYaz(p,once,'odeme',x.kaynak+' (Excel\'de boş)'); delete birak[p.id]; n++; }
+    else { birak[p.id]=true; k++; } });
+  window._celiski=null; persist(); closeModal(); render();
+  toast(`✓ ${n} aidat Excel'e göre ÖDENMEDİ yapıldı${k?`, ${k} kayıt panelde bırakıldı`:''}`);
 }
 async function sheetsPull(manual){
   if(!can('ayar')){ if(manual) toast('🔒 Google Sheets senkronunu yalnızca yönetici başlatabilir'); return; }
@@ -1212,7 +1238,13 @@ async function sheetsPull(manual){
     let p=S.payments.find(x=>String(x.uyeId)===String(m.id)&&Number(x.yil)===yil&&isAidatTip(x));
     const once=p?kopya(p):null;
     if(!p){ p={id:nid('p'),uyeId:m.id,yil,tip:'AIDAT',tutar:null,durum:'ÖDENMEDİ',odenenTutar:0,odemeTarihi:null,not:'Sheets'}; S.payments.push(p); nP++; }
-    const durum=normDurum(cval(r,kolon.durum),p.durum);
+    const hamDurum=cval(r,kolon.durum);
+    const bos=!hamDurum||/^[\s\-–—.]*$/.test(hamDurum);
+    // Excel'de ödeme bilgisi boş ama panelde ödendi/kısmi: sessizce korunmaz, kullanıcıya sorulur (Excel esas).
+    const birak=S.ayarlar.celiskiBirak=S.ayarlar.celiskiBirak||{};
+    if(bos&&once&&['ÖDENDİ','KISMİ'].includes(p.durum)&&!birak[p.id]) _sheetsCeliski.push({pid:p.id,kaynak:kolon.ad||'Google Sheets'});
+    if(!bos&&birak[p.id]) delete birak[p.id];
+    const durum=normDurum(bos?'':hamDurum,p.durum);
     const tutar=parseTutar(cval(r,kolon.tutar))??p.tutar;
     const trh=parseTarih(cval(r,['Ödeme Tarihi']));
     Object.assign(p,{tutar,durum,odemeTarihi:trh||p.odemeTarihi,odenenTutar:durum==='ÖDENDİ'?(tutar||0):p.odenenTutar});
@@ -1267,6 +1299,7 @@ async function sheetsPull(manual){
     persist(); render();
     document.getElementById('syncDot').classList.remove('off');
     const ek=eslesmeSonuc(sonuc,'Google Sheets verisi',manual);
+    if(!sonuc.bekleyen.length) celiskiGoster(manual);
     toast(`✓ Senkron tamam: ${nU} yeni üye, ${uU} güncelleme, ${nP} ödeme, ${nB} başvuru${nS?`, ${nS} sıra no`:''}${sonuc.hatir?`, ${sonuc.hatir} satır hatırlanan seçiminizle`:''}${ek}`);
     if(S.ayarlar.sheets.yilCsv&&!nS&&!sonuc.bekleyen.length) setTimeout(()=>toast('⚠ Sıra kolonu okunamadı — Sheets birkaç dakika önbellekte eski kalabilir, biraz sonra tekrar Senkron deneyin'),1600);
     const _g={}; S.members.forEach(m=>{ const k=trNorm(m.ad); _g[k]=(_g[k]||0)+1; });
