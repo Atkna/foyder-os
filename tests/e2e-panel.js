@@ -468,6 +468,15 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 6000 }).then
       ok(k && k.thead === 'none' && k.tr === 'grid' && k.w > 300 && k.once.includes(etiket), `telefon: ${r} tablosu kart görünümünde (${JSON.stringify(k)})`);
       await page.screenshot({ path: path.join(OUT, `telefon-${r}-kart.png`) });
     }
+    // Telefonda arama: harf yazarken arama kutusu yerinde kalır, odak kaybolmaz (klavye kapanıp açılmaz)
+    for (const [r, id, yaz, beklenen] of [['aidat', 'aqInput', 'Bir', '1 kayıt'], ['kararlar', 'kqInput', 'Bir', '1 karar']]) {
+      await page.evaluate(r => { fA.yil = THIS_YEAR; fA.tip = 'AIDAT'; fA.q = ''; fK.q = ''; go(r); }, r);
+      await page.evaluate(id => { window.__odakKaybi = 0; window.__kutu = document.getElementById(id); window.__kutu.addEventListener('blur', () => window.__odakKaybi++); }, id);
+      await page.tap('#' + id); await page.keyboard.type(yaz, { delay: 40 }); await sleep(150);
+      const a = await page.evaluate(id => ({ ayni: document.getElementById(id) === window.__kutu, odak: document.activeElement === window.__kutu, kayip: window.__odakKaybi, deger: window.__kutu.value, sayi: document.querySelector('#main .count').textContent, satir: document.querySelectorAll('#main tbody tr').length }), id);
+      ok(a.ayni && a.odak && a.kayip === 0 && a.deger === yaz && a.sayi === beklenen && a.satir === 1, `telefon: ${r} aramasında yazarken klavye kapanmıyor, liste süzülüyor (${JSON.stringify(a)})`);
+      await page.evaluate(() => { fA.q = ''; fK.q = ''; });
+    }
     // Telefonda gezinme: alt çubuk ve açılır menü
     ok(await page.isVisible('#altbar') && !(await page.isVisible('.sidebar .nav button >> nth=0').then(v => v && page.evaluate(() => document.querySelector('.sidebar').getBoundingClientRect().right > 0))), 'telefon: alt gezinme çubuğu görünüyor, yan menü kapalı');
     await page.click('#altbar button:has-text("Üyeler")');
