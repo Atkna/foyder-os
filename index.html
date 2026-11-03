@@ -1538,7 +1538,6 @@ function memberTable(list){
       <td class="kt-islem" onclick="event.stopPropagation()">${can('uye')?`<button class="btn sm ghost" onclick="editMember('${m.id}')">Düzenle</button>`:''}</td></tr>`;}).join('')}
   </tbody></table>`;
 }
-function renderKF(id){ render(); requestAnimationFrame(()=>{ const el=document.getElementById(id); if(el){ el.focus(); try{ const v=el.value; el.setSelectionRange(v.length,v.length); }catch(e){} } }); }
 function rerenderBody(){ const el=document.getElementById('tblBody'); const l=filteredMembers(); if(el) el.innerHTML=memberTable(l); const c=document.getElementById('uCount'); if(c) c.textContent=l.length+' kayıt'; }
 
 function openMember(id){
@@ -1708,40 +1707,57 @@ function saveMember(id){
    AİDAT & ÖDEMELER
 ================================================================ */
 let fA={yil:THIS_YEAR,durum:'',q:'',tip:'AIDAT'};
-function pageAidat(){
-  const ys=years();
-  const list=S.payments.filter(p=>Number(p.yil)===+fA.yil&&tipKey(p)===fA.tip&&(!fA.durum||p.durum===fA.durum)&&
+// Aidat listesi ve üstündeki özet kartları; arama kutusuna yazarken yalnızca bu iki parça yenilenir
+// (sayfanın tamamı yeniden çizilirse arama kutusu da silinip oluşturulur ve telefonda klavye kapanıp açılır).
+function aidatListesi(){
+  return S.payments.filter(p=>Number(p.yil)===+fA.yil&&tipKey(p)===fA.tip&&(!fA.durum||p.durum===fA.durum)&&
     (!fA.q||trNorm(member(p.uyeId)?.ad||'').includes(trNorm(fA.q))))
     .sort((a,b)=>byName(member(a.uyeId)||{ad:''},member(b.uyeId)||{ad:''}));
+}
+function aidatOzetHTML(list){
   const tplan=list.reduce((s,p)=>s+(p.durum!=='MUAF'?(p.tutar||0):0),0);
   const ttah=list.reduce((s,p)=>s+(p.durum==='ÖDENDİ'?(p.tutar||0):(p.durum==='KISMİ'?(p.odenenTutar||0):0)),0);
   return `
-  <div class="pagehead"><div><h2>Aidat &amp; Ödeme Takibi</h2><div class="sub">Yıllık aidat ve giriş ödentileri · komut çubuğuna "X ödemesini yaptı" yazmanız yeterli</div></div>
-  <div class="actions">
-    ${can('aidat')?`<button class="btn gold" onclick="yilBorcuOlustur()">⚡ Yıl Borcu Oluştur</button><button class="btn primary" onclick="editPayment()">+ Ödeme Kaydı</button>`:''}
-    <button class="btn" onclick="exportPaymentsXlsx()">⬇ Excel</button></div></div>
-  ${can('aidat')?'':'<div class="role-note">🔒 Mevcut rolünüz ödeme kayıtlarını yalnızca görüntüleyebilir.</div>'}
   <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(195px,1fr))">
     <div class="kpi" title="Aşağıdaki listede (seçili yıl, tür ve filtrelerle) muaf olmayan kayıtların toplam tutarı. Pasif üyelerin kayıtları da listedeyse dahildir."><div class="l">${fA.yil} Planlanan ${ipucuHTML()}</div><div class="v" style="font-size:19px">${fmt(tplan)}</div></div>
     <div class="kpi" title="Listedeki kayıtlardan tahsil edilen tutar: tam ödemeler + kısmi ödemelerin ödenen kısmı."><div class="l">Tahsil Edilen ${ipucuHTML()}</div><div class="v" style="font-size:19px;color:var(--green)">${fmt(ttah)}</div></div>
     <div class="kpi" title="Planlanan eksi tahsil edilen. Listedeki tüm kayıtları kapsar; ana sayfadaki &quot;Bekleyen Aidat&quot; ise yalnızca aktif üyeleri sayar."><div class="l">Bekleyen ${ipucuHTML()}</div><div class="v" style="font-size:19px;color:var(--amber)">${fmt(tplan-ttah)}</div></div>
     <div class="kpi" title="Listede durumu Ödenmedi veya Kısmi olan kayıt sayısı."><div class="l">Açık Kayıt ${ipucuHTML()}</div><div class="v" style="color:var(--red)">${list.filter(p=>['ÖDENMEDİ','KISMİ'].includes(p.durum)).length}</div></div>
-  </div>
-  <div class="card"><div class="filters">
-    <select onchange="fA.yil=this.value;render()">${ys.map(y=>`<option ${+fA.yil===y?'selected':''}>${y}</option>`).join('')}</select>
-    <select onchange="fA.tip=this.value;render()"><option value="AIDAT" ${fA.tip==='AIDAT'?'selected':''}>Yıllık Aidat</option><option value="GİRİŞ" ${fA.tip==='GİRİŞ'?'selected':''}>Giriş Ödentisi</option></select>
-    <select onchange="fA.durum=this.value;render()"><option value="">Durum: Tümü</option>${['ÖDENDİ','ÖDENMEDİ','KISMİ','MUAF'].map(d=>`<option ${fA.durum===d?'selected':''}>${d}</option>`).join('')}</select>
-    <input type="search" id="aqInput" placeholder="Üye ara…" value="${esc(fA.q)}" oninput="fA.q=this.value;renderKF('aqInput')">
-    <span class="count">${list.length} kayıt</span>
-  </div><div class="card-b np tbl-wrap">
+  </div>`;
+}
+function aidatTabloHTML(list){
+  return `
   ${list.length?`<table class="kart-tablo"><thead><tr><th>Üye</th><th>Tür</th><th class="num">Tutar</th><th class="num">Kalan</th><th>Durum</th><th>Tarih</th><th></th></tr></thead><tbody>
   ${list.map(p=>{const m=member(p.uyeId);return `<tr>
     <td class="clickable kt-bas" data-label="Üye" onclick="openMember('${p.uyeId}')"><div class="name-cell"><span class="avatar">${initials(m?.ad||'?')}</span><span class="nm">${esc(m?.ad||'?')}</span></div></td>
     <td data-label="Üyelik türü">${esc(m?.uyelikTuru||'—')}</td><td class="num" data-label="Tutar">${fmt(p.tutar)}</td><td class="num" data-label="Kalan">${fmt(kalan(p))}</td>
     <td data-label="Durum"><span class="tag ${payTag(p.durum)}">${esc(p.durum)}</span></td><td data-label="Ödeme tarihi">${dfmt(p.odemeTarihi)}</td>
     <td class="kt-islem">${can('aidat')?`${!['ÖDENDİ','MUAF'].includes(p.durum)?`<button class="btn sm" onclick="quickPaid('${p.id}')">✓ Ödendi</button>`:''}${makbuzVar(p)?`<button class="btn sm ghost" onclick="makbuz('${p.id}')" title="Ödeme makbuzu (PDF)">🧾 Makbuz</button>`:''} <button class="btn sm ghost" onclick="editPayment('${p.id}')">Düzenle</button>`:''}</td>
-  </tr>`}).join('')}</tbody></table>`:'<div class="empty">Bu filtrede kayıt yok. "⚡ Yıl Borcu Oluştur" ile tüm aktif üyelere tek seferde borç yazabilirsiniz.</div>'}
-  </div></div>`;
+  </tr>`}).join('')}</tbody></table>`:'<div class="empty">Bu filtrede kayıt yok. "⚡ Yıl Borcu Oluştur" ile tüm aktif üyelere tek seferde borç yazabilirsiniz.</div>'}`;
+}
+function aidatAra(q){
+  fA.q=q; const list=aidatListesi();
+  const oz=document.getElementById('aidatOzet'), tb=document.getElementById('aidatTablo'), c=document.getElementById('aCount');
+  if(!oz||!tb){ render(); return; }
+  oz.innerHTML=aidatOzetHTML(list); tb.innerHTML=aidatTabloHTML(list); if(c) c.textContent=list.length+' kayıt';
+}
+function pageAidat(){
+  const ys=years();
+  const list=aidatListesi();
+  return `
+  <div class="pagehead"><div><h2>Aidat &amp; Ödeme Takibi</h2><div class="sub">Yıllık aidat ve giriş ödentileri · komut çubuğuna "X ödemesini yaptı" yazmanız yeterli</div></div>
+  <div class="actions">
+    ${can('aidat')?`<button class="btn gold" onclick="yilBorcuOlustur()">⚡ Yıl Borcu Oluştur</button><button class="btn primary" onclick="editPayment()">+ Ödeme Kaydı</button>`:''}
+    <button class="btn" onclick="exportPaymentsXlsx()">⬇ Excel</button></div></div>
+  ${can('aidat')?'':'<div class="role-note">🔒 Mevcut rolünüz ödeme kayıtlarını yalnızca görüntüleyebilir.</div>'}
+  <div id="aidatOzet">${aidatOzetHTML(list)}</div>
+  <div class="card"><div class="filters">
+    <select onchange="fA.yil=this.value;render()">${ys.map(y=>`<option ${+fA.yil===y?'selected':''}>${y}</option>`).join('')}</select>
+    <select onchange="fA.tip=this.value;render()"><option value="AIDAT" ${fA.tip==='AIDAT'?'selected':''}>Yıllık Aidat</option><option value="GİRİŞ" ${fA.tip==='GİRİŞ'?'selected':''}>Giriş Ödentisi</option></select>
+    <select onchange="fA.durum=this.value;render()"><option value="">Durum: Tümü</option>${['ÖDENDİ','ÖDENMEDİ','KISMİ','MUAF'].map(d=>`<option ${fA.durum===d?'selected':''}>${d}</option>`).join('')}</select>
+    <input type="search" id="aqInput" placeholder="Üye ara…" value="${esc(fA.q)}" oninput="aidatAra(this.value)">
+    <span class="count" id="aCount">${list.length} kayıt</span>
+  </div><div class="card-b np tbl-wrap" id="aidatTablo">${aidatTabloHTML(list)}  </div></div>`;
 }
 function quickPaid(pid){ if(!need('aidat')) return; const p=S.payments.find(x=>x.id===pid); if(!p) return goneToast(); const once=kopya(p); p.durum='ÖDENDİ'; p.odenenTutar=p.tutar; p.odemeTarihi=TODAY; farkYaz(p,once,'odeme','Hızlı "Ödendi"'); persist(); render(); toast('✓ Ödendi işaretlendi'); }
 function editPayment(pid){
@@ -1946,7 +1962,7 @@ function pageBasvurular(){
   ${gorunen.map(blok).join('')||'<div class="empty">Bu filtrede başvuru yok.</div>'}
   ${gizli.length?`<button class="btn ghost sm" style="margin:4px 0 14px" onclick="fB.eski=!fB.eski;render()">${fB.eski?'Eski tamamlanan grupları gizle':`Eski tamamlanan grupları göster (${gizli.reduce((n,g)=>n+g.items.length,0)} kişi)`}</button>`:''}`
   :`<div class="card"><div class="card-b"><div class="empty">Henüz başvuru yok.${can('basvuru')?' Bir başvuru e-postası geldiğinde "✉ E-postadan Aktar" ile içeriği yapıştırın; bilgiler otomatik forma dönüşür.':''}</div></div></div>`}
-  ${url?'':`<div class="banner blue">⚙ Tam otomasyon: Gmail'deki başvuruların, onay maillerinin, aday cevaplarının ve hoş geldiniz maillerinin buraya kendiliğinden gelmesi için "FOYDER Üyelik Başvuru" tablosundaki <b>Panel Akışı</b> sayfasını CSV olarak yayınlayıp bağlantısını Ayarlar → Entegrasyonlar → <b>Başvurular CSV bağlantısı</b> alanına yapıştırın.</div>`}`;
+  ${url?'':`<div class="banner blue"><span>⚙ Tam otomasyon: Gmail'deki başvuruların, onay maillerinin, aday cevaplarının ve hoş geldiniz maillerinin buraya kendiliğinden gelmesi için "FOYDER Üyelik Başvuru" tablosundaki <b>Panel Akışı</b> sayfasını CSV olarak yayınlayıp bağlantısını Ayarlar → Entegrasyonlar → <b>Başvurular CSV bağlantısı</b> alanına yapıştırın.</span></div>`}`;
 }
 function emailParseModal(){
   modal('✉ E-postadan Başvuru Aktar',`
@@ -2044,19 +2060,25 @@ function onaylaBasvuru(id){
 ================================================================ */
 let fK={q:''};
 function pageKararlar(){
-  const list=S.kararlar.filter(k=>!fK.q||trNorm((k.uyeAdi||'')+' '+(k.konu||'')+' '+(k.no||'')).includes(trNorm(fK.q))).sort((a,b)=>(b.no||0)-(a.no||0));
+  const list=kararListesi();
   return `
   <div class="pagehead"><div><h2>Yönetim Kurulu Kararları</h2><div class="sub">Üyelik kabul kararları ve karar takibi</div></div>
   <div class="actions">${can('karar')?`<button class="btn primary" onclick="editKarar()">+ Yeni Karar</button>`:''}</div></div>
   <div class="card"><div class="filters">
-    <input type="search" id="kqInput" placeholder="Karar no, üye adı veya konu ara…" value="${esc(fK.q)}" oninput="fK.q=this.value;renderKF('kqInput')" style="min-width:300px">
-    <span class="count">${list.length} karar</span>
-  </div><div class="card-b np tbl-wrap">
-  ${list.length?`<table><thead><tr><th>No</th><th>Tarih</th><th>Konu</th><th>İlgili Üye / Şirket</th><th>Tür</th><th>Statü</th><th>Not</th>${can('karar')?'<th></th>':''}</tr></thead><tbody>
+    <input type="search" id="kqInput" placeholder="Karar no, üye adı veya konu ara…" value="${esc(fK.q)}" oninput="kararAra(this.value)" style="min-width:300px">
+    <span class="count" id="kCount">${list.length} karar</span>
+  </div><div class="card-b np tbl-wrap" id="kararTablo">${kararTabloHTML(list)}</div></div>`;
+}
+function kararListesi(){ return S.kararlar.filter(k=>!fK.q||trNorm((k.uyeAdi||'')+' '+(k.konu||'')+' '+(k.no||'')).includes(trNorm(fK.q))).sort((a,b)=>(b.no||0)-(a.no||0)); }
+// Arama yazılırken yalnızca liste yenilenir; arama kutusu yerinde kalır (telefonda klavye kapanmaz).
+function kararAra(q){ fK.q=q; const list=kararListesi(), tb=document.getElementById('kararTablo'), c=document.getElementById('kCount');
+  if(!tb){ render(); return; } tb.innerHTML=kararTabloHTML(list); if(c) c.textContent=list.length+' karar'; }
+function kararTabloHTML(list){
+  return `${list.length?`<table><thead><tr><th>No</th><th>Tarih</th><th>Konu</th><th>İlgili Üye / Şirket</th><th>Tür</th><th>Statü</th><th>Not</th>${can('karar')?'<th></th>':''}</tr></thead><tbody>
   ${list.map(k=>`<tr><td class="num"><b>${esc(k.no??'—')}</b></td><td>${dfmt(k.tarih)}</td><td>${esc(k.konu||'—')}${HZ.relChip('karar',k.id)}</td><td>${esc(k.uyeAdi||'—')}</td>
   <td>${esc(k.uyelikTuru||'—')}</td><td>${k.durum?`<span class="tag ${k.durum==='AKTİF'?'t-green':(k.durum==='PASİF'?'t-gray':'t-amber')}">${esc(k.durum)}</span>`:'—'}</td>
   <td style="max-width:230px">${esc(k.not||'')}</td>${can('karar')?`<td><button class="btn sm ghost" onclick="editKarar('${k.id}')">Düzenle</button></td>`:''}</tr>`).join('')}
-  </tbody></table>`:'<div class="empty">Karar bulunamadı.</div>'}</div></div>`;
+  </tbody></table>`:'<div class="empty">Karar bulunamadı.</div>'}`;
 }
 function editKarar(id){
   const k=id?S.kararlar.find(x=>x.id===id):{no:Math.max(0,...S.kararlar.map(x=>x.no||0))+1,tarih:TODAY,konu:'Üyelik Kabulü',uyeAdi:'',uyelikTuru:'',durum:'AKTİF',not:''};
@@ -2719,6 +2741,10 @@ kbd{font-family:inherit;font-size:11.5px;font-weight:700;background:#F2F4F8;bord
   #chatInput{flex:1 1 100%}
   .card-b>div[style*="display:flex;gap:8px"] .btn{flex:1 1 auto;justify-content:center}
   .esles-s{grid-template-columns:1fr}
+
+  /* --- Başvurular: süreç adımları --- */
+  .bs-pill{font-size:12.5px}
+  .bs-steps li,.bs-d{font-size:12px}
 
   /* --- Toplantılar ve Görevler --- */
   .hz-kpis{display:flex;overflow-x:auto;scrollbar-width:none;gap:8px;margin:0 calc(-1 * var(--kenar)) 14px;padding:0 var(--kenar) 2px}
